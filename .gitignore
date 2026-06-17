@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+portal/.next/
+portal/out/
+portal/build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Docker volumes (runtime data)
+postgres-data/
+n8n-data/
+redis-data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# TypeScript
+*.tsbuildinfo
+
+# Adjuntos / archivos de clientes
+adjuntos/
+escala_mayo_2026.jpg

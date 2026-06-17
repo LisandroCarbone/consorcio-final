@@ -1,0 +1,104 @@
+{
+  "name": "Envío de Circular WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "circular",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook — recibir circular",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "notes": "POST /webhook/circular\nBody: { consorcio_id, mensaje, tipo }\nEl administrador llama esto desde el portal o Postman"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.mensaje }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            },
+            {
+              "leftValue": "={{ $json.body.consorcio_id }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "validate",
+      "name": "Validar payload",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://comms-agent:3002/send-circular",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-api-key", "value": "={{ $env.AGENT_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"consorcio_id\": {{ $json.body.consorcio_id }},\n  \"message\": {{ JSON.stringify($json.body.mensaje) }}\n}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "send-circular",
+      "name": "Enviar circular via comms-agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"enviados\": {{ $json.sent }},\n  \"fallidos\": {{ $json.failed }}\n}"
+      },
+      "id": "respond-ok",
+      "name": "Responder — éxito",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 400,
+        "responseBody": "{ \"error\": \"consorcio_id y mensaje son requeridos\" }"
+      },
+      "id": "respond-error",
+      "name": "Responder — error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 400]
+    }
+  ],
+  "connections": {
+    "Webhook — recibir circular": {
+      "main": [[{ "node": "Validar payload", "type": "main", "index": 0 }]]
+    },
+    "Validar payload": {
+      "main": [
+        [{ "node": "Enviar circular via comms-agent", "type": "main", "index": 0 }],
+        [{ "node": "Responder — error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Enviar circular via comms-agent": {
+      "main": [[{ "node": "Responder — éxito", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": ["whatsapp", "comunicacion", "circular"]
+}

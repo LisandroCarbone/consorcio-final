@@ -1,0 +1,18 @@
+export const FUNCIONES = [
+  'Encargado Permanente con vivienda',
+  'Encargado Permanente sin vivienda',
+  'Encargado No Permanente con vivienda',
+  'Encargado No Permanente Sin vivienda',
+  'Ayudante Permanente con vivienda',
+  'Ayudante Permanente sin vivienda',
+  'Ayudante Media jornada',
+  'Personal Asimilado Con vivienda',
+  'Personal Asimilado Sin vivienda',
+  'Mayordomo Con vivienda',
+  'Mayordomo Sin vivienda',
+  'Suplente con horario por dia',
+  'Personal Vigilancia Nocturna',
+  'Personal Vigilancia Diurna',
+  'Suplente eventual',
+  'Intendente',
+];
