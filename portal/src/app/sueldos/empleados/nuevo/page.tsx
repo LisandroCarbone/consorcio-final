@@ -3,9 +3,10 @@ export const dynamic = 'force-dynamic';
 import { pool } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { FUNCIONES } from "../constants";
+import { cookies } from "next/headers";
 
 async function getConsorcios() {
-  const { rows } = await pool.query("SELECT id, nombre FROM app.consorcios ORDER BY nombre");
+  const { rows } = await pool.query("SELECT cuit, nombre FROM app.consorcios ORDER BY nombre");
   return rows;
 }
 
@@ -16,33 +17,33 @@ async function crearEmpleado(formData: FormData) {
 
   if (!get('nombre')?.trim()) throw new Error("Nombre requerido");
   if (!get('cuil')?.trim()) throw new Error("CUIL requerido");
-  const consorcioId = Number(get('consorcio_id'));
-  if (!consorcioId || consorcioId <= 0) throw new Error("Consorcio inválido");
+  const consorcioCuit = get('consorcio_cuit');
+  if (!consorcioCuit) throw new Error("Consorcio inválido");
   if (!get('fecha_ingreso')) throw new Error("Fecha de ingreso requerida");
 
   try {
-   await pool.query(
-    `INSERT INTO app.empleados_edificio
-     (cuil, nombre, legajo, fecha_nacimiento, fecha_ingreso, consorcio_id,
-      obra_social, cod_obra_social, funcion, categoria_edificio, jornada,
-      tiene_vivienda, banco, cbu,
-      retiro_residuos, clasificacion_residuos,
-      plus_cocheras, plus_movimiento_coches, plus_jardin, plus_zona_desfavorable, plus_pileta,
-      tiene_titulo, adicional_voluntario, estado)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,'activo')`,
-    [
-      get('cuil'), get('nombre'), get('legajo') || null,
-      get('fecha_nacimiento') || null, get('fecha_ingreso') || null,
-      Number(get('consorcio_id')),
-      get('obra_social') || null, Number(get('cod_obra_social')) || null,
-      get('funcion'), Number(get('categoria_edificio')), get('jornada'),
-      bool('tiene_vivienda'), get('banco') || null, get('cbu') || null,
-      bool('retiro_residuos'), bool('clasificacion_residuos'),
-      bool('plus_cocheras'), bool('plus_movimiento_coches'),
-      bool('plus_jardin'), bool('plus_zona_desfavorable'), bool('plus_pileta'),
-      bool('tiene_titulo'), Number(get('adicional_voluntario')) || 0,
-    ]
-  );
+    await pool.query(
+      `INSERT INTO app.empleados
+       (cuil, nombre, legajo, fecha_nacimiento, fecha_ingreso, consorcio_cuit,
+        obra_social, cod_obra_social, funcion, categoria_edificio, jornada,
+        tiene_vivienda, banco, cbu,
+        retiro_residuos, clasificacion_residuos,
+        plus_cocheras, plus_movimiento_coches, plus_jardin, plus_zona_desfavorable, plus_pileta,
+        tiene_titulo, adicional_voluntario, estado)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,'activo')`,
+      [
+        get('cuil'), get('nombre'), get('legajo') || null,
+        get('fecha_nacimiento') || null, get('fecha_ingreso') || null,
+        consorcioCuit,
+        get('obra_social') || null, Number(get('cod_obra_social')) || null,
+        get('funcion'), Number(get('categoria_edificio')), get('jornada'),
+        bool('tiene_vivienda'), get('banco') || null, get('cbu') || null,
+        bool('retiro_residuos'), bool('clasificacion_residuos'),
+        bool('plus_cocheras'), bool('plus_movimiento_coches'),
+        bool('plus_jardin'), bool('plus_zona_desfavorable'), bool('plus_pileta'),
+        bool('tiene_titulo'), Number(get('adicional_voluntario')) || 0,
+      ]
+    );
   } catch (err: unknown) {
     const pg = err as { code?: string };
     if (pg.code === '23505') {
@@ -53,7 +54,6 @@ async function crearEmpleado(formData: FormData) {
   redirect('/sueldos/empleados');
 }
 
-
 export default async function NuevoEmpleadoPage({
   searchParams,
 }: {
@@ -61,6 +61,9 @@ export default async function NuevoEmpleadoPage({
 }) {
   const { error } = await searchParams;
   const consorcios = await getConsorcios();
+
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -107,12 +110,23 @@ export default async function NuevoEmpleadoPage({
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="label">Consorcio *</label>
-              <select name="consorcio_id" required className="input">
-                <option value="">— seleccionar —</option>
-                {consorcios.map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                ))}
-              </select>
+              {activeCuit ? (
+                <>
+                  <select disabled value={activeCuit} className="input bg-gray-50 cursor-not-allowed">
+                    {consorcios.map((c: any) => (
+                      <option key={c.cuit} value={c.cuit}>{c.nombre}</option>
+                    ))}
+                  </select>
+                  <input type="hidden" name="consorcio_cuit" value={activeCuit} />
+                </>
+              ) : (
+                <select name="consorcio_cuit" required className="input">
+                  <option value="">— seleccionar —</option>
+                  {consorcios.map((c: any) => (
+                    <option key={c.cuit} value={c.cuit}>{c.nombre}</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="col-span-2">
               <label className="label">Función *</label>

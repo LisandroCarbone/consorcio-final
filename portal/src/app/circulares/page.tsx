@@ -1,22 +1,37 @@
-export const dynamic = 'force-dynamic';
-
 import { query } from "@/lib/db";
 import { sendCircular } from "./actions";
+import { cookies } from "next/headers";
+import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 
 async function getConsorcios() {
-  return query<{ id: number; nombre: string; total_con_whatsapp: string }>(
-    `SELECT c.id, c.nombre,
+  return query<{ id: string; nombre: string; total_con_whatsapp: string }>(
+    `SELECT c.cuit AS id, c.nombre,
             COUNT(p.id) FILTER (WHERE p.whatsapp IS NOT NULL) AS total_con_whatsapp
-     FROM consorcios c
-     LEFT JOIN unidades u ON u.consorcio_id=c.id
-     LEFT JOIN ocupantes o ON o.unidad_id=u.id AND o.activo=true
-     LEFT JOIN personas p ON p.id=o.persona_id
-     GROUP BY c.id ORDER BY c.nombre`
+     FROM app.consorcios c
+     LEFT JOIN app.unidades u ON u.consorcio_cuit=c.cuit
+     LEFT JOIN app.ocupantes o ON o.unidad_id=u.id AND o.activo=true
+     LEFT JOIN app.personas p ON p.id=o.persona_id
+     GROUP BY c.cuit ORDER BY c.nombre`
   );
 }
 
 export default async function CircularesPage() {
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
   const consorcios = await getConsorcios();
+
+  if (!activeCuit) {
+    return (
+      <div className="max-w-3xl">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Circulares</h2>
+        <ConsorcioRequerido
+          consorcios={consorcios.map((c) => ({ cuit: c.id, nombre: c.nombre }))}
+          seccion="el envío de circulares"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl">
@@ -29,13 +44,14 @@ export default async function CircularesPage() {
         <form action={sendCircular} className="space-y-5">
           <div>
             <label className="label">Consorcio *</label>
-            <select name="consorcio_id" required className="input">
+            <select disabled value={activeCuit} className="input bg-gray-50 cursor-not-allowed">
               {consorcios.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre} ({c.total_con_whatsapp} con WhatsApp)
                 </option>
               ))}
             </select>
+            <input type="hidden" name="consorcio_id" value={activeCuit} />
           </div>
 
           <div>

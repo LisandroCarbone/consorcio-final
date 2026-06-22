@@ -6,14 +6,14 @@ import Link from "next/link";
 
 async function getStats() {
   const [consorcios, tickets, expensas, periodos] = await Promise.all([
-    query<{ count: string }>("SELECT COUNT(*) FROM consorcios"),
-    query<{ count: string }>("SELECT COUNT(*) FROM tickets WHERE estado NOT IN ('resuelto','cerrado')"),
+    query<{ count: string }>("SELECT COUNT(*) FROM app.consorcios"),
+    query<{ count: string }>("SELECT COUNT(*) FROM app.tickets WHERE estado NOT IN ('resuelto','cerrado')"),
     query<{ pendientes: string; total: string }>(
-      "SELECT COUNT(*) FILTER (WHERE estado='pendiente') AS pendientes, COALESCE(SUM(monto_total) FILTER (WHERE estado='pendiente'), 0) AS total FROM expensas"
+      "SELECT COUNT(*) FILTER (WHERE estado='pendiente') AS pendientes, COALESCE(SUM(total_pagar) FILTER (WHERE estado='pendiente'), 0) AS total FROM app.res_cuenta_periodo"
     ),
     query<{ id: number; consorcio_nombre: string; anio: number; mes: number; estado: string }>(
       `SELECT p.id, c.nombre AS consorcio_nombre, p.anio, p.mes, p.estado
-       FROM periodos p JOIN consorcios c ON c.id = p.consorcio_id
+       FROM app.periodos_expensas p JOIN app.consorcios c ON c.cuit = p.consorcio_cuit
        ORDER BY p.anio DESC, p.mes DESC LIMIT 5`
     ),
   ]);
@@ -29,7 +29,7 @@ async function getStats() {
 async function getTicketsRecientes() {
   return query<{ id: number; titulo: string; categoria: string; prioridad: string; estado: string; created_at: string; consorcio_nombre: string }>(
     `SELECT t.id, t.titulo, t.categoria, t.prioridad, t.estado, t.created_at, c.nombre AS consorcio_nombre
-     FROM tickets t JOIN consorcios c ON c.id = t.consorcio_id
+     FROM app.tickets t JOIN app.consorcios c ON c.cuit = t.consorcio_cuit
      WHERE t.estado NOT IN ('resuelto','cerrado')
      ORDER BY t.created_at DESC LIMIT 8`
   );

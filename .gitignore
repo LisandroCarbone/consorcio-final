@@ -36,3 +36,31 @@ Thumbs.db
 # Adjuntos / archivos de clientes
 adjuntos/
 escala_mayo_2026.jpg
+
+# Base de datos local (binarios y datos de Postgres embebido)
+pg_data/
+pg_local/
+
+# Archivos temporales de exportación AFIP LSD
+portal/temp_afip_*.txt
+portal/temp_afid_*.txt
+
+# Scripts de migración / inspección (solo uso local)
+portal/migrate_db_json.ts
+portal/inspect_*.ts
+portal/count_db_rows.ts
+portal/test_db_connection.js
+portal/verify_afip_lsd.ts
+portal/verify_all_afip_lsd.ts
+portal/afip_lsd_exporter.ts
+
+# JSONs de datos de migración (solo uso local, pueden contener datos sensibles)
+portal/consorcios_excel_details.json
+portal/employees_excel_details.json
+portal/novedades_excel.json
+
+# Scripts de scratch en raíz
+scratch_check_steps*.js
+
+# n8n workflow exports (runtime)
+actualizar-escalas-suterh.json

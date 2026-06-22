@@ -1,8 +1,9 @@
-export const dynamic = "force-dynamic";
-
+import React from "react";
 import { query } from "@/lib/db";
 import { formatMoney, formatDate } from "@/lib/format";
 import { registrarPago } from "../actions";
+import { cookies } from "next/headers";
+import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 
 type Row = {
   unidad_id: number;
@@ -17,40 +18,52 @@ type Row = {
   [key: string]: unknown;
 };
 
-async function getCuentaCorriente(consorcioId: number): Promise<Row[]> {
+async function getCuentaCorriente(consorcioCuit: string): Promise<Row[]> {
   return query<Row>(
     `SELECT
        u.id AS unidad_id,
-       u.numero AS unidad_numero,
+       u.uf::text AS unidad_numero,
        NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '') AS propietario,
-       COALESCE((SELECT SUM(monto_total) FROM app.expensas WHERE unidad_id=u.id), 0)::text            AS total_expensas,
-       COALESCE((SELECT SUM(monto) FROM app.pagos WHERE unidad_id=u.id), 0)::text                    AS total_pagado,
-       COALESCE((SELECT SUM(monto_total) FROM app.expensas WHERE unidad_id=u.id AND estado='pendiente'), 0)::text AS saldo,
-       (SELECT MAX(fecha)::text FROM app.pagos WHERE unidad_id=u.id)                                 AS ultimo_pago,
-       (SELECT id FROM app.expensas WHERE unidad_id=u.id AND estado='pendiente' ORDER BY id LIMIT 1) AS expensa_pendiente_id,
-       (SELECT monto_total::text FROM app.expensas WHERE unidad_id=u.id AND estado='pendiente' ORDER BY id LIMIT 1) AS expensa_pendiente_monto
+       COALESCE((SELECT SUM(total_pagar) FROM app.res_cuenta_periodo WHERE unidad_id=u.id), 0)::text            AS total_expensas,
+       COALESCE((SELECT SUM(monto) FROM app.pagos WHERE unidad_id=u.id), 0)::text                               AS total_pagado,
+       COALESCE((SELECT SUM(total_pagar) FROM app.res_cuenta_periodo WHERE unidad_id=u.id AND estado='pendiente'), 0)::text AS saldo,
+       (SELECT MAX(fecha)::text FROM app.pagos WHERE unidad_id=u.id)                                            AS ultimo_pago,
+       (SELECT id FROM app.res_cuenta_periodo WHERE unidad_id=u.id AND estado='pendiente' ORDER BY id LIMIT 1)  AS expensa_pendiente_id,
+       (SELECT total_pagar::text FROM app.res_cuenta_periodo WHERE unidad_id=u.id AND estado='pendiente' ORDER BY id LIMIT 1) AS expensa_pendiente_monto
      FROM app.unidades u
      LEFT JOIN app.ocupantes o ON o.unidad_id = u.id AND o.activo = true AND o.rol = 'propietario'
      LEFT JOIN app.personas  p ON p.id = o.persona_id
-     WHERE u.consorcio_id = $1
-     ORDER BY u.numero`,
-    [consorcioId]
+     WHERE u.consorcio_cuit = $1
+     ORDER BY u.uf`,
+    [consorcioCuit]
   );
 }
 
 export default async function CuentaCorrientePage({
   searchParams,
 }: {
-  searchParams: Promise<{ consorcio?: string; pago?: string }>;
+  searchParams: Promise<{ pago?: string }>;
 }) {
   const sp = await searchParams;
-  const consorcios = await query<{ id: number; nombre: string }>(
-    "SELECT id, nombre FROM app.consorcios ORDER BY nombre"
+  const consorcios = await query<{ cuit: string; nombre: string }>(
+    "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
   );
 
-  const selectedId = sp.consorcio ? Number(sp.consorcio) : consorcios[0]?.id ?? null;
-  const selectedConsorcio = consorcios.find((c) => c.id === selectedId);
-  const rows = selectedId ? await getCuentaCorriente(selectedId) : [];
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
+  if (!activeCuit) {
+    return (
+      <div className="max-w-5xl">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Cuenta Corriente</h2>
+        <ConsorcioRequerido consorcios={consorcios} seccion="la cuenta corriente" />
+      </div>
+    );
+  }
+
+  const selectedCuit = activeCuit;
+  const selectedConsorcio = consorcios.find((c) => c.cuit === selectedCuit);
+  const rows = await getCuentaCorriente(selectedCuit);
   const pagoUnidadId = sp.pago ? Number(sp.pago) : null;
 
   const totalDeuda = rows.reduce((s, r) => s + Number(r.saldo), 0);
@@ -59,23 +72,15 @@ export default async function CuentaCorrientePage({
 
   return (
     <div className="max-w-5xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Cuenta Corriente</h2>
-          <p className="text-gray-500 text-sm mt-1">Saldo por unidad · pagos registrados</p>
-        </div>
-        <form method="GET" className="flex gap-2">
-          <select name="consorcio" defaultValue={selectedId ?? ""} className="input">
-            {consorcios.map((c) => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </select>
-          <button type="submit" className="btn-secondary">Ver</button>
-        </form>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Cuenta Corriente</h2>
+        <p className="text-gray-500 text-sm mt-1">
+          Saldo por unidad · pagos registrados — <strong>{selectedConsorcio?.nombre}</strong>
+        </p>
       </div>
 
       {/* Summary cards */}
-      {selectedId && (
+      {selectedCuit && (
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="card p-4 text-center">
             <p className="text-xs text-gray-500 mb-1">Deuda total</p>
@@ -112,8 +117,8 @@ export default async function CuentaCorrientePage({
                 const deuda = Number(r.saldo);
                 const isOpen = pagoUnidadId === r.unidad_id;
                 return (
-                  <>
-                    <tr key={r.unidad_id} className={`border-b border-gray-50 ${deuda > 0 ? "bg-red-50/30" : ""}`}>
+                  <React.Fragment key={r.unidad_id}>
+                    <tr className={`border-b border-gray-50 ${deuda > 0 ? "bg-red-50/30" : ""}`}>
                       <td className="td font-semibold">{r.unidad_numero}</td>
                       <td className="td text-gray-600">{r.propietario ?? "—"}</td>
                       <td className="td text-right font-mono">{formatMoney(r.total_expensas)}</td>
@@ -128,7 +133,7 @@ export default async function CuentaCorrientePage({
                       </td>
                       <td className="td">
                         <a
-                          href={`?consorcio=${selectedId}&pago=${isOpen ? "" : r.unidad_id}`}
+                          href={`?consorcio=${selectedCuit}&pago=${isOpen ? "" : r.unidad_id}`}
                           className="text-xs text-brand-600 hover:underline whitespace-nowrap"
                         >
                           {isOpen ? "Cerrar" : "Registrar pago"}
@@ -139,7 +144,7 @@ export default async function CuentaCorrientePage({
                       <tr key={`form-${r.unidad_id}`} className="bg-blue-50 border-b border-blue-100">
                         <td colSpan={7} className="px-5 py-4">
                           <form action={registrarPago} className="grid grid-cols-2 gap-3 max-w-lg">
-                            <input type="hidden" name="consorcio_id" value={selectedId} />
+                            <input type="hidden" name="consorcio_id" value={selectedCuit} />
                             <input type="hidden" name="unidad_id" value={r.unidad_id} />
                             {r.expensa_pendiente_id && (
                               <input type="hidden" name="expensa_id" value={r.expensa_pendiente_id} />
@@ -187,13 +192,13 @@ export default async function CuentaCorrientePage({
                             </div>
                             <div className="col-span-2 flex gap-2">
                               <button type="submit" className="btn-primary">Registrar pago</button>
-                              <a href={`?consorcio=${selectedId}`} className="btn-secondary">Cancelar</a>
+                              <a href={`?consorcio=${selectedCuit}`} className="btn-secondary">Cancelar</a>
                             </div>
                           </form>
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -201,7 +206,7 @@ export default async function CuentaCorrientePage({
         </div>
       )}
 
-      {rows.length === 0 && selectedId && (
+      {rows.length === 0 && selectedCuit && (
         <div className="card p-12 text-center text-gray-400">
           <p className="text-3xl mb-2">📊</p>
           <p>No hay unidades en este consorcio aún.</p>

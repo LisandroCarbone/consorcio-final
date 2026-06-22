@@ -1,23 +1,24 @@
-export const dynamic = 'force-dynamic';
-
 import { pool } from "@/lib/db";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 
-async function getData() {
+async function getData(activeCuit: string) {
   const { rows: consorcios } = await pool.query(
-    "SELECT id, nombre FROM app.consorcios ORDER BY nombre"
+    "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
   );
   const { rows: empleados } = await pool.query(`
     SELECT e.*,
            c.nombre AS consorcio_nombre,
            EXTRACT(YEAR FROM AGE(NOW(), e.fecha_ingreso))::int AS antiguedad_anios
-    FROM app.empleados_edificio e
-    JOIN app.consorcios c ON c.id = e.consorcio_id
-    WHERE e.estado = 'activo'
+    FROM app.empleados e
+    JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
+    WHERE e.estado = 'activo' AND e.consorcio_cuit = $1
     ORDER BY c.nombre, e.nombre
-  `);
+  `, [activeCuit]);
   return { consorcios, empleados };
 }
+
 
 const JORNADA_BADGE: Record<string, string> = {
   Completa: 'bg-green-100 text-green-700',
@@ -37,14 +38,33 @@ const FUNCION_SHORT: Record<string, string> = {
 };
 
 export default async function EmpleadosPage() {
-  const { consorcios, empleados } = await getData();
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
+  const { rows: consorcios } = await pool.query(
+    "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
+  );
+
+  if (!activeCuit) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Empleados</h1>
+        </div>
+        <ConsorcioRequerido consorcios={consorcios} seccion="los empleados" />
+      </div>
+    );
+  }
+
+  const { empleados } = await getData(activeCuit);
 
   const grouped = consorcios
     .map((c: any) => ({
       ...c,
-      empleados: empleados.filter((e: any) => e.consorcio_id === c.id),
+      empleados: empleados.filter((e: any) => e.consorcio_cuit === c.cuit),
     }))
     .filter((g: any) => g.empleados.length > 0);
+
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -63,7 +83,7 @@ export default async function EmpleadosPage() {
       ) : (
         <div className="space-y-8">
           {grouped.map((g: any) => (
-            <div key={g.id} className="card overflow-hidden">
+            <div key={g.cuit} className="card overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
                 <h2 className="font-semibold text-gray-800 text-sm">{g.nombre}</h2>
                 <span className="text-xs text-gray-400">{g.empleados.length} empleado{g.empleados.length !== 1 ? 's' : ''}</span>
@@ -96,7 +116,7 @@ export default async function EmpleadosPage() {
                     ].filter(Boolean);
 
                     return (
-                      <tr key={e.id} className="border-b last:border-0 hover:bg-gray-50">
+                      <tr key={e.cuil} className="border-b last:border-0 hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium text-gray-900">
                           {e.nombre}
                           {e.tiene_vivienda && (
@@ -123,7 +143,7 @@ export default async function EmpleadosPage() {
                         </td>
                         <td className="px-3 py-3">
                           <Link
-                            href={`/sueldos/empleados/${e.id}/editar`}
+                            href={`/sueldos/empleados/${e.cuil}/editar`}
                             className="text-brand-600 hover:underline text-xs"
                           >
                             Editar

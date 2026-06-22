@@ -6,7 +6,7 @@ import { formatMoney0, formatEmpleadoOption } from "@/lib/format";
 import Link from "next/link";
 
 interface Props {
-  searchParams: Promise<{ empleado_id?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ empleado_cuil?: string; desde?: string; hasta?: string }>;
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -23,7 +23,7 @@ const ESTADO_CLS: Record<string, string> = {
 };
 
 export default async function HistoriaPage({ searchParams }: Props) {
-  const { empleado_id, desde, hasta } = await searchParams;
+  const { empleado_cuil, desde, hasta } = await searchParams;
   const empleados = await getEmpleados();
 
   const now = new Date();
@@ -36,26 +36,26 @@ export default async function HistoriaPage({ searchParams }: Props) {
   let liquidaciones: any[] = [];
   let empleadoNombre = "";
 
-  const empleadoIdNum = empleado_id ? Number(empleado_id) : NaN;
-  if (empleado_id && !isNaN(empleadoIdNum) && empleadoIdNum > 0) {
+  if (empleado_cuil) {
     try {
       const { rows } = await pool.query(
-        `SELECT l.id, l.periodo, l.tipo, l.estado,
+        `SELECT l.id, l.periodo::text AS periodo, l.tipo, l.estado,
                 l.remuneracion_bruta, l.total_descuentos_empleado, l.neto_a_pagar,
                 c.nombre AS consorcio_nombre
          FROM app.liquidaciones_sueldo l
-         JOIN app.empleados_edificio e ON e.id = l.empleado_id
-         JOIN app.consorcios c ON c.id = e.consorcio_id
-         WHERE l.empleado_id = $1
+         JOIN app.empleados e ON e.cuil = l.empleado_cuil
+         JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
+         WHERE l.empleado_cuil = $1
            AND l.periodo >= $2
            AND l.periodo <= $3
          ORDER BY l.periodo DESC, l.tipo`,
-        [empleadoIdNum, desdeVal, hastaVal]
+        [empleado_cuil, desdeVal, hastaVal]
       );
       liquidaciones = rows;
-      const emp = empleados.find((e: any) => String(e.id) === empleado_id);
+      const emp = empleados.find((e: any) => e.cuil === empleado_cuil);
       empleadoNombre = emp ? String(emp.nombre) : "";
-    } catch {
+    } catch (err) {
+      console.error("[HistoriaPage] Error querying history:", err);
       liquidaciones = [];
     }
   }
@@ -76,18 +76,16 @@ export default async function HistoriaPage({ searchParams }: Props) {
       <form method="GET" className="card p-5 mb-6 grid grid-cols-4 gap-4 items-end">
         <div className="col-span-2">
           <label className="label">Empleado</label>
-          <select name="empleado_id" defaultValue={empleado_id ?? ""} className="input" required>
+          <select name="empleado_cuil" defaultValue={empleado_cuil ?? ""} className="input" required>
             <option value="">Seleccionar...</option>
             {empleados.map((e: any) => (
-              <option key={e.id} value={e.id}>{formatEmpleadoOption(e)}</option>
+              <option key={e.cuil} value={e.cuil}>{formatEmpleadoOption(e)}</option>
             ))}
           </select>
         </div>
         <div>
           <label className="label">Desde</label>
-          <input name="desde" type="month" defaultValue={desdeVal.slice(0, 7)} className="input"
-            onChange={undefined}
-          />
+          <input name="desde" type="month" defaultValue={desdeVal.slice(0, 7)} className="input" />
         </div>
         <div>
           <label className="label">Hasta</label>
@@ -98,7 +96,7 @@ export default async function HistoriaPage({ searchParams }: Props) {
         </div>
       </form>
 
-      {empleado_id && liquidaciones.length === 0 && (
+      {empleado_cuil && liquidaciones.length === 0 && (
         <p className="text-center py-12 text-gray-500">
           No hay liquidaciones en el período seleccionado.
         </p>
@@ -127,9 +125,10 @@ export default async function HistoriaPage({ searchParams }: Props) {
               </thead>
               <tbody>
                 {liquidaciones.map((l) => {
-                  const periodoDate = new Date(l.periodo + "T00:00:00Z");
+                  const [y, m] = l.periodo.split("-");
+                  const periodoDate = new Date(Number(y), Number(m) - 1, 1);
                   const periodoLabel = periodoDate.toLocaleDateString("es-AR", {
-                    month: "short", year: "numeric", timeZone: "UTC",
+                    month: "short", year: "numeric"
                   });
                   return (
                     <tr key={l.id} className="border-b last:border-0 hover:bg-gray-50">

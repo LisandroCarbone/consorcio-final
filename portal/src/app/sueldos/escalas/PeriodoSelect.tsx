@@ -1,16 +1,12 @@
 'use client';
 
 export function PeriodoSelect({
-  periodos,
+  options,
   selected,
-  fmtPeriodo,
 }: {
-  periodos: { periodo: string }[];
+  options: { value: string; label: string }[];
   selected: string;
-  fmtPeriodo: (p: string) => string;
 }) {
-  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
   return (
     <select
       className="input text-sm py-1.5"
@@ -21,11 +17,12 @@ export function PeriodoSelect({
         window.location.href = url.toString();
       }}
     >
-      {periodos.map((p) => (
-        <option key={p.periodo} value={p.periodo}>
-          {capitalize(fmtPeriodo(p.periodo))}
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
         </option>
       ))}
     </select>
   );
 }
+

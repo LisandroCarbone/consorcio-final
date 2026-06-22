@@ -1,13 +1,27 @@
-export const dynamic = 'force-dynamic';
-
 import { query } from "@/lib/db";
 import { formatMoney, formatDate } from "@/lib/format";
 import { createProveedor, createOrdenTrabajo } from "./actions";
+import { cookies } from "next/headers";
+import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 
-async function getData() {
+async function getData(activeCuit?: string) {
+  const otWhereParams: unknown[] = [];
+  let otWhereClause = "WHERE ot.estado NOT IN ('completada','cancelada')";
+  if (activeCuit) {
+    otWhereParams.push(activeCuit);
+    otWhereClause += " AND ot.consorcio_cuit = $1";
+  }
+
+  const ticketParams: unknown[] = [];
+  let ticketWhereClause = "WHERE t.estado NOT IN ('resuelto','cerrado')";
+  if (activeCuit) {
+    ticketParams.push(activeCuit);
+    ticketWhereClause += " AND t.consorcio_cuit = $1";
+  }
+
   const [proveedores, ordenes, consorcios, ticketsAbiertos] = await Promise.all([
     query<{ id: number; nombre: string; rubro: string | null; telefono: string | null; whatsapp: string | null; activo: boolean }>(
-      "SELECT id, nombre, rubro, telefono, whatsapp, activo FROM proveedores WHERE activo=true ORDER BY nombre"
+      "SELECT id, nombre, rubro, telefono, whatsapp, activo FROM app.proveedores WHERE activo=true ORDER BY nombre"
     ),
     query<{
       id: number; descripcion: string; estado: string; fecha_programada: string | null;
@@ -15,17 +29,19 @@ async function getData() {
     }>(
       `SELECT ot.id, ot.descripcion, ot.estado, ot.fecha_programada, ot.monto_presupuesto,
               p.nombre AS proveedor_nombre, c.nombre AS consorcio_nombre
-       FROM ordenes_trabajo ot
-       JOIN consorcios c ON c.id=ot.consorcio_id
-       LEFT JOIN proveedores p ON p.id=ot.proveedor_id
-       WHERE ot.estado NOT IN ('completada','cancelada')
-       ORDER BY ot.created_at DESC LIMIT 20`
+       FROM app.ordenes_trabajo ot
+       JOIN app.consorcios c ON c.cuit=ot.consorcio_cuit
+       LEFT JOIN app.proveedores p ON p.id=ot.proveedor_id
+       ${otWhereClause}
+       ORDER BY ot.created_at DESC LIMIT 20`,
+       otWhereParams
     ),
-    query<{ id: number; nombre: string }>("SELECT id, nombre FROM consorcios ORDER BY nombre"),
+    query<{ id: string; nombre: string }>("SELECT cuit AS id, nombre FROM app.consorcios ORDER BY nombre"),
     query<{ id: number; titulo: string; consorcio_nombre: string }>(
-      `SELECT t.id, t.titulo, c.nombre AS consorcio_nombre FROM tickets t
-       JOIN consorcios c ON c.id=t.consorcio_id
-       WHERE t.estado NOT IN ('resuelto','cerrado') ORDER BY t.created_at DESC`
+      `SELECT t.id, t.titulo, c.nombre AS consorcio_nombre FROM app.tickets t
+       JOIN app.consorcios c ON c.cuit=t.consorcio_cuit
+       ${ticketWhereClause} ORDER BY t.created_at DESC`,
+       ticketParams
     ),
   ]);
   return { proveedores, ordenes, consorcios, ticketsAbiertos };
@@ -40,7 +56,22 @@ const ESTADO_OT: Record<string, string> = {
 };
 
 export default async function ProveedoresPage() {
-  const { proveedores, ordenes, consorcios, ticketsAbiertos } = await getData();
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
+  const { proveedores, ordenes, consorcios, ticketsAbiertos } = await getData(activeCuit);
+
+  if (!activeCuit) {
+    return (
+      <div className="max-w-6xl">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Proveedores</h2>
+        <ConsorcioRequerido
+          consorcios={consorcios.map((c) => ({ cuit: c.id, nombre: c.nombre }))}
+          seccion="las órdenes de trabajo y proveedores"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl">
@@ -123,9 +154,10 @@ export default async function ProveedoresPage() {
             <form action={createOrdenTrabajo} className="space-y-3">
               <div>
                 <label className="label">Consorcio *</label>
-                <select name="consorcio_id" required className="input">
+                <select disabled value={activeCuit} className="input bg-gray-50 cursor-not-allowed">
                   {consorcios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
+                <input type="hidden" name="consorcio_id" value={activeCuit} />
               </div>
               <div>
                 <label className="label">Descripción *</label>

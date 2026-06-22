@@ -6,21 +6,20 @@ import { createConsorcio } from "./actions";
 
 async function getConsorcios() {
   return query<{
-    id: number; nombre: string; direccion: string; cuit: string | null;
-    codigo_postal: string | null; categoria_edificio: string | null;
-    banco: string | null; cant_uf: number | null;
+    cuit: string; nombre: string; direccion: string; codigo_postal: string | null;
+    categoria_edificio: string | null; banco: string | null; cant_uf: number | null;
     tiene_cochera: boolean; tiene_jardin: boolean; tiene_pileta: boolean;
     total_unidades: string; total_empleados: string;
   }>(
-    `SELECT c.id, c.nombre, c.direccion, c.cuit, c.codigo_postal,
+    `SELECT c.cuit, c.nombre, c.direccion, c.codigo_postal,
             c.categoria_edificio, c.banco, c.cant_uf,
             c.tiene_cochera, c.tiene_jardin, c.tiene_pileta,
             COUNT(DISTINCT u.id) AS total_unidades,
-            COUNT(DISTINCT e.id) AS total_empleados
-     FROM consorcios c
-     LEFT JOIN unidades u ON u.consorcio_id = c.id
-     LEFT JOIN empleados_edificio e ON e.consorcio_id = c.id AND e.estado = 'activo'
-     GROUP BY c.id ORDER BY c.nombre`
+            COUNT(DISTINCT e.cuil) AS total_empleados
+     FROM app.consorcios c
+     LEFT JOIN app.unidades u ON u.consorcio_cuit = c.cuit
+     LEFT JOIN app.empleados e ON e.consorcio_cuit = c.cuit AND e.estado = 'activo'
+     GROUP BY c.cuit ORDER BY c.nombre`
   );
 }
 
@@ -59,7 +58,7 @@ export default async function ConsorciosPage() {
             </thead>
             <tbody>
               {consorcios.map((c) => (
-                <tr key={c.id} className="table-row hover:bg-gray-50">
+                <tr key={c.cuit} className="table-row hover:bg-gray-50">
                   <td className="td font-medium text-gray-900">{c.nombre}</td>
                   <td className="td text-gray-500 text-xs">{c.direccion}{c.codigo_postal ? ` (${c.codigo_postal})` : ''}</td>
                   <td className="td text-gray-500 text-xs font-mono">{c.cuit ?? '—'}</td>
@@ -82,8 +81,8 @@ export default async function ConsorciosPage() {
                   <td className="td text-center text-gray-700">{c.total_empleados}</td>
                   <td className="td">
                     <div className="flex gap-3">
-                      <Link href={`/consorcios/${c.id}`} className="text-brand-600 text-sm hover:underline">Ver →</Link>
-                      <Link href={`/consorcios/${c.id}/editar`} className="text-gray-400 text-sm hover:underline">Editar</Link>
+                      <Link href={`/consorcios/${c.cuit}`} className="text-brand-600 text-sm hover:underline">Ver →</Link>
+                      <Link href={`/consorcios/${c.cuit}/editar`} className="text-gray-400 text-sm hover:underline">Editar</Link>
                     </div>
                   </td>
                 </tr>
@@ -106,16 +105,16 @@ export default async function ConsorciosPage() {
             <input name="direccion" required className="input" />
           </div>
           <div>
-            <label className="label">CUIT</label>
-            <input name="cuit" className="input" placeholder="30-12345678-9" />
+            <label className="label">CUIT *</label>
+            <input name="cuit" required className="input" placeholder="30-12345678-9" />
           </div>
           <div>
             <label className="label">Código Postal</label>
             <input name="codigo_postal" className="input" />
           </div>
           <div>
-            <label className="label">N° Cta. SUTERH</label>
-            <input name="nro_cta_suterh" className="input" />
+            <label className="label">Clave SUTERH</label>
+            <input name="suterh_key" className="input" />
           </div>
           <div>
             <label className="label">Cant. UF</label>

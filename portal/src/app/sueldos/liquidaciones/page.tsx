@@ -2,11 +2,14 @@ export const dynamic = "force-dynamic";
 
 import { getLiquidacionesPeriodo } from "../actions";
 import { recalcularPeriodoAction, confirmarLiquidacionAction } from "./actions";
-import { formatMoney0 } from "@/lib/format";
+import { formatMoney0, cleanPeriodo } from "@/lib/format";
 import { EstadoBadge } from "@/components/ui/EstadoBadge";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionFeedback } from "@/components/ui/ActionFeedback";
+import { cookies } from "next/headers";
+import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
+import { pool } from "@/lib/db";
 
 interface LiquidacionRow {
   id: number;
@@ -25,12 +28,29 @@ interface Props {
 
 export default async function LiquidacionesPage({ searchParams }: Props) {
   const { periodo: periodoParam, tipo: tipoParam } = await searchParams;
+  const cleanedPeriodo = cleanPeriodo(periodoParam);
   const now = new Date();
   const tipo = tipoParam ?? "mensual";
 
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
+  const { rows: consorcios } = await pool.query(
+    "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
+  );
+
+  if (!activeCuit) {
+    return (
+      <div className="p-6 max-w-5xl mx-auto">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Liquidaciones</h1>
+        <ConsorcioRequerido consorcios={consorcios} seccion="las liquidaciones de sueldos" />
+      </div>
+    );
+  }
+
   // For SAC periods, default to June (sac_1) or December (sac_2) of current year
   let periodo: string;
-  if (!periodoParam) {
+  if (!cleanedPeriodo) {
     if (tipo === "sac_1") {
       periodo = `${now.getFullYear()}-06-01`;
     } else if (tipo === "sac_2") {
@@ -39,10 +59,11 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
       periodo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     }
   } else {
-    periodo = periodoParam;
+    periodo = cleanedPeriodo;
   }
 
-  const liquidaciones: LiquidacionRow[] = await getLiquidacionesPeriodo(periodo, tipo);
+  const liquidaciones: LiquidacionRow[] = await getLiquidacionesPeriodo(periodo, tipo, activeCuit);
+
   const periodoDate = new Date(periodo + "T00:00:00Z");
   const year = periodoDate.getUTCFullYear();
 

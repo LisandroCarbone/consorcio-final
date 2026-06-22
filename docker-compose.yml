@@ -51,8 +51,8 @@ services:
       DB_POSTGRESDB_USER: ${POSTGRES_USER:-consorcio}
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-consorcio_secret}
       DB_POSTGRESDB_SCHEMA: n8n
-      # Queue / Redis
-      EXECUTIONS_MODE: queue
+      # Queue / Redis (disabled for local dev to run regular mode)
+      EXECUTIONS_MODE: regular
       QUEUE_BULL_REDIS_HOST: redis
       QUEUE_BULL_REDIS_PORT: 6379
       QUEUE_BULL_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
@@ -75,6 +75,8 @@ services:
       - ./n8n/workflows:/home/node/workflows
     ports:
       - "5678:5678"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   portal:
     build:
@@ -93,6 +95,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-consorcio_secret}
       COMMS_AGENT_URL: http://comms-agent:3002
       AGENT_API_KEY: ${AGENT_API_KEY:-changeme}
+      N8N_BASE_URL: http://n8n:5678
+      N8N_API_KEY: ${N8N_API_KEY:-}
     ports:
       - "3010:3000"
 

@@ -1,23 +1,41 @@
-export const dynamic = "force-dynamic";
-
 import { getEmpleados } from "../actions";
 import { calcularSACPreview, SACPreview } from "@/lib/liquidacion/engine";
 import { formatMoney, formatEmpleadoOption } from "@/lib/format";
 import { accionLiquidarSAC } from "./actions";
+import { cookies } from "next/headers";
+import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
+import { pool } from "@/lib/db";
 
 export default async function SACPage({
   searchParams,
 }: {
-  searchParams: Promise<{ empleado_id?: string; anio?: string; semestre?: string; liquidado?: string }>;
+  searchParams: Promise<{ empleado_cuil?: string; anio?: string; semestre?: string; liquidado?: string }>;
 }) {
   const sp = await searchParams;
-  const empleados = await getEmpleados();
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
+  const { rows: consorcios } = await pool.query(
+    "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
+  );
+
+  if (!activeCuit) {
+    return (
+      <div className="max-w-3xl">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Liquidación SAC</h2>
+        <ConsorcioRequerido consorcios={consorcios} seccion="el SAC" />
+      </div>
+    );
+  }
+
+  const allEmpleados = await getEmpleados();
+  const empleados = allEmpleados.filter((e) => e.consorcio_cuit === activeCuit);
 
   const now = new Date();
   const anioDefault = now.getFullYear();
   const semestreDefault = now.getMonth() < 6 ? 1 : 2;
 
-  const empleadoId = sp.empleado_id ? Number(sp.empleado_id) : null;
+  const empleadoCuil = sp.empleado_cuil ?? null;
   const anio = sp.anio ? Number(sp.anio) : anioDefault;
   const semestreRaw = sp.semestre ? Number(sp.semestre) : semestreDefault;
   const semestre = (semestreRaw === 1 || semestreRaw === 2 ? semestreRaw : semestreDefault) as 1 | 2;
@@ -25,9 +43,10 @@ export default async function SACPage({
   let preview: SACPreview | null = null;
   let previewError: string | null = null;
 
-  if (empleadoId) {
+
+  if (empleadoCuil) {
     try {
-      preview = await calcularSACPreview(empleadoId, anio, semestre);
+      preview = await calcularSACPreview(empleadoCuil, anio, semestre);
     } catch (err) {
       previewError = err instanceof Error ? err.message : "Error al calcular";
     }
@@ -47,10 +66,10 @@ export default async function SACPage({
       <form method="GET" className="card p-5 mb-6 grid grid-cols-3 gap-4">
         <div>
           <label className="label">Empleado</label>
-          <select name="empleado_id" defaultValue={empleadoId ?? ""} className="input" required>
+          <select name="empleado_cuil" defaultValue={empleadoCuil ?? ""} className="input" required>
             <option value="">Seleccionar...</option>
-            {empleados.map((e: { id: number; nombre: string; legajo: string | null }) => (
-              <option key={e.id} value={e.id}>
+            {empleados.map((e) => (
+              <option key={e.cuil} value={e.cuil}>
                 {formatEmpleadoOption(e)}
               </option>
             ))}
@@ -152,7 +171,7 @@ export default async function SACPage({
           </div>
 
           <form action={accionLiquidarSAC}>
-            <input type="hidden" name="empleado_id" value={empleadoId!} />
+            <input type="hidden" name="empleado_cuil" value={empleadoCuil!} />
             <input type="hidden" name="anio" value={anio} />
             <input type="hidden" name="semestre" value={semestre} />
             <button type="submit" className="btn-primary">

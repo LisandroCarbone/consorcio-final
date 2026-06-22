@@ -13,7 +13,7 @@ function createPool() {
     database: process.env.POSTGRES_DB ?? "consorcio",
     user: process.env.POSTGRES_USER ?? "consorcio",
     password: process.env.POSTGRES_PASSWORD ?? "consorcio_secret",
-    options: "-c search_path=app,public",
+    options: "-c search_path=app,public -c timezone=UTC",
   });
 }
 

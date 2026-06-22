@@ -3,10 +3,11 @@ export const dynamic = 'force-dynamic';
 import { pool } from "@/lib/db";
 import { PeriodoSelect } from "./PeriodoSelect";
 import { TriggerN8nButton } from "./TriggerN8nButton";
+import { cleanPeriodo } from "@/lib/format";
 
 async function getEscalasData(periodo?: string) {
   const { rows: periodos } = await pool.query(
-    "SELECT DISTINCT periodo FROM app.escalas_suterh ORDER BY periodo DESC LIMIT 24"
+    "SELECT DISTINCT periodo::text AS periodo FROM app.escalas_suterh ORDER BY periodo DESC LIMIT 24"
   );
   if (periodos.length === 0) return { periodos: [], escalas: [], adicionales: [], selected: null };
 
@@ -29,7 +30,13 @@ export default async function EscalasPage({
   searchParams: Promise<{ periodo?: string }>;
 }) {
   const { periodo: periodoParam } = await searchParams;
-  const { periodos, escalas, adicionales, selected } = await getEscalasData(periodoParam);
+  const cleanedPeriodo = cleanPeriodo(periodoParam);
+  const { periodos, escalas, adicionales, selected } = await getEscalasData(cleanedPeriodo);
+
+  const selectOptions = periodos.map((p) => ({
+    value: p.periodo,
+    label: capitalize(fmtPeriodo(p.periodo)),
+  }));
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -43,9 +50,8 @@ export default async function EscalasPage({
         <div className="flex items-center gap-3">
           {periodos.length > 1 && (
             <PeriodoSelect
-              periodos={periodos}
+              options={selectOptions}
               selected={selected ?? ''}
-              fmtPeriodo={fmtPeriodo}
             />
           )}
           <TriggerN8nButton />

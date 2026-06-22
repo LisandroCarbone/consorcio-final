@@ -65,3 +65,18 @@ export function numberToWords(n: number): string {
   const centsStr = cents === 0 ? "00/100" : `${cents}/100`;
   return `Son pesos ${words.trim()} con ${centsStr}`;
 }
+
+export function cleanPeriodo(p: string | undefined): string | undefined {
+  if (!p) return undefined;
+  // If it's already in YYYY-MM-DD format, it's clean
+  if (/^\d{4}-\d{2}-\d{2}$/.test(p)) return p;
+  
+  // Try to parse it as a Date
+  const parsed = new Date(p);
+  if (isNaN(parsed.getTime())) return undefined; // Invalid date
+  
+  // Format as YYYY-MM-DD
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}-01`;
+}

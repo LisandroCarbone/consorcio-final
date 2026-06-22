@@ -3,13 +3,24 @@ export const dynamic = 'force-dynamic';
 import { query } from "@/lib/db";
 import { formatDate } from "@/lib/format";
 import { createTicket, updateTicketEstado, addMensaje } from "./actions";
+import { cookies } from "next/headers";
 
-async function getTickets(filtro: string) {
-  const where = filtro === "todos"
-    ? ""
-    : filtro === "cerrados"
-    ? "WHERE t.estado IN ('resuelto','cerrado')"
-    : "WHERE t.estado NOT IN ('resuelto','cerrado')";
+async function getTickets(filtro: string, activeCuit?: string) {
+  const conds: string[] = [];
+
+  if (filtro === "cerrados") {
+    conds.push("t.estado IN ('resuelto','cerrado')");
+  } else if (filtro !== "todos") {
+    conds.push("t.estado NOT IN ('resuelto','cerrado')");
+  }
+
+  const params: unknown[] = [];
+  if (activeCuit) {
+    params.push(activeCuit);
+    conds.push(`t.consorcio_cuit = $${params.length}`);
+  }
+
+  const where = conds.length > 0 ? "WHERE " + conds.join(" AND ") : "";
 
   return query<{
     id: number; titulo: string; descripcion: string | null; categoria: string;
@@ -17,16 +28,17 @@ async function getTickets(filtro: string) {
     consorcio_nombre: string; unidad_numero: string | null; ocupante_nombre: string | null;
   }>(
     `SELECT t.*, c.nombre AS consorcio_nombre,
-            u.numero AS unidad_numero,
+            u.uf::text AS unidad_numero,
             p.nombre||' '||p.apellido AS ocupante_nombre
-     FROM tickets t
-     JOIN consorcios c ON c.id = t.consorcio_id
-     LEFT JOIN unidades u ON u.id = t.unidad_id
-     LEFT JOIN personas p ON p.id = t.persona_id
+     FROM app.tickets t
+     JOIN app.consorcios c ON c.cuit = t.consorcio_cuit
+     LEFT JOIN app.unidades u ON u.id = t.unidad_id
+     LEFT JOIN app.personas p ON p.id = t.persona_id
      ${where}
      ORDER BY
        CASE t.prioridad WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END,
-       t.created_at DESC`
+       t.created_at DESC`,
+    params
   );
 }
 
@@ -37,12 +49,12 @@ async function getTicketDetail(id: number) {
       prioridad: string; estado: string; canal_origen: string; created_at: string;
       resolucion: string | null; consorcio_nombre: string;
     }>(
-      `SELECT t.*, c.nombre AS consorcio_nombre FROM tickets t
-       JOIN consorcios c ON c.id=t.consorcio_id WHERE t.id=$1`,
+      `SELECT t.*, c.nombre AS consorcio_nombre FROM app.tickets t
+       JOIN app.consorcios c ON c.cuit=t.consorcio_cuit WHERE t.id=$1`,
       [id]
     ),
     query<{ id: number; autor: string; contenido: string; es_interno: boolean; created_at: string }>(
-      "SELECT * FROM ticket_mensajes WHERE ticket_id=$1 ORDER BY created_at",
+      "SELECT * FROM app.ticket_mensajes WHERE ticket_id=$1 ORDER BY created_at",
       [id]
     ),
   ]);
@@ -80,9 +92,12 @@ export default async function TicketsPage({
   const filtro = sp.filtro ?? "abiertos";
   const selectedId = sp.id ? Number(sp.id) : null;
 
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
   const [tickets, consorcios, detail] = await Promise.all([
-    getTickets(filtro),
-    query<{ id: number; nombre: string }>("SELECT id, nombre FROM consorcios ORDER BY nombre"),
+    getTickets(filtro, activeCuit),
+    query<{ id: string; nombre: string }>("SELECT cuit AS id, nombre FROM app.consorcios ORDER BY nombre"),
     selectedId ? getTicketDetail(selectedId) : null,
   ]);
 
@@ -136,9 +151,19 @@ export default async function TicketsPage({
             <form action={createTicket} className="space-y-3">
               <div>
                 <label className="label">Consorcio *</label>
-                <select name="consorcio_id" required className="input">
-                  {consorcios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
+                {activeCuit ? (
+                  <>
+                    <select disabled value={activeCuit} className="input bg-gray-50 cursor-not-allowed">
+                      {consorcios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    </select>
+                    <input type="hidden" name="consorcio_id" value={activeCuit} />
+                  </>
+                ) : (
+                  <select name="consorcio_id" required className="input">
+                    <option value="">— seleccionar —</option>
+                    {consorcios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="label">Título *</label>

@@ -24,13 +24,13 @@ interface Props {
 export default async function EditarConsorcioPage({ params }: Props) {
   const { id } = await params;
   const c = await queryOne<{
-    id: number; nombre: string; direccion: string; cuit: string | null;
-    codigo_postal: string | null; nro_cta_suterh: string | null;
+    cuit: string; nombre: string; direccion: string;
+    codigo_postal: string | null; suterh_key: string | null;
     cant_uf: number | null; categoria_edificio: string | null; banco: string | null;
     tiene_cochera: boolean; tiene_movimiento_coches: boolean; tiene_jardin: boolean;
     zona_desfavorable: boolean; tiene_pileta: boolean; tiene_caldera: boolean;
-    intereses_mora_pct: string | null;
-  }>("SELECT * FROM consorcios WHERE id = $1", [Number(id)]);
+    interest_rate: string | null;
+  }>("SELECT * FROM app.consorcios WHERE cuit = $1", [id]);
 
   if (!c) notFound();
 
@@ -39,8 +39,8 @@ export default async function EditarConsorcioPage({ params }: Props) {
     cochera: c.tiene_cochera, caldera: c.tiene_caldera,
   });
 
-  const interesesPct = c.intereses_mora_pct
-    ? (Number(c.intereses_mora_pct) * 100).toFixed(2)
+  const interesesPct = c.interest_rate
+    ? (Number(c.interest_rate) * 100).toFixed(2)
     : "";
 
   const CHECKBOXES = [
@@ -68,7 +68,7 @@ export default async function EditarConsorcioPage({ params }: Props) {
       </div>
 
       <form action={updateConsorcio} className="card p-6 space-y-5">
-        <input type="hidden" name="id" value={c.id} />
+        <input type="hidden" name="cuit" value={c.cuit} />
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -81,7 +81,7 @@ export default async function EditarConsorcioPage({ params }: Props) {
           </div>
           <div>
             <label className="label">CUIT</label>
-            <input name="cuit" defaultValue={c.cuit ?? ""} className="input" placeholder="30-12345678-9" />
+            <input name="cuit_disabled" defaultValue={c.cuit} className="input bg-gray-100 cursor-not-allowed" readOnly disabled />
           </div>
           <div>
             <label className="label">Código Postal</label>
@@ -89,7 +89,7 @@ export default async function EditarConsorcioPage({ params }: Props) {
           </div>
           <div>
             <label className="label">N° Cta. SUTERH</label>
-            <input name="nro_cta_suterh" defaultValue={c.nro_cta_suterh ?? ""} className="input" />
+            <input name="nro_cta_suterh" defaultValue={c.suterh_key ?? ""} className="input" />
           </div>
           <div>
             <label className="label">Cant. UF</label>

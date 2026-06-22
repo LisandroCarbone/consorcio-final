@@ -1,9 +1,9 @@
-export const dynamic = 'force-dynamic';
-
 import Link from "next/link";
 import { pool } from "@/lib/db";
+import { cookies } from "next/headers";
+import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 
-async function getSueldosStats() {
+async function getSueldosStats(activeCuit: string) {
   const db = pool;
   const now = new Date();
   const periodo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
@@ -11,19 +11,43 @@ async function getSueldosStats() {
   const [{ rows: [stats] }, { rows: [escala] }] = await Promise.all([
     db.query(`
       SELECT
-        (SELECT COUNT(*) FROM app.empleados_edificio WHERE estado = 'activo') AS total_empleados,
-        (SELECT COUNT(*) FROM app.liquidaciones_sueldo WHERE periodo = $1) AS liquidaciones_mes,
-        (SELECT COUNT(*) FROM app.liquidaciones_sueldo WHERE periodo = $1 AND estado = 'confirmada') AS confirmadas,
-        (SELECT COALESCE(SUM(neto_a_pagar),0) FROM app.liquidaciones_sueldo WHERE periodo = $1 AND estado != 'anulada') AS total_neto
-    `, [periodo]),
+        (SELECT COUNT(*) FROM app.empleados WHERE estado = 'activo' AND consorcio_cuit = $2) AS total_empleados,
+        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.cuil = l.empleado_cuil WHERE l.periodo = $1 AND e.consorcio_cuit = $2) AS liquidaciones_mes,
+        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.cuil = l.empleado_cuil WHERE l.periodo = $1 AND l.estado = 'confirmada' AND e.consorcio_cuit = $2) AS confirmadas,
+        (SELECT COALESCE(SUM(l.neto_a_pagar),0) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.cuil = l.empleado_cuil WHERE l.periodo = $1 AND l.estado != 'anulada' AND e.consorcio_cuit = $2) AS total_neto
+    `, [periodo, activeCuit]),
     db.query(`SELECT periodo FROM app.escalas_suterh ORDER BY periodo DESC LIMIT 1`),
   ]);
 
-  return { ...stats, periodo, ultima_escala: escala?.periodo ?? null };
+  return {
+    total_empleados: Number(stats?.total_empleados || 0),
+    liquidaciones_mes: Number(stats?.liquidaciones_mes || 0),
+    confirmadas: Number(stats?.confirmadas || 0),
+    total_neto: Number(stats?.total_neto || 0),
+    periodo,
+    ultima_escala: escala?.periodo ?? null
+  };
 }
 
 export default async function SueldosPage() {
-  const stats = await getSueldosStats();
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
+  const { rows: consorcios } = await pool.query(
+    "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
+  );
+
+  if (!activeCuit) {
+    return (
+      <div className="p-6 max-w-5xl mx-auto">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Liquidación de Sueldos</h1>
+        <ConsorcioRequerido consorcios={consorcios} seccion="los sueldos" />
+      </div>
+    );
+  }
+
+  const stats = await getSueldosStats(activeCuit);
+
   const mes = new Date(stats.periodo).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
   const escalaLabel = stats.ultima_escala
     ? new Date(stats.ultima_escala).toLocaleDateString("es-AR", { month: "long", year: "numeric" })

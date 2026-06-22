@@ -4,18 +4,19 @@ import { calcularLiquidacion, calcularPeriodo } from "@/lib/liquidacion/engine";
 export async function POST(req: NextRequest) {
   // Auth
   const apiKey = req.headers.get("x-api-key");
-  if (!apiKey || apiKey !== process.env.AGENT_API_KEY) {
+  const expectedApiKey = process.env.AGENT_API_KEY || "changeme";
+  if (!apiKey || apiKey !== expectedApiKey) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { periodo?: string; empleadoId?: number };
+  let body: { periodo?: string; empleadoCuil?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { periodo, empleadoId } = body;
+  const { periodo, empleadoCuil } = body;
 
   if (!periodo || typeof periodo !== "string") {
     return NextResponse.json(
@@ -36,17 +37,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (empleadoId !== undefined) {
+  if (empleadoCuil !== undefined) {
     // Single employee
-    if (typeof empleadoId !== "number" || !Number.isInteger(empleadoId)) {
+    if (typeof empleadoCuil !== "string" || !empleadoCuil.trim()) {
       return NextResponse.json(
-        { error: "empleadoId debe ser un entero" },
+        { error: "empleadoCuil debe ser un string no vacío" },
         { status: 400 }
       );
     }
 
     try {
-      await calcularLiquidacion(empleadoId, periodoNorm);
+      await calcularLiquidacion(empleadoCuil, periodoNorm);
       return NextResponse.json({ ok: 1, errores: [] });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

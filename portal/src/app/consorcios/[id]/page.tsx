@@ -8,27 +8,27 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-async function getData(id: number) {
+async function getData(cuit: string) {
   const [consorcio, unidades] = await Promise.all([
-    queryOne<{ id: number; nombre: string; direccion: string; cuit: string | null; cbu: string | null }>(
-      "SELECT * FROM consorcios WHERE id=$1",
-      [id]
+    queryOne<{ cuit: string; nombre: string; direccion: string; cbu: string | null }>(
+      "SELECT * FROM app.consorcios WHERE cuit=$1",
+      [cuit]
     ),
     query<{
-      id: number; numero: string; coeficiente: string; tipo: string;
+      id: number; uf: number; coef_a: string; coef_b: string; tipo: string;
       ocupante_nombre: string | null; ocupante_email: string | null;
       ocupante_whatsapp: string | null; ocupante_rol: string | null;
     }>(
-      `SELECT u.id, u.numero, u.coeficiente, u.tipo,
+      `SELECT u.id, u.uf, u.coef_a, u.coef_b, u.tipo,
               p.nombre || ' ' || p.apellido AS ocupante_nombre,
               p.email AS ocupante_email,
               p.whatsapp AS ocupante_whatsapp,
               o.rol AS ocupante_rol
-       FROM unidades u
-       LEFT JOIN ocupantes o ON o.unidad_id=u.id AND o.activo=true AND o.rol='propietario'
-       LEFT JOIN personas p ON p.id=o.persona_id
-       WHERE u.consorcio_id=$1 ORDER BY u.numero`,
-      [id]
+       FROM app.unidades u
+       LEFT JOIN app.ocupantes o ON o.unidad_id=u.id AND o.activo=true AND o.rol='propietario'
+       LEFT JOIN app.personas p ON p.id=o.persona_id
+       WHERE u.consorcio_cuit=$1 ORDER BY u.uf`,
+      [cuit]
     ),
   ]);
   return { consorcio, unidades };
@@ -36,11 +36,11 @@ async function getData(id: number) {
 
 export default async function ConsorcioDetailPage({ params }: Props) {
   const { id } = await params;
-  const numId = Number(id);
-  const { consorcio, unidades } = await getData(numId);
+  const { consorcio, unidades } = await getData(id);
   if (!consorcio) notFound();
 
-  const coefTotal = unidades.reduce((acc, u) => acc + parseFloat(u.coeficiente), 0);
+  const coefATotal = unidades.reduce((acc, u) => acc + parseFloat(u.coef_a), 0);
+  const coefBTotal = unidades.reduce((acc, u) => acc + parseFloat(u.coef_b), 0);
 
   return (
     <div className="max-w-5xl">
@@ -58,7 +58,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
           <h3 className="font-semibold text-gray-800">
             Unidades <span className="text-gray-400 font-normal text-sm">({unidades.length})</span>
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">Coeficiente total: {coefTotal.toFixed(4)}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Coeficiente A total: {coefATotal.toFixed(4)} · Coeficiente B total: {coefBTotal.toFixed(4)}</p>
         </div>
         {unidades.length > 0 ? (
           <table className="w-full">
@@ -66,8 +66,8 @@ export default async function ConsorcioDetailPage({ params }: Props) {
               <tr>
                 <th className="th">Unidad</th>
                 <th className="th">Tipo</th>
-                <th className="th text-right">Coef.</th>
-                <th className="th text-right">% del total</th>
+                <th className="th text-right">Coef. A</th>
+                <th className="th text-right">Coef. B</th>
                 <th className="th">Propietario</th>
                 <th className="th">Email / WhatsApp</th>
               </tr>
@@ -75,12 +75,10 @@ export default async function ConsorcioDetailPage({ params }: Props) {
             <tbody>
               {unidades.map((u) => (
                 <tr key={u.id} className="table-row hover:bg-gray-50">
-                  <td className="td font-medium">{u.numero}</td>
+                  <td className="td font-medium">{u.uf}</td>
                   <td className="td text-gray-500 capitalize">{u.tipo}</td>
-                  <td className="td text-right font-mono text-sm">{parseFloat(u.coeficiente).toFixed(4)}</td>
-                  <td className="td text-right text-sm text-gray-500">
-                    {coefTotal > 0 ? ((parseFloat(u.coeficiente) / coefTotal) * 100).toFixed(2) : 0}%
-                  </td>
+                  <td className="td text-right font-mono text-sm">{parseFloat(u.coef_a).toFixed(4)}</td>
+                  <td className="td text-right font-mono text-sm">{parseFloat(u.coef_b).toFixed(4)}</td>
                   <td className="td">{u.ocupante_nombre ?? <span className="text-gray-400 italic text-xs">Sin asignar</span>}</td>
                   <td className="td text-sm text-gray-500">{u.ocupante_email ?? "—"} {u.ocupante_whatsapp ? `· ${u.ocupante_whatsapp}` : ""}</td>
                 </tr>
@@ -97,10 +95,10 @@ export default async function ConsorcioDetailPage({ params }: Props) {
         <div className="card p-6">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Nueva unidad</h3>
           <form action={createUnidad} className="space-y-3">
-            <input type="hidden" name="consorcio_id" value={numId} />
+            <input type="hidden" name="consorcio_cuit" value={id} />
             <div>
-              <label className="label">Número *</label>
-              <input name="numero" required className="input" placeholder="Ej: 1A, PH2" />
+              <label className="label">Número UF *</label>
+              <input name="numero" type="number" required className="input" placeholder="Ej: 1" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -114,7 +112,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Coeficiente *</label>
+                <label className="label">Coeficiente A *</label>
                 <input name="coeficiente" type="number" step="0.0001" required className="input" placeholder="0.0500" />
               </div>
               <div>
@@ -135,13 +133,13 @@ export default async function ConsorcioDetailPage({ params }: Props) {
         <div className="card p-6">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Asignar propietario / inquilino</h3>
           <form action={createPersonaAndOcupante} className="space-y-3">
-            <input type="hidden" name="consorcio_id" value={numId} />
+            <input type="hidden" name="consorcio_cuit" value={id} />
             <div>
               <label className="label">Unidad *</label>
               <select name="unidad_id" required className="input">
                 <option value="">Seleccionar...</option>
                 {unidades.map((u) => (
-                  <option key={u.id} value={u.id}>{u.numero}</option>
+                  <option key={u.id} value={u.id}>{u.uf}</option>
                 ))}
               </select>
             </div>

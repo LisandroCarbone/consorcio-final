@@ -3,11 +3,22 @@ import { pool } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
-  if (apiKey !== process.env.AGENT_API_KEY) {
+  const expectedApiKey = process.env.AGENT_API_KEY || "changeme";
+  if (apiKey !== expectedApiKey) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { escalas, adicionales } = await req.json();
+  let escalas, adicionales;
+  try {
+    const body = await req.json();
+    escalas = body.escalas;
+    adicionales = body.adicionales;
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: `Invalid JSON body: ${err.message}. Make sure you are not sending '[object Object]' or malformed JSON.` },
+      { status: 400 }
+    );
+  }
 
   let savedEscalas = 0;
   let savedAdicionales = 0;

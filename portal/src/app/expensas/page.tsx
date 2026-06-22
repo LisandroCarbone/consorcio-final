@@ -1,58 +1,52 @@
-export const dynamic = 'force-dynamic';
-
 import { query } from "@/lib/db";
 import { formatMoney, formatMonth, formatDate } from "@/lib/format";
-import { createPeriodo, addGasto, calcularExpensas, marcarPagada } from "./actions";
+import { createPeriodo, addGasto, calcularExpensas, regenerarGastosFijos } from "./actions";
+import { cookies } from "next/headers";
+import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 
-async function getData() {
+async function getData(activeCuit?: string) {
+  const params: unknown[] = [];
+  let where = "";
+  if (activeCuit) {
+    params.push(activeCuit);
+    where = "WHERE p.consorcio_cuit = $1";
+  }
+
   const [periodos, consorcios] = await Promise.all([
     query<{
-      id: number; consorcio_id: number; consorcio_nombre: string;
+      id: number; consorcio_id: string; consorcio_nombre: string;
       anio: number; mes: number; estado: string; fecha_vencimiento: string | null;
       total_gastos: string; total_expensas: string; pagadas: string;
     }>(
-      `SELECT p.*, c.nombre AS consorcio_nombre,
-              COALESCE((SELECT SUM(monto) FROM gastos WHERE periodo_id=p.id), 0) AS total_gastos,
-              COUNT(e.id) AS total_expensas,
-              COUNT(e.id) FILTER (WHERE e.estado='pagada') AS pagadas
-       FROM periodos p
-       JOIN consorcios c ON c.id = p.consorcio_id
-       LEFT JOIN expensas e ON e.periodo_id = p.id
-       GROUP BY p.id, c.nombre
-       ORDER BY p.anio DESC, p.mes DESC`
+      `SELECT p.id, p.consorcio_cuit AS consorcio_id, c.nombre AS consorcio_nombre,
+              p.anio, p.mes, p.estado, p.fecha_vencimiento,
+              COALESCE((SELECT SUM(monto) FROM app.gastos_periodo WHERE periodo_id=p.id), 0) AS total_gastos,
+              (SELECT COUNT(*) FROM app.res_cuenta_periodo WHERE periodo_id=p.id) AS total_expensas,
+              (SELECT COUNT(*) FROM app.res_cuenta_periodo WHERE periodo_id=p.id AND estado='pagada') AS pagadas
+       FROM app.periodos_expensas p
+       JOIN app.consorcios c ON c.cuit = p.consorcio_cuit
+       ${where}
+       GROUP BY p.id, c.nombre, p.anio, p.mes, p.estado, p.fecha_vencimiento
+       ORDER BY p.anio DESC, p.mes DESC`,
+      params
     ),
-    query<{ id: number; nombre: string }>("SELECT id, nombre FROM consorcios ORDER BY nombre"),
+    query<{ id: string; nombre: string }>("SELECT cuit AS id, nombre FROM app.consorcios ORDER BY nombre"),
   ]);
   return { periodos, consorcios };
 }
 
 async function getPeriodoDetail(periodoId: number) {
-  const [gastos, expensas] = await Promise.all([
-    query<{ id: number; concepto: string; monto: string; tipo: string }>(
-      "SELECT * FROM gastos WHERE periodo_id=$1 ORDER BY tipo, concepto",
-      [periodoId]
-    ),
-    query<{
-      id: number; unidad_numero: string; monto_total: string;
-      estado: string; ocupante_nombre: string | null; ocupante_email: string | null;
-    }>(
-      `SELECT e.id, u.numero AS unidad_numero, e.monto_total, e.estado,
-              p.nombre||' '||p.apellido AS ocupante_nombre, p.email AS ocupante_email
-       FROM expensas e
-       JOIN unidades u ON u.id=e.unidad_id
-       LEFT JOIN ocupantes o ON o.unidad_id=u.id AND o.activo=true AND o.rol='propietario'
-       LEFT JOIN personas p ON p.id=o.persona_id
-       WHERE e.periodo_id=$1 ORDER BY u.numero`,
-      [periodoId]
-    ),
-  ]);
-  return { gastos, expensas };
+  const gastos = await query<{ id: number; concepto: string; monto: string; tipo: string; categoria: number }>(
+    "SELECT id, descripcion AS concepto, monto::numeric, tipo, categoria FROM app.gastos_periodo WHERE periodo_id=$1 ORDER BY categoria, tipo, descripcion",
+    [periodoId]
+  );
+  return { gastos };
 }
 
 const TIPO_COLORS: Record<string, string> = {
-  ordinario: "bg-blue-50 text-blue-700",
-  extraordinario: "bg-purple-50 text-purple-700",
-  fondo_reserva: "bg-green-50 text-green-700",
+  A: "bg-blue-50 text-blue-700",
+  B: "bg-purple-50 text-purple-700",
+  Particular: "bg-green-50 text-green-700",
 };
 
 export default async function ExpensasPage({
@@ -62,9 +56,34 @@ export default async function ExpensasPage({
 }) {
   const sp = await searchParams;
   const selectedPeriodo = sp.periodo ? Number(sp.periodo) : null;
-  const { periodos, consorcios } = await getData();
+
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
+  const { periodos, consorcios } = await getData(activeCuit);
+
+  if (!activeCuit) {
+    return (
+      <div className="max-w-6xl">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Expensas</h2>
+        <ConsorcioRequerido
+          consorcios={consorcios.map((c) => ({ cuit: c.id, nombre: c.nombre }))}
+          seccion="las expensas"
+        />
+      </div>
+    );
+  }
+
   const selected = selectedPeriodo ? periodos.find((p) => p.id === selectedPeriodo) : null;
   const detail = selectedPeriodo ? await getPeriodoDetail(selectedPeriodo) : null;
+
+  // El botón "Recalcular prorrateo" solo aparece en el período más reciente del consorcio.
+  // periodos viene ordenado por anio DESC, mes DESC, así que el primero con el mismo
+  // consorcio_id es el más reciente.
+  const ultimoPeriodoCuit = selected
+    ? periodos.find((p) => p.consorcio_id === selected.consorcio_id)?.id
+    : null;
+  const isUltimoPeriodo = selected ? selected.id === ultimoPeriodoCuit : false;
 
   return (
     <div className="max-w-6xl">
@@ -106,9 +125,10 @@ export default async function ExpensasPage({
             <form action={createPeriodo} className="space-y-3">
               <div>
                 <label className="label">Consorcio *</label>
-                <select name="consorcio_id" required className="input">
+                <select disabled value={activeCuit} className="input bg-gray-50 cursor-not-allowed">
                   {consorcios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
+                <input type="hidden" name="consorcio_id" value={activeCuit} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -148,11 +168,20 @@ export default async function ExpensasPage({
                       Vencimiento: {formatDate(selected.fecha_vencimiento)} · Estado: <strong>{selected.estado}</strong>
                     </p>
                   </div>
-                  {selected.estado !== "liquidado" && (
-                    <form action={calcularExpensas.bind(null, selected.id)}>
-                      <button type="submit" className="btn-primary">⚙️ Calcular expensas</button>
+                  <div className="flex gap-2 flex-wrap">
+                    <form action={regenerarGastosFijos.bind(null, selected.id)}>
+                      <button type="submit" className="btn-secondary text-amber-700 border-amber-300 hover:bg-amber-50">
+                        ⚡ Regenerar Cat. 1
+                      </button>
                     </form>
-                  )}
+                    {isUltimoPeriodo && (
+                      <form action={calcularExpensas.bind(null, selected.id)}>
+                        <button type="submit" className="btn-primary">
+                          🔁 Recalcular prorrateo
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="bg-gray-50 rounded-lg p-3">
@@ -176,69 +205,58 @@ export default async function ExpensasPage({
                   <h3 className="text-sm font-semibold text-gray-700">Gastos del período</h3>
                   <p className="text-sm font-bold">{formatMoney(selected.total_gastos)}</p>
                 </div>
-                {detail?.gastos.map((g) => (
-                  <div key={g.id} className="flex items-center justify-between px-5 py-2.5 border-b border-gray-50 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`badge ${TIPO_COLORS[g.tipo] ?? ""}`}>{g.tipo}</span>
-                      <span className="text-sm">{g.concepto}</span>
+                {/* Cat 1: Fijos e Impositivos */}
+                {detail && detail.gastos.some((g) => g.categoria === 1) && (
+                  <>
+                    <div className="px-5 py-2 bg-amber-50 border-b border-amber-100">
+                      <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">📋 Cat. 1 — Gastos Fijos e Impositivos (Sueldos)</span>
                     </div>
-                    <span className="text-sm font-mono">{formatMoney(g.monto)}</span>
-                  </div>
-                ))}
+                    {detail.gastos.filter((g) => g.categoria === 1).map((g) => (
+                      <div key={g.id} className="flex items-center justify-between px-5 py-2 border-b border-gray-50 last:border-0 bg-amber-50/30">
+                        <div className="flex items-center gap-2">
+                          <span className={`badge ${TIPO_COLORS[g.tipo] ?? ""}`}>{g.tipo === "A" ? "Coef A" : g.tipo === "B" ? "Coef B" : g.tipo}</span>
+                          <span className="text-sm text-gray-700">{g.concepto}</span>
+                        </div>
+                        <span className="text-sm font-mono font-semibold">{formatMoney(g.monto)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {/* Other categories */}
+                {detail && detail.gastos.some((g) => g.categoria !== 1) && (
+                  <>
+                    {detail.gastos.some((g) => g.categoria === 1) && (
+                      <div className="px-5 py-2 bg-gray-50 border-b border-gray-100">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">📦 Cat. 2–10 — Gastos Variables</span>
+                      </div>
+                    )}
+                    {detail.gastos.filter((g) => g.categoria !== 1).map((g) => (
+                      <div key={g.id} className="flex items-center justify-between px-5 py-2.5 border-b border-gray-50 last:border-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`badge ${TIPO_COLORS[g.tipo] ?? ""}`}>{g.tipo === "A" ? "Coef A" : g.tipo === "B" ? "Coef B" : g.tipo}</span>
+                          <span className="text-sm">{g.concepto}</span>
+                        </div>
+                        <span className="text-sm font-mono">{formatMoney(g.monto)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
                 {/* Add gasto form */}
                 <form action={addGasto} className="flex gap-2 px-5 py-3 bg-gray-50 border-t border-gray-100">
                   <input type="hidden" name="periodo_id" value={selected.id} />
                   <input name="concepto" required placeholder="Concepto" className="input flex-1" />
                   <input name="monto" type="number" step="0.01" required placeholder="Monto" className="input w-28" />
                   <select name="tipo" className="input w-36">
-                    <option value="ordinario">Ordinario</option>
-                    <option value="extraordinario">Extraordinario</option>
-                    <option value="fondo_reserva">Fondo reserva</option>
+                    <option value="A">Coeficiente A</option>
+                    <option value="B">Coeficiente B</option>
+                    <option value="Particular">Particular</option>
                   </select>
+                  <input name="target_uf" placeholder="UF (Particular)" className="input w-32" />
                   <button type="submit" className="btn-primary shrink-0">+ Agregar</button>
                 </form>
               </div>
 
-              {/* Expensas por unidad */}
-              {detail && detail.expensas.length > 0 && (
-                <div className="card">
-                  <div className="px-5 py-3 border-b border-gray-100">
-                    <h3 className="text-sm font-semibold text-gray-700">Expensas por unidad</h3>
-                  </div>
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-100">
-                      <tr>
-                        <th className="th">Unidad</th>
-                        <th className="th">Propietario</th>
-                        <th className="th text-right">Total</th>
-                        <th className="th text-center">Estado</th>
-                        <th className="th"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detail.expensas.map((e) => (
-                        <tr key={e.id} className="table-row hover:bg-gray-50">
-                          <td className="td font-medium">{e.unidad_numero}</td>
-                          <td className="td text-gray-600 text-sm">{e.ocupante_nombre ?? "—"}</td>
-                          <td className="td text-right font-mono text-sm">{formatMoney(e.monto_total)}</td>
-                          <td className="td text-center">
-                            <span className={`badge ${e.estado === "pagada" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
-                              {e.estado}
-                            </span>
-                          </td>
-                          <td className="td">
-                            {e.estado === "pendiente" && (
-                              <form action={marcarPagada.bind(null, e.id)}>
-                                <button type="submit" className="text-xs text-brand-600 hover:underline">Marcar pagada</button>
-                              </form>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+
             </div>
           )}
         </div>

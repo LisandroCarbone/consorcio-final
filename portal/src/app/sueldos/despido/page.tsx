@@ -1,9 +1,10 @@
-export const dynamic = "force-dynamic";
-
 import { getEmpleados } from "../actions";
 import { calcularIndemnizacionPreview, IndemnizacionPreview } from "@/lib/liquidacion/engine";
 import { formatMoney, formatEmpleadoOption } from "@/lib/format";
 import { accionLiquidarDespido } from "./actions";
+import { cookies } from "next/headers";
+import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
+import { pool } from "@/lib/db";
 
 const TIPOS_EGRESO = [
   { value: "despido_sin_causa", label: "Despido sin causa" },
@@ -18,25 +19,43 @@ export default async function DespidoPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    empleado_id?: string;
+    empleado_cuil?: string;
     fecha_egreso?: string;
     tipo_egreso?: string;
     liquidado?: string;
   }>;
 }) {
   const sp = await searchParams;
-  const empleados = await getEmpleados();
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
 
-  const empleadoId = sp.empleado_id ? Number(sp.empleado_id) : null;
+  const { rows: consorcios } = await pool.query(
+    "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
+  );
+
+  if (!activeCuit) {
+    return (
+      <div className="max-w-3xl">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Liquidación por Egreso</h2>
+        <ConsorcioRequerido consorcios={consorcios} seccion="el egreso del personal" />
+      </div>
+    );
+  }
+
+  const allEmpleados = await getEmpleados();
+  const empleados = allEmpleados.filter((e) => e.consorcio_cuit === activeCuit);
+
+  const empleadoCuil = sp.empleado_cuil ?? null;
   const fechaEgreso = sp.fecha_egreso ?? new Date().toISOString().slice(0, 10);
   const tipoEgreso = sp.tipo_egreso ?? "despido_sin_causa";
 
   let preview: IndemnizacionPreview | null = null;
   let previewError: string | null = null;
 
-  if (empleadoId && sp.fecha_egreso && sp.tipo_egreso) {
+
+  if (empleadoCuil && sp.fecha_egreso && sp.tipo_egreso) {
     try {
-      preview = await calcularIndemnizacionPreview(empleadoId, fechaEgreso, tipoEgreso);
+      preview = await calcularIndemnizacionPreview(empleadoCuil, fechaEgreso, tipoEgreso);
     } catch (err) {
       previewError = err instanceof Error ? err.message : "Error al calcular";
     }
@@ -56,10 +75,10 @@ export default async function DespidoPage({
       <form method="GET" className="card p-5 mb-6 grid grid-cols-2 gap-4">
         <div>
           <label className="label">Empleado</label>
-          <select name="empleado_id" defaultValue={empleadoId ?? ""} className="input" required>
+          <select name="empleado_cuil" defaultValue={empleadoCuil ?? ""} className="input" required>
             <option value="">Seleccionar...</option>
             {empleados.map((e) => (
-              <option key={e.id} value={e.id}>
+              <option key={e.cuil} value={e.cuil}>
                 {formatEmpleadoOption(e)}
               </option>
             ))}
@@ -177,7 +196,7 @@ export default async function DespidoPage({
           </div>
 
           <form action={accionLiquidarDespido}>
-            <input type="hidden" name="empleado_id" value={empleadoId!} />
+            <input type="hidden" name="empleado_cuil" value={empleadoCuil!} />
             <input type="hidden" name="fecha_egreso" value={fechaEgreso} />
             <input type="hidden" name="tipo_egreso" value={tipoEgreso} />
             <button type="submit" className="btn-primary">

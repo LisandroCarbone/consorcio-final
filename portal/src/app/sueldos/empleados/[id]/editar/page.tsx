@@ -5,38 +5,38 @@ import { redirect, notFound } from "next/navigation";
 
 import { FUNCIONES } from "../../constants";
 
-async function getEmpleado(id: number) {
+async function getEmpleado(cuil: string) {
   const { rows } = await pool.query(
     `SELECT e.*, c.nombre AS consorcio_nombre
-     FROM app.empleados_edificio e
-     JOIN app.consorcios c ON c.id = e.consorcio_id
-     WHERE e.id = $1`,
-    [id]
+     FROM app.empleados e
+     JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
+     WHERE e.cuil = $1`,
+    [cuil]
   );
   return rows[0] ?? null;
 }
 
 async function getConsorcios() {
-  const { rows } = await pool.query("SELECT id, nombre FROM app.consorcios ORDER BY nombre");
+  const { rows } = await pool.query("SELECT cuit, nombre FROM app.consorcios ORDER BY nombre");
   return rows;
 }
 
-async function actualizarEmpleado(id: number, formData: FormData) {
+async function actualizarEmpleado(cuil: string, formData: FormData) {
   'use server';
   const get = (k: string) => formData.get(k) as string | null;
   const bool = (k: string) => formData.get(k) === 'true';
 
-  if (!id || id <= 0) throw new Error("ID de empleado inválido");
+  if (!cuil) throw new Error("CUIL de empleado inválido");
   if (!get('nombre')?.trim()) throw new Error("Nombre requerido");
   if (!get('cuil')?.trim()) throw new Error("CUIL requerido");
-  const consorcioId = Number(get('consorcio_id'));
-  if (!consorcioId || consorcioId <= 0) throw new Error("Consorcio inválido");
+  const consorcioCuit = get('consorcio_cuit');
+  if (!consorcioCuit) throw new Error("Consorcio CUIT requerido");
 
   await pool.query(
-    `UPDATE app.empleados_edificio SET
+    `UPDATE app.empleados SET
        cuil = $1, nombre = $2, legajo = $3,
        fecha_nacimiento = $4, fecha_ingreso = $5,
-       consorcio_id = $6, obra_social = $7, cod_obra_social = $8,
+       consorcio_cuit = $6, obra_social = $7, cod_obra_social = $8,
        funcion = $9, categoria_edificio = $10, jornada = $11,
        tiene_vivienda = $12, banco = $13, cbu = $14,
        retiro_residuos = $15, clasificacion_residuos = $16,
@@ -44,11 +44,11 @@ async function actualizarEmpleado(id: number, formData: FormData) {
        plus_jardin = $19, plus_zona_desfavorable = $20, plus_pileta = $21,
        tiene_titulo = $22, adicional_voluntario = $23,
        updated_at = now()
-     WHERE id = $24`,
+     WHERE cuil = $24`,
     [
       get('cuil'), get('nombre'), get('legajo') || null,
       get('fecha_nacimiento') || null, get('fecha_ingreso') || null,
-      Number(get('consorcio_id')),
+      consorcioCuit,
       get('obra_social') || null, Number(get('cod_obra_social')) || null,
       get('funcion'), Number(get('categoria_edificio')), get('jornada'),
       bool('tiene_vivienda'), get('banco') || null, get('cbu') || null,
@@ -56,7 +56,7 @@ async function actualizarEmpleado(id: number, formData: FormData) {
       bool('plus_cocheras'), bool('plus_movimiento_coches'),
       bool('plus_jardin'), bool('plus_zona_desfavorable'), bool('plus_pileta'),
       bool('tiene_titulo'), Number(get('adicional_voluntario')) || 0,
-      id,
+      cuil,
     ]
   );
   redirect('/sueldos/empleados');
@@ -68,16 +68,16 @@ export default async function EditarEmpleadoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const empleadoId = Number(id);
+  const empleadoCuil = decodeURIComponent(id);
 
   const [emp, consorcios] = await Promise.all([
-    getEmpleado(empleadoId),
+    getEmpleado(empleadoCuil),
     getConsorcios(),
   ]);
 
   if (!emp) notFound();
 
-  const action = actualizarEmpleado.bind(null, empleadoId);
+  const action = actualizarEmpleado.bind(null, empleadoCuil);
 
   const fmt = (d: string | null) => d ? new Date(d).toISOString().slice(0, 10) : '';
   const checked = (v: boolean | null) => v === true;
@@ -122,9 +122,9 @@ export default async function EditarEmpleadoPage({
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="label">Consorcio *</label>
-              <select name="consorcio_id" required className="input" defaultValue={emp.consorcio_id}>
-                {consorcios.map((c: { id: number; nombre: string }) => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
+              <select name="consorcio_cuit" required className="input" defaultValue={emp.consorcio_cuit}>
+                {consorcios.map((c: { cuit: string; nombre: string }) => (
+                  <option key={c.cuit} value={c.cuit}>{c.nombre}</option>
                 ))}
               </select>
             </div>
