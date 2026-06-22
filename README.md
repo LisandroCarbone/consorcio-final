@@ -1,288 +1,217 @@
-# Consorcio Platform
+# Consorcio Final — Portal de Administración de Consorcios
 
-Plataforma de automatización para administración de consorcios.
-Stack: n8n + PostgreSQL + Redis + MCP servers + Claude agents.
+Sistema web completo para la administración de consorcios de propiedad horizontal.
 
-## Arranque rápido
+**Stack:** Next.js 14 · PostgreSQL 16 · n8n · Docker
 
-### 1. Variables de entorno
+---
+
+## 🚀 Levantar desde cero
+
+### Requisitos previos
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y corriendo
+- [Node.js 18+](https://nodejs.org/) (para desarrollo local del portal)
+- Git
+
+### 1. Clonar el repo
+
+```bash
+git clone https://github.com/LisandroCarbone/consorcio-final.git
+cd consorcio-final
+```
+
+### 2. Configurar variables de entorno
 
 ```bash
 cp env.example .env
-# Editá .env con tus valores reales, especialmente N8N_ENCRYPTION_KEY
 ```
 
-Generar la clave de encriptación de n8n:
-```bash
-openssl rand -hex 32
-```
-
-### 2. Levantar infraestructura
-
-```bash
-docker compose up -d
-```
-
-Servicios disponibles:
-- **n8n**: http://localhost:5678 (usuario/contraseña del .env)
-- **PostgreSQL**: localhost:5432
-- **Redis**: localhost:6379
-
-El schema de la DB se aplica automáticamente desde `db/migrations/001_init.sql`.
-
-### 3. Instalar y correr el MCP server
-
-```bash
-cd mcp-servers/mcp-consorcio
-npm install
-npm run dev
-```
-
-El server corre por stdio — se conecta a Claude Code o a cualquier cliente MCP compatible.
-
-### Agregar a Claude Code (claude_desktop_config.json)
-
-```json
-{
-  "mcpServers": {
-    "consorcio": {
-      "command": "node",
-      "args": ["C:/ruta/a/consorcio-platform/mcp-servers/mcp-consorcio/dist/index.js"],
-      "env": {
-        "POSTGRES_HOST": "localhost",
-        "POSTGRES_DB": "consorcio",
-        "POSTGRES_USER": "consorcio",
-        "POSTGRES_PASSWORD": "consorcio_secret"
-      }
-    }
-  }
-}
-```
-
-## Estructura
-
-```
-consorcio-platform/
-├── docker-compose.yml          # Infraestructura (n8n + postgres + redis)
-├── db/migrations/              # Schema SQL
-├── mcp-servers/
-│   ├── mcp-consorcio/          # MCP server principal (CRUD de negocio)
-│   ├── mcp-pdf/                # Generación de PDFs (Fase 2)
-│   └── mcp-whatsapp/           # Integración WhatsApp (Fase 3)
-├── agents/                     # Agentes Claude por proceso
-├── n8n/workflows/              # Exports de workflows n8n
-└── portal/                     # Frontend Next.js (Fase 4+)
-```
-
-## Herramientas MCP disponibles (mcp-consorcio)
-
-| Herramienta | Descripción |
-|-------------|-------------|
-| `list_consorcios` | Lista todos los consorcios |
-| `get_consorcio` | Obtiene un consorcio por ID |
-| `create_consorcio` | Crea un nuevo consorcio |
-| `list_unidades` | Lista unidades de un consorcio con ocupante |
-| `get_unidad` | Obtiene una unidad por ID |
-| `create_unidad` | Crea una unidad funcional |
-| `upsert_persona` | Crea o actualiza un propietario/inquilino |
-| `asignar_ocupante` | Asigna persona a unidad |
-| `create_periodo` | Abre un período de liquidación |
-| `get_periodo` | Obtiene período por consorcio/año/mes |
-| `add_gasto` | Agrega un gasto al período |
-| `calcular_expensas` | Calcula y genera expensas por coeficiente |
-| `marcar_expensa_pagada` | Marca una expensa como pagada |
-| `list_expensas_periodo` | Lista expensas con datos del ocupante |
-| `create_ticket` | Abre un reclamo/ticket |
-| `update_ticket` | Actualiza estado/resolución de ticket |
-| `list_tickets` | Lista tickets de un consorcio |
-| `add_mensaje_ticket` | Agrega nota a un ticket |
-| `list_proveedores` | Lista proveedores activos |
-| `create_proveedor` | Registra un proveedor |
-| `create_orden_trabajo` | Crea orden de trabajo |
-| `update_orden_trabajo` | Actualiza OT (estado, monto, comprobante) |
-
-## Fase 2 — Distribución de Expensas
-
-### Variables de entorno adicionales (agregar al .env)
+Editá `.env` con tus valores. Como mínimo necesitás cambiar:
 
 ```env
-# SMTP para envío de emails
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=tu@gmail.com
-SMTP_PASS=tu_app_password
-SMTP_FROM=tu@gmail.com
-
-# Agente
-AGENT_API_KEY=una_clave_secreta
+# Cambiar estas claves en producción:
+POSTGRES_PASSWORD=tu_password_seguro
+N8N_PASSWORD=tu_password_n8n
+N8N_ENCRYPTION_KEY=  # Generá con: openssl rand -hex 32
 ```
 
-### Flujo completo de liquidación
-
-1. Cargar gastos del período via MCP (`add_gasto`)
-2. El agente calcula automáticamente la proporción por coeficiente
-3. Genera un PDF por unidad con el detalle completo
-4. Envía el email con el PDF adjunto a cada propietario con email registrado
-
-### Correr manualmente (CLI)
+### 3. Levantar la infraestructura (PostgreSQL + n8n + Redis)
 
 ```bash
-cd agents/expensas-agent
-npm install
-PERIODO_ID=1 DRY_RUN=true npm start    # preview sin enviar emails
-PERIODO_ID=1 npm start                 # envío real
+docker compose up -d postgres redis n8n
 ```
 
-### Correr como servidor HTTP (para n8n)
+Esto levanta:
+- **PostgreSQL** en `localhost:5432` — el schema se aplica automáticamente desde `db/migrations/001_init.sql`
+- **n8n** en `http://localhost:5678` — workflows de automatización
+- **Redis** en `localhost:6379` — cola de tareas para n8n
 
+> ⏳ La primera vez tarda ~1 min mientras Docker descarga las imágenes.
+
+Verificar que todo esté OK:
 ```bash
-npm run server     # escucha en :3001
-# POST /run-expensas { "consorcio_id": 1, "anio": 2026, "mes": 6 }
+docker compose ps
 ```
 
-### Importar workflow en n8n
-
-1. Ir a n8n → Workflows → Import
-2. Subir `n8n/workflows/distribucion-expensas.json`
-3. Configurar la variable de entorno `DEFAULT_CONSORCIO_ID` en n8n
-4. Activar el workflow
-
-## Fase 3 — Comunicación WhatsApp
-
-### Variables de entorno adicionales
-
-```env
-# WhatsApp provider: "twilio" o "meta"
-WA_PROVIDER=twilio
-
-# Twilio (si usás Twilio)
-TWILIO_ACCOUNT_SID=ACxxxxxxxx
-TWILIO_AUTH_TOKEN=xxxxxxxx
-TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
-
-# Meta Business API (si usás Meta directamente)
-META_WA_TOKEN=EAAxxxxxxx
-META_WA_PHONE_NUMBER_ID=1234567890
-META_WA_VERIFY_TOKEN=consorcio_verify
-
-# Admin (recibe alertas de reclamos urgentes)
-ADMIN_WHATSAPP_PHONE=+5491112345678
-```
-
-### Flujo de mensajes entrantes
-
-```
-Vecino escribe por WhatsApp
-        ↓
-  Webhook (Twilio o Meta)
-        ↓
-  Claude clasifica el mensaje
-  (reclamo / consulta_expensa / consulta_general / pago / saludo)
-        ↓
-  ┌─ reclamo ────────────────────────────────────────────────────────┐
-  │  • Crea ticket automáticamente en la DB                          │
-  │  • Si urgente/alta → notifica al administrador por WhatsApp      │
-  └──────────────────────────────────────────────────────────────────┘
-        ↓
-  Respuesta automática al vecino
-```
-
-### Enviar una circular
-
-```bash
-curl -X POST http://localhost:3002/send-circular \
-  -H "x-api-key: tu_clave" \
-  -H "Content-Type: application/json" \
-  -d '{ "consorcio_id": 1, "message": "Hola {{nombre}}! Mañana habrá corte de agua de 9 a 13hs." }'
-```
-
-O desde n8n importando `n8n/workflows/circular-whatsapp.json`.
-
-### Configurar el webhook en Twilio
-
-En tu consola de Twilio → WhatsApp Sandbox → "When a message comes in":
-`https://tu-dominio.com/webhook/twilio`  (POST)
-
-## Fase 4 — Portal Web
-
-El portal corre en `http://localhost:3000` con las siguientes secciones:
-
-| Ruta | Descripción |
-|------|-------------|
-| `/` | Dashboard con stats y tickets urgentes |
-| `/consorcios` | CRUD de consorcios, unidades y propietarios |
-| `/expensas` | Períodos, carga de gastos, cálculo y seguimiento de pagos |
-| `/tickets` | Gestión de reclamos con notas y cambio de estado |
-| `/proveedores` | Registro de proveedores y órdenes de trabajo |
-| `/circulares` | Envío masivo de avisos por WhatsApp |
-
-### Correr el portal localmente
+### 4. Instalar dependencias del portal
 
 ```bash
 cd portal
 npm install
-npm run dev    # http://localhost:3000
 ```
 
-### Variables adicionales para el portal
+### 5. Configurar variables del portal para desarrollo local
+
+Crear `portal/.env.local`:
 
 ```env
-COMMS_AGENT_URL=http://localhost:3002   # para envío de circulares
-AGENT_API_KEY=una_clave_secreta
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=consorcio
+POSTGRES_USER=consorcio
+POSTGRES_PASSWORD=consorcio_secret
+
+N8N_BASE_URL=http://localhost:5678
+N8N_API_KEY=                         # Generarlo en n8n: Settings > API > Create API Key
 ```
 
-## Arquitectura completa
-
-```
-┌────────────────────────────────────────────────────────────────────┐
-│  Portal Next.js :3000                                              │
-│  Dashboard · Consorcios · Expensas · Tickets · Proveedores · Circulares │
-└──────────────────┬─────────────────────────────────────────────────┘
-                   │ Server Actions (directo a DB)
-┌──────────────────▼─────────────────────────────────────────────────┐
-│                  PostgreSQL :5432                                   │
-└──────┬───────────────────────────────────────────────────────────┬─┘
-       │                                                           │
-┌──────▼──────┐                                            ┌──────▼──────┐
-│  expensas-  │  POST /run-expensas                        │  comms-     │
-│  agent :3001│◄── n8n cron workflow                       │  agent :3002│
-│             │  Calcula + PDF + email                     │             │
-└─────────────┘                                            │  WhatsApp   │
-                                                           │  webhook    │
-┌──────────────────────────────────────────────────────────┤  + Claude   │
-│  n8n :5678                                               │  classifier │
-│  - distribucion-expensas.json (cron mensual)             └─────────────┘
-│  - circular-whatsapp.json (webhook)                      
-└──────────────────────────────────────────────────────────
-┌──────────────────────────────────────────────────────────────────────┐
-│  MCP Servers (para Claude Code / agentes externos)                   │
-│  mcp-consorcio: 22 herramientas CRUD sobre la DB                    │
-│  mcp-pdf: generate_expensa_pdf, generate_expensa_html               │
-│  mcp-whatsapp: send_message, send_bulk, send_expensa_notification   │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-## Arranque completo con Docker
+### 6. Correr el portal en desarrollo
 
 ```bash
-cp env.example .env
-# Editá .env con tus credenciales reales
-
-docker compose up -d
-
-# Servicios disponibles:
-# Portal:     http://localhost:3000
-# n8n:        http://localhost:5678
-# PostgreSQL: localhost:5432
-# Redis:      localhost:6379
-# expensas:   http://localhost:3001
-# comms:      http://localhost:3002
+cd portal
+npm run dev
 ```
 
-## Roadmap
+El portal queda disponible en **http://localhost:3000** 🎉
 
-- [x] Fase 1 — Infraestructura + Schema + MCP server
-- [x] Fase 2 — Liquidaciones, generación de PDFs y distribución por email
-- [x] Fase 3 — Comunicación con vecinos (WhatsApp, clasificación IA, circulares)
-- [x] Fase 4 — Portal web del administrador (Next.js)
-- [ ] Próximos pasos: auth del portal, reportes de morosidad, integración CBU/pagos online
+---
+
+## 🏗️ Estructura del proyecto
+
+```
+consorcio-final/
+├── docker-compose.yml          # Infraestructura completa
+├── env.example                 # Template de variables de entorno
+├── db/
+│   └── migrations/
+│       └── 001_init.sql        # Schema completo de la base de datos
+├── portal/                     # Aplicación Next.js 14 (App Router)
+│   ├── src/
+│   │   ├── app/                # Páginas y Server Actions
+│   │   │   ├── consorcios/     # ABM de consorcios
+│   │   │   ├── sueldos/        # Liquidación de haberes (SUTERH)
+│   │   │   │   ├── empleados/  # Empleados por consorcio
+│   │   │   │   ├── novedades/  # Horas extras, ausencias, etc.
+│   │   │   │   ├── liquidaciones/ # Historial de liquidaciones
+│   │   │   │   ├── escalas/    # Escalas salariales SUTERH
+│   │   │   │   ├── sac/        # Aguinaldo
+│   │   │   │   └── despido/    # Liquidación final
+│   │   │   ├── expensas/       # Períodos de expensas y gastos
+│   │   │   ├── finanzas/       # Cuenta corriente por unidad
+│   │   │   ├── tickets/        # Gestión de reclamos
+│   │   │   ├── circulares/     # Comunicaciones
+│   │   │   └── proveedores/    # Proveedores y órdenes de trabajo
+│   │   ├── lib/
+│   │   │   ├── db.ts           # Pool de conexiones PostgreSQL
+│   │   │   ├── liquidacion/
+│   │   │   │   └── engine.ts   # Motor de cálculo de sueldos (CCT SUTERH)
+│   │   │   └── expenses/
+│   │   │       └── engine.ts   # Motor de gastos y prorrateo
+│   │   └── components/ui/      # Componentes compartidos
+│   └── package.json
+├── n8n/workflows/              # Exports de workflows n8n (importar manualmente)
+└── agents/                     # Agentes de automatización (opcional)
+```
+
+---
+
+## 📋 Módulos del portal
+
+### Sueldos y Haberes
+- Liquidación mensual según CCT SUTERH con todos los rubros: salario básico, antigüedad, horas extras, feriados, zona desfavorable, caldera, cochera, pileta
+- Cálculo automático de aportes y contribuciones (F.931 AFIP): SIJP, Obra Social, ART, SCVO
+- Contribuciones sindicales: SUTERH (4.5%), FATERYH (6.5%), SERACARH (0.5%)
+- SAC (1° y 2° aguinaldo) con integración de bonificación CCT
+- Liquidación final (despido) con indemnización, vacaciones y SAC proporcional
+- Exportación en formato AFIP LSD
+
+### Expensas
+- Períodos de expensas por consorcio
+- **Gastos Categoría 1** (fijos e impositivos): generación automática al confirmar liquidaciones
+  - Sueldo neto por empleado
+  - F.931, ART, SCVO consolidados (tomados del período anterior)
+  - SUTERH, FATERYH, SERACARH consolidados
+- **Gastos Categorías 2–10** (variables): carga manual
+- Prorrateo por coeficientes A/B con recalculo por período
+- Botón **⚡ Regenerar Cat. 1**: re-procesa gastos fijos en cualquier período
+- Botón **🔁 Recalcular prorrateo**: solo disponible en el período más reciente
+
+### Cuenta Corriente
+- Deuda por unidad
+- Saldo anterior, pagos, intereses automáticos por mora
+
+### Otros
+- **Tickets**: reclamos de inquilinos/propietarios con seguimiento
+- **Circulares**: comunicaciones masivas por consorcio
+- **Proveedores**: ABM con órdenes de trabajo vinculadas a tickets
+
+---
+
+## 🔧 Configuración n8n
+
+### Workflow de escalas SUTERH
+1. Importar `n8n/workflows/actualizar-escalas.json` en n8n
+2. Configurar el trigger para que apunte a `http://localhost:3000/api/sueldos/trigger-escalas`
+3. Generar una API Key en n8n: **Settings > n8n API > Create API Key**
+4. Agregar la key al `.env` del portal como `N8N_API_KEY`
+
+---
+
+## 🗄️ Base de datos
+
+El schema se inicializa automáticamente al levantar el contenedor de Postgres por primera vez.
+
+Para conectarte manualmente:
+```bash
+docker exec -it consorcio-postgres psql -U consorcio -d consorcio
+```
+
+Todas las tablas están bajo el schema `app`:
+```sql
+SET search_path TO app, public;
+\dt  -- lista todas las tablas
+```
+
+---
+
+## 🐳 Modo producción (todo en Docker)
+
+Para correr el portal también en Docker (sin `npm run dev` local):
+
+```bash
+docker compose up -d
+```
+
+El portal queda disponible en **http://localhost:3010** (mapeado desde el puerto 3000 del contenedor).
+
+> Requiere que exista un `portal/Dockerfile` válido.
+
+---
+
+## 📝 Variables de entorno — referencia completa
+
+| Variable | Descripción | Default |
+|---|---|---|
+| `POSTGRES_DB` | Nombre de la base de datos | `consorcio` |
+| `POSTGRES_USER` | Usuario de Postgres | `consorcio` |
+| `POSTGRES_PASSWORD` | Contraseña de Postgres | `consorcio_secret` |
+| `POSTGRES_HOST` | Host de Postgres | `localhost` |
+| `POSTGRES_PORT` | Puerto de Postgres | `5432` |
+| `N8N_USER` | Usuario de n8n | `admin` |
+| `N8N_PASSWORD` | Contraseña de n8n | `admin_secret` |
+| `N8N_ENCRYPTION_KEY` | Clave de encriptación n8n | ⚠️ Cambiar |
+| `N8N_API_KEY` | API Key de n8n para el portal | — |
+| `N8N_BASE_URL` | URL base de n8n | `http://localhost:5678` |
+| `GEMINI_API_KEY` | API Key de Google Gemini (agentes IA) | — |
+| `REDIS_PASSWORD` | Contraseña de Redis | `redis_secret` |
