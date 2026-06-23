@@ -71,7 +71,7 @@ export function AddGastoForm({
         </select>
       </div>
 
-      <div className="flex-1 min-w-40">
+      <div className="flex-1 min-w-35">
         <label className="label text-xs">Concepto</label>
         <input name="concepto" required placeholder="Concepto" className="input" />
       </div>
@@ -100,7 +100,7 @@ export function AddGastoForm({
         />
       </div>
 
-      <div className="w-28">
+      <div className="w-33">
         <label className="label text-xs">Tipo</label>
         <select
           name="_tipo_display"
@@ -123,8 +123,8 @@ export function AddGastoForm({
           {tipo === "A"
             ? "UF (no aplica)"
             : tipo === "B"
-            ? "UFs destinatarias"
-            : "UF destinataria"}
+              ? "UFs destinatarias"
+              : "UF destinataria"}
         </label>
 
         {tipo === "A" && (
@@ -161,9 +161,8 @@ export function AddGastoForm({
               <span className="truncate">
                 {ufsSel.length === 0
                   ? "— Seleccionar UFs —"
-                  : `${ufsSel.length} UF${ufsSel.length > 1 ? "s" : ""} seleccionada${
-                      ufsSel.length > 1 ? "s" : ""
-                    }`}
+                  : `${ufsSel.length} UF${ufsSel.length > 1 ? "s" : ""} seleccionada${ufsSel.length > 1 ? "s" : ""
+                  }`}
               </span>
               <span className="text-gray-400 text-xs">▼</span>
             </button>
