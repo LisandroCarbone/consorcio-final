@@ -2,6 +2,7 @@ import Link from "next/link";
 import { pool } from "@/lib/db";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
+import { cleanPeriodo } from "@/lib/format";
 
 async function getSueldosStats(activeCuit: string, activePeriodo?: string) {
   const db = pool;
@@ -33,7 +34,7 @@ async function getSueldosStats(activeCuit: string, activePeriodo?: string) {
 export default async function SueldosPage() {
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
-  const activePeriodo = cookieStore.get("active_periodo")?.value;
+  const activePeriodo = cleanPeriodo(cookieStore.get("active_periodo")?.value);
 
   const { rows: consorcios } = await pool.query(
     "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"

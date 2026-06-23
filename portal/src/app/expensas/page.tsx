@@ -1,5 +1,5 @@
 import { query } from "@/lib/db";
-import { formatMoney, formatMonth, formatDate } from "@/lib/format";
+import { formatMoney, formatMonth, formatDate, cleanPeriodo } from "@/lib/format";
 import { createPeriodo, calcularExpensas, regenerarGastosFijos } from "./actions";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
@@ -81,14 +81,16 @@ export default async function ExpensasPage({
     );
   }
 
-  const activePeriodo = cookieStore.get("active_periodo")?.value;
+  const activePeriodoRaw = cookieStore.get("active_periodo")?.value;
+  const activePeriodo = cleanPeriodo(activePeriodoRaw);
   let activeYear = 0;
   let activeMonth = 0;
   if (activePeriodo) {
     const parts = activePeriodo.split("-");
     activeYear = Number(parts[0]);
     activeMonth = Number(parts[1]);
-  } else {
+  }
+  if (!activeYear || isNaN(activeYear) || !activeMonth || isNaN(activeMonth)) {
     const now = new Date();
     activeYear = now.getFullYear();
     activeMonth = now.getMonth() + 1;

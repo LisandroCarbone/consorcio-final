@@ -49,7 +49,7 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
   }
 
   // Read active_periodo cookie
-  const activePeriodo = cookieStore.get("active_periodo")?.value;
+  const activePeriodo = cleanPeriodo(cookieStore.get("active_periodo")?.value);
 
   // For SAC periods, default to June (sac_1) or December (sac_2) of current year
   let periodo: string;

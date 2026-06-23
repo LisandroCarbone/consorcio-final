@@ -16,7 +16,7 @@ export default async function NovedadesPage({ searchParams }: Props) {
   
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
-  const activePeriodo = cookieStore.get("active_periodo")?.value;
+  const activePeriodo = cleanPeriodo(cookieStore.get("active_periodo")?.value);
 
   const now = new Date();
   const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
