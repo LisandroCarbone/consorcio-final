@@ -1,8 +1,9 @@
 import { query } from "@/lib/db";
 import { formatMoney, formatMonth, formatDate } from "@/lib/format";
-import { createPeriodo, addGasto, calcularExpensas, regenerarGastosFijos } from "./actions";
+import { createPeriodo, calcularExpensas, regenerarGastosFijos } from "./actions";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
+import { AddGastoForm } from "./AddGastoForm";
 
 async function getData(activeCuit?: string) {
   const params: unknown[] = [];
@@ -35,12 +36,18 @@ async function getData(activeCuit?: string) {
   return { periodos, consorcios };
 }
 
-async function getPeriodoDetail(periodoId: number) {
-  const gastos = await query<{ id: number; concepto: string; monto: string; tipo: string; categoria: number }>(
-    "SELECT id, descripcion AS concepto, monto::numeric, tipo, categoria FROM app.gastos_periodo WHERE periodo_id=$1 ORDER BY categoria, tipo, descripcion",
-    [periodoId]
-  );
-  return { gastos };
+async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
+  const [gastos, unidades] = await Promise.all([
+    query<{ id: number; concepto: string; monto: string; tipo: string; categoria: number }>(
+      "SELECT id, descripcion AS concepto, monto::numeric, tipo, categoria FROM app.gastos_periodo WHERE periodo_id=$1 ORDER BY categoria, tipo, descripcion",
+      [periodoId]
+    ),
+    query<{ id: number; uf: number }>(
+      "SELECT id, uf FROM app.unidades WHERE consorcio_cuit=$1 ORDER BY uf",
+      [consorcioCuit]
+    ),
+  ]);
+  return { gastos, unidades };
 }
 
 const TIPO_COLORS: Record<string, string> = {
@@ -75,7 +82,9 @@ export default async function ExpensasPage({
   }
 
   const selected = selectedPeriodo ? periodos.find((p) => p.id === selectedPeriodo) : null;
-  const detail = selectedPeriodo ? await getPeriodoDetail(selectedPeriodo) : null;
+  const detail = selectedPeriodo && selected
+    ? await getPeriodoDetail(selectedPeriodo, selected.consorcio_id)
+    : null;
 
   // El botón "Recalcular prorrateo" solo aparece en el período más reciente del consorcio.
   // periodos viene ordenado por anio DESC, mes DESC, así que el primero con el mismo
@@ -242,18 +251,10 @@ export default async function ExpensasPage({
                   </>
                 )}
                 {/* Add gasto form */}
-                <form action={addGasto} className="flex gap-2 px-5 py-3 bg-gray-50 border-t border-gray-100">
-                  <input type="hidden" name="periodo_id" value={selected.id} />
-                  <input name="concepto" required placeholder="Concepto" className="input flex-1" />
-                  <input name="monto" type="number" step="0.01" required placeholder="Monto" className="input w-28" />
-                  <select name="tipo" className="input w-36">
-                    <option value="A">Coeficiente A</option>
-                    <option value="B">Coeficiente B</option>
-                    <option value="Particular">Particular</option>
-                  </select>
-                  <input name="target_uf" placeholder="UF (Particular)" className="input w-32" />
-                  <button type="submit" className="btn-primary shrink-0">+ Agregar</button>
-                </form>
+                <AddGastoForm
+                  periodoId={selected.id}
+                  unidades={detail?.unidades ?? []}
+                />
               </div>
 
 

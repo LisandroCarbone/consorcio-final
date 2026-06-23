@@ -124,12 +124,22 @@ export default async function CuentaCorrientePage({
                       <td className="td text-right font-mono">{formatMoney(r.total_expensas)}</td>
                       <td className="td text-right font-mono text-green-700">{formatMoney(r.total_pagado)}</td>
                       <td className="td text-right font-mono font-bold">
-                        <span className={deuda > 0 ? "text-red-600" : "text-green-600"}>
-                          {deuda > 0 ? `- ${formatMoney(deuda)}` : "Al día"}
-                        </span>
+                        {deuda > 0 ? (
+                          <span className="text-red-600">- {formatMoney(deuda)}</span>
+                        ) : (
+                          <span className="text-green-600">Al día</span>
+                        )}
                       </td>
-                      <td className="td text-center text-xs text-gray-500">
-                        {r.ultimo_pago ? formatDate(r.ultimo_pago) : "—"}
+                      <td className="td text-center text-xs">
+                        {deuda > 0 && Number(r.total_pagado) > 0 && (
+                          <span className="badge bg-orange-100 text-orange-700">Pago Parcial</span>
+                        )}
+                        {deuda === 0 && Number(r.total_pagado) > 0 && (
+                          <span className="badge bg-green-100 text-green-700">Al día</span>
+                        )}
+                        {r.ultimo_pago && (
+                          <p className="text-gray-400 mt-0.5">{formatDate(r.ultimo_pago)}</p>
+                        )}
                       </td>
                       <td className="td">
                         <a
