@@ -71,7 +71,7 @@ export default async function ExpensasPage({
 
   if (!activeCuit) {
     return (
-      <div className="max-w-6xl">
+      <div className="w-full">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Expensas</h2>
         <ConsorcioRequerido
           consorcios={consorcios.map((c) => ({ cuit: c.id, nombre: c.nombre }))}
@@ -117,7 +117,7 @@ export default async function ExpensasPage({
   const isUltimoPeriodo = selected ? selected.id === ultimoPeriodoCuit : false;
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Expensas</h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

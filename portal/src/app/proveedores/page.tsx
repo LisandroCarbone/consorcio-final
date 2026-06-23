@@ -83,7 +83,7 @@ export default async function ProveedoresPage({
 
   if (!activeCuit) {
     return (
-      <div className="max-w-6xl">
+      <div className="w-full">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Proveedores</h2>
         <ConsorcioRequerido
           consorcios={consorcios.map((c) => ({ cuit: c.id, nombre: c.nombre }))}
@@ -104,7 +104,7 @@ export default async function ProveedoresPage({
   const otCompletarId = sp.ot_completar ? Number(sp.ot_completar) : null;
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Proveedores</h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

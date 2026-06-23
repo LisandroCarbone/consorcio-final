@@ -34,7 +34,7 @@ export default async function ConsorciosPage() {
   const consorcios = await getConsorcios();
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Consorcios</h2>
         <span className="text-sm text-gray-500">{consorcios.length} consorcio{consorcios.length !== 1 ? 's' : ''}</span>

@@ -42,7 +42,7 @@ export default async function SueldosPage() {
 
   if (!activeCuit) {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="p-6 w-full">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Liquidación de Sueldos</h1>
         <ConsorcioRequerido consorcios={consorcios} seccion="los sueldos" />
       </div>
@@ -57,7 +57,7 @@ export default async function SueldosPage() {
     : "Sin datos";
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Liquidación de Sueldos</h1>

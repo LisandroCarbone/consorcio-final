@@ -47,7 +47,7 @@ export default async function EmpleadosPage() {
 
   if (!activeCuit) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-6 w-full">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Empleados</h1>
         </div>
@@ -67,7 +67,7 @@ export default async function EmpleadosPage() {
 
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Empleados</h1>

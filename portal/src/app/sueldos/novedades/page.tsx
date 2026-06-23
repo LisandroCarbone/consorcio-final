@@ -29,7 +29,7 @@ export default async function NovedadesPage({ searchParams }: Props) {
 
   if (!activeCuit) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-6 w-full">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Novedades del mes</h1>
         <ConsorcioRequerido consorcios={consorciosRows} seccion="las novedades de sueldos" />
       </div>
@@ -77,7 +77,7 @@ export default async function NovedadesPage({ searchParams }: Props) {
   const activeConsorcioNombre = consorcios.find(([cuit]) => cuit === activeCuit)?.[1] || activeCuit;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 w-full">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Novedades del mes</h1>

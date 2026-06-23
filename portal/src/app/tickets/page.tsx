@@ -114,7 +114,7 @@ export default async function TicketsPage({
   ]);
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Tickets</h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">

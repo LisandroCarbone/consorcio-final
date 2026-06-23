@@ -47,7 +47,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
   const coefBTotal = unidades.reduce((acc, u) => acc + parseFloat(u.coef_b), 0);
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <div className="mb-6">
         <p className="text-sm text-gray-500 mb-1">
           <a href="/consorcios" className="hover:underline text-brand-600">Consorcios</a> /

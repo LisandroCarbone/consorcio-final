@@ -41,7 +41,7 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
 
   if (!activeCuit) {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="p-6 w-full">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Liquidaciones</h1>
         <ConsorcioRequerido consorcios={consorcios} seccion="las liquidaciones de sueldos" />
       </div>
@@ -98,7 +98,7 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
     .reduce((s, l) => s + Number(l.neto_a_pagar), 0);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 w-full">
       <Suspense><ActionFeedback /></Suspense>
       <div className="flex items-center justify-between mb-6">
         <div>

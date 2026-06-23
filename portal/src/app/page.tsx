@@ -47,7 +47,7 @@ export default async function DashboardPage() {
   const [stats, tickets] = await Promise.all([getStats(), getTicketsRecientes()]);
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h2>
 
       {/* Stats */}

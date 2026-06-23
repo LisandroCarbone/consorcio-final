@@ -50,9 +50,14 @@ export default async function CuentaCorrientePage({
     consorcio?: string;
     ver_historial?: string;
     ver_pagos?: string;
+    sort?: string;
+    dir?: string;
   }>;
 }) {
   const sp = await searchParams;
+  const sortCol = sp.sort || "";
+  const sortDir = sp.dir === "desc" ? "desc" : "asc";
+
   const consorcios = await query<{ cuit: string; nombre: string }>(
     "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
   );
@@ -62,7 +67,7 @@ export default async function CuentaCorrientePage({
 
   if (!activeCuit) {
     return (
-      <div className="max-w-5xl">
+      <div className="w-full">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Cuenta Corriente</h2>
         <ConsorcioRequerido consorcios={consorcios} seccion="la cuenta corriente" />
       </div>
@@ -77,6 +82,26 @@ export default async function CuentaCorrientePage({
   const totalDeuda = rows.reduce((s, r) => s + Number(r.saldo), 0);
   const totalPagado = rows.reduce((s, r) => s + Number(r.total_pagado), 0);
   const unidadesDeudoras = rows.filter((r) => Number(r.saldo) > 0).length;
+
+  // Apply sorting in memory
+  const sortedRows = [...rows];
+  if (sortCol === "unidad") {
+    sortedRows.sort((a, b) => {
+      const valA = a.unidad_numero || "";
+      const valB = b.unidad_numero || "";
+      return sortDir === "asc"
+        ? valA.localeCompare(valB, undefined, { numeric: true })
+        : valB.localeCompare(valA, undefined, { numeric: true });
+    });
+  } else if (sortCol === "propietario") {
+    sortedRows.sort((a, b) => {
+      const valA = a.propietario || "";
+      const valB = b.propietario || "";
+      return sortDir === "asc"
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA);
+    });
+  }
 
   // Query details if modals are active
   let historyUnitDetails: { uf: string; propietario: string }[] = [];
@@ -142,7 +167,7 @@ export default async function CuentaCorrientePage({
   }
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Cuenta Corriente</h2>
         <p className="text-gray-500 text-sm mt-1">
@@ -169,13 +194,27 @@ export default async function CuentaCorrientePage({
       )}
 
       {/* Table */}
-      {rows.length > 0 && (
-        <div className="card overflow-hidden">
+      {sortedRows.length > 0 && (
+        <div className="card overflow-hidden w-full">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th className="th">Unidad</th>
-                <th className="th">Propietario</th>
+                <th className="th">
+                  <a
+                    href={`?consorcio=${selectedCuit}&sort=unidad&dir=${sortCol === "unidad" && sortDir === "asc" ? "desc" : "asc"}`}
+                    className="hover:text-brand-600 transition-colors inline-flex items-center gap-1 font-semibold text-gray-700 select-none"
+                  >
+                    Unidad {sortCol === "unidad" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                  </a>
+                </th>
+                <th className="th">
+                  <a
+                    href={`?consorcio=${selectedCuit}&sort=propietario&dir=${sortCol === "propietario" && sortDir === "asc" ? "desc" : "asc"}`}
+                    className="hover:text-brand-600 transition-colors inline-flex items-center gap-1 font-semibold text-gray-700 select-none"
+                  >
+                    Propietario {sortCol === "propietario" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                  </a>
+                </th>
                 <th className="th text-right">Expensas emitidas</th>
                 <th className="th text-right">Pagado</th>
                 <th className="th text-right">Saldo</th>
@@ -184,7 +223,7 @@ export default async function CuentaCorrientePage({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {sortedRows.map((r) => {
                 const deuda = Number(r.saldo);
                 const isOpen = pagoUnidadId === r.unidad_id;
                 return (
