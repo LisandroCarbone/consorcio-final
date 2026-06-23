@@ -290,7 +290,7 @@ export default async function ProveedoresPage({
                 <select
                   name="ticket_id"
                   className="input"
-                  value={prefilledTicket ? prefilledTicket.id : ""}
+                  defaultValue={prefilledTicket ? prefilledTicket.id : ""}
                   disabled={!!prefilledTicket}
                   style={prefilledTicket ? { pointerEvents: 'none', backgroundColor: '#f9fafb' } : {}}
                 >
