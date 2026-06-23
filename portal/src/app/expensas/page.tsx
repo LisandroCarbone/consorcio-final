@@ -122,7 +122,7 @@ export default async function ExpensasPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Períodos */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 order-2 lg:order-last">
           <div className="card mb-4">
             <div className="px-5 py-4 border-b border-gray-100">
               <h3 className="font-semibold text-gray-800">Períodos</h3>
@@ -181,7 +181,7 @@ export default async function ExpensasPage({
         </div>
 
         {/* Detalle del período seleccionado */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 order-1 lg:order-first">
           {!selected ? (
             <div className="card p-12 text-center">
               <p className="text-3xl mb-2">💰</p>
