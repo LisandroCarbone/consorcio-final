@@ -191,6 +191,33 @@ export default async function ProveedoresPage({
             )}
           </div>
 
+          {/* Tickets sin OT asignada */}
+          <div className="card">
+            <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-brand-50/50">
+              <h3 className="font-semibold text-gray-800 text-sm">Tickets sin OT ({ticketsPendientes.length})</h3>
+            </div>
+            {ticketsPendientes.length === 0 ? (
+              <p className="px-5 py-6 text-xs text-gray-400 text-center">Todos los tickets tienen OT asignada</p>
+            ) : (
+              <ul className="divide-y divide-gray-100 max-h-56 overflow-y-auto">
+                {ticketsPendientes.map((t) => (
+                  <li key={t.id} className="p-3 hover:bg-gray-50 flex items-start justify-between gap-3 text-xs">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-700 truncate">{t.titulo}</p>
+                      <p className="text-gray-400 text-[10px] mt-0.5">{t.consorcio_nombre} · #{t.id}</p>
+                    </div>
+                    <a
+                      href={`?ticket_id=${t.id}`}
+                      className="text-[10px] text-brand-600 font-bold hover:underline shrink-0 uppercase tracking-wider"
+                    >
+                      Asociar OT
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {/* Lista de proveedores */}
           <div className="card">
             <div className="px-5 py-4 border-b border-gray-100">
@@ -220,33 +247,6 @@ export default async function ProveedoresPage({
         </div>
 
         <div className="space-y-5">
-          {/* Tickets sin OT asignada */}
-          <div className="card">
-            <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-brand-50/50">
-              <h3 className="font-semibold text-gray-800 text-sm">Tickets sin OT ({ticketsPendientes.length})</h3>
-            </div>
-            {ticketsPendientes.length === 0 ? (
-              <p className="px-5 py-6 text-xs text-gray-400 text-center">Todos los tickets tienen OT asignada</p>
-            ) : (
-              <ul className="divide-y divide-gray-100 max-h-56 overflow-y-auto">
-                {ticketsPendientes.map((t) => (
-                  <li key={t.id} className="p-3 hover:bg-gray-50 flex items-start justify-between gap-3 text-xs">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-700 truncate">{t.titulo}</p>
-                      <p className="text-gray-400 text-[10px] mt-0.5">{t.consorcio_nombre} · #{t.id}</p>
-                    </div>
-                    <a
-                      href={`?ticket_id=${t.id}`}
-                      className="text-[10px] text-brand-600 font-bold hover:underline shrink-0 uppercase tracking-wider"
-                    >
-                      Asociar OT
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
           {/* Nueva OT */}
           <div className="card p-5">
             <div className="flex justify-between items-center mb-3">
