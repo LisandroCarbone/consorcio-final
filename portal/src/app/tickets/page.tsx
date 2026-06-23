@@ -83,6 +83,18 @@ const ESTADOS_NEXT: Record<string, string[]> = {
   resuelto: ["cerrado"],
 };
 
+const CATEGORIAS_LABEL: Record<string, string> = {
+  "2": "Servicios Públicos",
+  "3": "Abonos de Servicios",
+  "4": "Mantenimiento Común",
+  "5": "Reparaciones en Unidades",
+  "6": "Gastos Bancarios",
+  "7": "Gastos de Limpieza",
+  "8": "Gastos Administración",
+  "9": "Seguros",
+  "10": "Otros Gastos",
+};
+
 export default async function TicketsPage({
   searchParams,
 }: {
@@ -137,6 +149,7 @@ export default async function TicketsPage({
                   <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                     <span className={`badge ${PRIORIDAD[t.prioridad]}`}>{t.prioridad}</span>
                     <span className={`badge ${ESTADO[t.estado]}`}>{t.estado.replace("_", " ")}</span>
+                    <span className="badge bg-blue-50 text-blue-700 text-[10px]">{CATEGORIAS_LABEL[t.categoria] || t.categoria}</span>
                   </div>
                   <p className="text-sm font-medium truncate">{t.titulo}</p>
                   <p className="text-xs text-gray-500">{t.consorcio_nombre} · {formatDate(t.created_at)}</p>
@@ -176,10 +189,16 @@ export default async function TicketsPage({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="label">Categoría</label>
-                  <select name="categoria" className="input">
-                    {["general","plomeria","electricidad","limpieza","ascensor","administracion","otro"].map(c => (
-                      <option key={c} value={c} className="capitalize">{c}</option>
-                    ))}
+                  <select name="categoria" className="input" defaultValue="10">
+                    <option value="2">Servicios Públicos (2)</option>
+                    <option value="3">Abonos de Servicios (3)</option>
+                    <option value="4">Mantenimiento Común (4)</option>
+                    <option value="5">Reparaciones en Unidades (5)</option>
+                    <option value="6">Gastos Bancarios (6)</option>
+                    <option value="7">Gastos de Limpieza (7)</option>
+                    <option value="8">Gastos Administración (8)</option>
+                    <option value="9">Seguros (9)</option>
+                    <option value="10">Otros Gastos (10)</option>
                   </select>
                 </div>
                 <div>
@@ -217,6 +236,7 @@ export default async function TicketsPage({
                   <div className="flex gap-1.5 shrink-0 flex-wrap">
                     <span className={`badge ${PRIORIDAD[detail.ticket.prioridad]}`}>{detail.ticket.prioridad}</span>
                     <span className={`badge ${ESTADO[detail.ticket.estado]}`}>{detail.ticket.estado.replace("_", " ")}</span>
+                    <span className="badge bg-blue-50 text-blue-700">{CATEGORIAS_LABEL[detail.ticket.categoria] || detail.ticket.categoria}</span>
                   </div>
                 </div>
                 {detail.ticket.descripcion && (

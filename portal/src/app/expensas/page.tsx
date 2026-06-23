@@ -81,9 +81,29 @@ export default async function ExpensasPage({
     );
   }
 
-  const selected = selectedPeriodo ? periodos.find((p) => p.id === selectedPeriodo) : null;
-  const detail = selectedPeriodo && selected
-    ? await getPeriodoDetail(selectedPeriodo, selected.consorcio_id)
+  const activePeriodo = cookieStore.get("active_periodo")?.value;
+  let activeYear = 0;
+  let activeMonth = 0;
+  if (activePeriodo) {
+    const parts = activePeriodo.split("-");
+    activeYear = Number(parts[0]);
+    activeMonth = Number(parts[1]);
+  } else {
+    const now = new Date();
+    activeYear = now.getFullYear();
+    activeMonth = now.getMonth() + 1;
+  }
+
+  const matchedPeriod = periodos.find(
+    (p) => p.consorcio_id === activeCuit && p.anio === activeYear && p.mes === activeMonth
+  );
+
+  const selected = selectedPeriodo
+    ? periodos.find((p) => p.id === selectedPeriodo)
+    : matchedPeriod || null;
+
+  const detail = selected
+    ? await getPeriodoDetail(selected.id, selected.consorcio_id)
     : null;
 
   // El botón "Recalcular prorrateo" solo aparece en el período más reciente del consorcio.
@@ -161,9 +181,32 @@ export default async function ExpensasPage({
         {/* Detalle del período seleccionado */}
         <div className="lg:col-span-2">
           {!selected ? (
-            <div className="card p-12 text-center text-gray-400">
+            <div className="card p-12 text-center">
               <p className="text-3xl mb-2">💰</p>
-              <p>Seleccioná un período para ver el detalle</p>
+              <h4 className="font-semibold text-gray-800 mb-1">Período no inicializado</h4>
+              <p className="text-gray-500 text-sm mb-4">
+                No existe el período para {formatMonth(activeYear, activeMonth)} en este consorcio.
+              </p>
+              <div className="max-w-sm mx-auto bg-gray-50 p-5 rounded-lg border border-gray-100 text-left">
+                <h5 className="text-xs font-bold text-gray-700 uppercase mb-2">Crear período ahora</h5>
+                <form action={createPeriodo} className="space-y-3">
+                  <input type="hidden" name="consorcio_id" value={activeCuit} />
+                  <input type="hidden" name="anio" value={activeYear} />
+                  <input type="hidden" name="mes" value={activeMonth} />
+                  <div>
+                    <label className="label">Vencimiento</label>
+                    <input
+                      name="fecha_vencimiento"
+                      type="date"
+                      className="input"
+                      defaultValue={new Date(activeYear, activeMonth - 1, 10).toISOString().slice(0, 10)}
+                    />
+                  </div>
+                  <button type="submit" className="btn-primary w-full justify-center">
+                    Crear período {formatMonth(activeYear, activeMonth)}
+                  </button>
+                </form>
+              </div>
             </div>
           ) : (
             <div className="space-y-5">

@@ -13,6 +13,11 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+  const activePeriodoRaw = cookieStore.get("active_periodo")?.value;
+
+  const now = new Date();
+  const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const activePeriodo = activePeriodoRaw || defaultPeriod;
 
   const consorcios = await query<{ cuit: string; nombre: string }>(
     "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
@@ -23,7 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <Nav />
         <div className="ml-56 flex flex-col min-h-screen">
-          <TopBar consorcios={consorcios} activeCuit={activeCuit} />
+          <TopBar consorcios={consorcios} activeCuit={activeCuit} activePeriodo={activePeriodo} />
           <main className="flex-1 p-8 bg-gray-50">{children}</main>
         </div>
       </body>

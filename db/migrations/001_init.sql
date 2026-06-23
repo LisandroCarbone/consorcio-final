@@ -446,8 +446,8 @@ CREATE TABLE IF NOT EXISTS app.tickets (
     persona_id      INTEGER REFERENCES app.personas(id) ON DELETE SET NULL,
     titulo          VARCHAR(255) NOT NULL,
     descripcion     TEXT,
-    categoria       VARCHAR(50) DEFAULT 'general'
-        CHECK (categoria IN ('general','plomeria','electricidad','limpieza','ascensor','administracion','otro')),
+    categoria       VARCHAR(50) DEFAULT '10'
+        CHECK (categoria IN ('2','3','4','5','6','7','8','9','10')),
     prioridad       VARCHAR(20) NOT NULL DEFAULT 'normal'
         CHECK (prioridad IN ('baja','normal','alta','urgente')),
     estado          VARCHAR(30) NOT NULL DEFAULT 'abierto'

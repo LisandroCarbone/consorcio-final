@@ -13,13 +13,14 @@ interface Props {
 export default async function NovedadesPage({ searchParams }: Props) {
   const { periodo: periodoParam } = await searchParams;
   const cleanedPeriodo = cleanPeriodo(periodoParam);
-  const now = new Date();
-  const periodo =
-    cleanedPeriodo ??
-    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-
+  
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+  const activePeriodo = cookieStore.get("active_periodo")?.value;
+
+  const now = new Date();
+  const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const periodo = cleanedPeriodo || activePeriodo || defaultPeriod;
 
   // Get consorcios for fallback
   const { rows: consorciosRows } = await pool.query(

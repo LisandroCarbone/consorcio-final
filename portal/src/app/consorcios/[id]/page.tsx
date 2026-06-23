@@ -16,17 +16,21 @@ async function getData(cuit: string) {
     ),
     query<{
       id: number; uf: number; coef_a: string; coef_b: string; tipo: string;
-      ocupante_nombre: string | null; ocupante_email: string | null;
-      ocupante_whatsapp: string | null; ocupante_rol: string | null;
+      propietario_nombre: string | null; propietario_email: string | null; propietario_whatsapp: string | null;
+      inquilino_nombre: string | null; inquilino_email: string | null; inquilino_whatsapp: string | null;
     }>(
       `SELECT u.id, u.uf, u.coef_a, u.coef_b, u.tipo,
-              p.nombre || ' ' || p.apellido AS ocupante_nombre,
-              p.email AS ocupante_email,
-              p.whatsapp AS ocupante_whatsapp,
-              o.rol AS ocupante_rol
+              prop.nombre || ' ' || prop.apellido AS propietario_nombre,
+              prop.email AS propietario_email,
+              prop.whatsapp AS propietario_whatsapp,
+              inq.nombre || ' ' || inq.apellido AS inquilino_nombre,
+              inq.email AS inquilino_email,
+              inq.whatsapp AS inquilino_whatsapp
        FROM app.unidades u
-       LEFT JOIN app.ocupantes o ON o.unidad_id=u.id AND o.activo=true AND o.rol='propietario'
-       LEFT JOIN app.personas p ON p.id=o.persona_id
+       LEFT JOIN app.ocupantes o_prop ON o_prop.unidad_id=u.id AND o_prop.activo=true AND o_prop.rol='propietario'
+       LEFT JOIN app.personas prop ON prop.id=o_prop.persona_id
+       LEFT JOIN app.ocupantes o_inq ON o_inq.unidad_id=u.id AND o_inq.activo=true AND o_inq.rol='inquilino'
+       LEFT JOIN app.personas inq ON inq.id=o_inq.persona_id
        WHERE u.consorcio_cuit=$1 ORDER BY u.uf`,
       [cuit]
     ),
@@ -69,7 +73,11 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                 <th className="th text-right">Coef. A</th>
                 <th className="th text-right">Coef. B</th>
                 <th className="th">Propietario</th>
-                <th className="th">Email / WhatsApp</th>
+                <th className="th">Email Prop.</th>
+                <th className="th">WhatsApp Prop.</th>
+                <th className="th">Inquilino</th>
+                <th className="th">Email Inq.</th>
+                <th className="th">WhatsApp Inq.</th>
               </tr>
             </thead>
             <tbody>
@@ -79,8 +87,12 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                   <td className="td text-gray-500 capitalize">{u.tipo}</td>
                   <td className="td text-right font-mono text-sm">{parseFloat(u.coef_a).toFixed(4)}</td>
                   <td className="td text-right font-mono text-sm">{parseFloat(u.coef_b).toFixed(4)}</td>
-                  <td className="td">{u.ocupante_nombre ?? <span className="text-gray-400 italic text-xs">Sin asignar</span>}</td>
-                  <td className="td text-sm text-gray-500">{u.ocupante_email ?? "—"} {u.ocupante_whatsapp ? `· ${u.ocupante_whatsapp}` : ""}</td>
+                  <td className="td font-medium text-gray-800">{u.propietario_nombre ?? <span className="text-gray-400 italic text-xs font-normal">Sin asignar</span>}</td>
+                  <td className="td text-xs text-gray-600 font-mono">{u.propietario_email ?? "—"}</td>
+                  <td className="td text-xs text-gray-600 font-mono">{u.propietario_whatsapp ?? "—"}</td>
+                  <td className="td font-medium text-gray-800">{u.inquilino_nombre ?? <span className="text-gray-400 italic text-xs font-normal">Sin asignar</span>}</td>
+                  <td className="td text-xs text-gray-600 font-mono">{u.inquilino_email ?? "—"}</td>
+                  <td className="td text-xs text-gray-600 font-mono">{u.inquilino_whatsapp ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

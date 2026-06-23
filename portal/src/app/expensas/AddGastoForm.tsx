@@ -14,6 +14,7 @@ export function AddGastoForm({
 }) {
   const [tipo, setTipo] = useState<"A" | "B" | "Particular">("A");
   const [ufsSel, setUfsSel] = useState<number[]>([]);
+  const [showUfDropdown, setShowUfDropdown] = useState(false);
 
   const toggleUf = (id: number) =>
     setUfsSel((prev) =>
@@ -37,6 +38,8 @@ export function AddGastoForm({
             sfd.set("monto", fd.get("monto") as string);
             sfd.set("tipo", "B");
             sfd.set("target_uf", String(u.uf));
+            sfd.set("categoria", fd.get("categoria") as string);
+            sfd.set("cuotas", fd.get("cuotas") as string);
             await addGasto(sfd);
           }
         } else {
@@ -53,13 +56,28 @@ export function AddGastoForm({
         <input type="hidden" name="target_uf" value={particularUf.uf} />
       )}
 
+      <div className="w-48">
+        <label className="label text-xs">Categoría</label>
+        <select name="categoria" className="input" defaultValue="10">
+          <option value="2">2 - Servicios Públicos</option>
+          <option value="3">3 - Abonos de Servicios</option>
+          <option value="4">4 - Mantenimiento Común</option>
+          <option value="5">5 - Reparaciones en Unidades</option>
+          <option value="6">6 - Gastos Bancarios</option>
+          <option value="7">7 - Gastos de Limpieza</option>
+          <option value="8">8 - Gastos Administración</option>
+          <option value="9">9 - Seguros</option>
+          <option value="10">10 - Otros Gastos</option>
+        </select>
+      </div>
+
       <div className="flex-1 min-w-40">
         <label className="label text-xs">Concepto</label>
         <input name="concepto" required placeholder="Concepto" className="input" />
       </div>
 
-      <div className="w-28">
-        <label className="label text-xs">Monto</label>
+      <div className="w-24">
+        <label className="label text-xs">Monto total</label>
         <input
           name="monto"
           type="number"
@@ -70,7 +88,19 @@ export function AddGastoForm({
         />
       </div>
 
-      <div className="w-36">
+      <div className="w-20">
+        <label className="label text-xs">Cuotas</label>
+        <input
+          name="cuotas"
+          type="number"
+          min="1"
+          defaultValue="1"
+          required
+          className="input"
+        />
+      </div>
+
+      <div className="w-28">
         <label className="label text-xs">Tipo</label>
         <select
           name="_tipo_display"
@@ -122,28 +152,51 @@ export function AddGastoForm({
         )}
 
         {tipo === "B" && (
-          <div className="border border-gray-200 rounded-md bg-white max-h-36 overflow-y-auto p-1 min-w-40">
-            {unidades.length === 0 && (
-              <p className="text-xs text-gray-400 px-2 py-1">Sin unidades</p>
-            )}
-            {unidades.map((u) => (
-              <label
-                key={u.id}
-                className="flex items-center gap-2 px-2 py-0.5 hover:bg-gray-50 rounded cursor-pointer text-sm"
-              >
-                <input
-                  type="checkbox"
-                  className="accent-brand-600"
-                  checked={ufsSel.includes(u.id)}
-                  onChange={() => toggleUf(u.id)}
+          <div className="relative min-w-48">
+            <button
+              type="button"
+              onClick={() => setShowUfDropdown(!showUfDropdown)}
+              className="input text-left flex justify-between items-center text-sm bg-white"
+            >
+              <span className="truncate">
+                {ufsSel.length === 0
+                  ? "— Seleccionar UFs —"
+                  : `${ufsSel.length} UF${ufsSel.length > 1 ? "s" : ""} seleccionada${
+                      ufsSel.length > 1 ? "s" : ""
+                    }`}
+              </span>
+              <span className="text-gray-400 text-xs">▼</span>
+            </button>
+            {showUfDropdown && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowUfDropdown(false)}
                 />
-                UF {u.uf}
-              </label>
-            ))}
-            {ufsSel.length > 0 && (
-              <p className="text-xs text-brand-600 px-2 pt-1 border-t border-gray-100 mt-1">
-                {ufsSel.length} seleccionada{ufsSel.length > 1 ? "s" : ""}
-              </p>
+                <div className="absolute left-0 top-full mt-1 z-20 w-full border border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto p-2 shadow-lg space-y-1">
+                  {unidades.length === 0 ? (
+                    <p className="text-xs text-gray-400 p-2">Sin unidades</p>
+                  ) : (
+                    unidades.map((u) => {
+                      const isChecked = ufsSel.includes(u.id);
+                      return (
+                        <label
+                          key={u.id}
+                          className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-sm text-gray-700"
+                        >
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                            checked={isChecked}
+                            onChange={() => toggleUf(u.id)}
+                          />
+                          <span>UF {u.uf}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}

@@ -164,6 +164,7 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
   let totalPagosB = 0;
   let totalGastosParticulares = 0;
   const unitParticularMap = new Map<number, number>(); // Map of unidad_id -> particular amount
+  const unitBMap = new Map<number, number>(); // Map of unidad_id -> unit-specific Coef B amount
 
   expenses.forEach(e => {
     const val = Number(e.monto || 0);
@@ -173,7 +174,11 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
         unitParticularMap.set(e.unidad_id, (unitParticularMap.get(e.unidad_id) || 0) + val);
       }
     } else if (e.tipo === "B") {
-      totalPagosB += val;
+      if (e.unidad_id) {
+        unitBMap.set(e.unidad_id, (unitBMap.get(e.unidad_id) || 0) + val);
+      } else {
+        totalPagosB += val;
+      }
     } else {
       totalPagosA += val;
     }
@@ -182,7 +187,9 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
   const totalPrevisiones = Number(periodo.total_previsiones || 0);
   const totalProrrateoA = round2(totalPagosA + totalPrevisiones);
   const totalProrrateoB = round2(totalPagosB);
-  const totalProrrateoAyB = round2(totalProrrateoA + totalProrrateoB);
+  // Calculate total prorrateo including specific Coef B expenses and particulars for trace
+  const totalBAndPart = Array.from(unitBMap.values()).reduce((sum, v) => sum + v, 0);
+  const totalProrrateoAyB = round2(totalProrrateoA + totalProrrateoB + totalBAndPart);
 
   // 8. Fetch payments in app.pagos for each unit in this period
   // We can query payments registered for this consorcio in this month
@@ -201,7 +208,7 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
   // 9. Calculate prorrateo for each unit and save to res_cuenta_periodo
   for (const u of units) {
     const expensasA = round2(totalProrrateoA * Number(u.coef_a) / divisorA);
-    const expensasB = round2(totalProrrateoB * Number(u.coef_b) / divisorB);
+    const expensasB = round2(totalProrrateoB * Number(u.coef_b) / divisorB) + round2(unitBMap.get(u.id) || 0);
     const gastPart = round2(unitParticularMap.get(u.id) || 0);
 
     const exist = existingMap.get(u.id);

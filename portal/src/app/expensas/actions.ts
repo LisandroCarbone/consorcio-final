@@ -2,7 +2,8 @@
 
 import { query, queryOne, pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { runCalculateExpenses, calculateEmployerObligations } from "@/lib/expenses/engine";
+import { runCalculateExpenses, calculateEmployerObligations, round2 } from "@/lib/expenses/engine";
+import { calcularLiquidacionesPeriodo } from "@/app/sueldos/actions";
 
 export async function createPeriodo(formData: FormData) {
   const consorcio_cuit = formData.get("consorcio_id") as string;
@@ -22,14 +23,17 @@ export async function addGasto(formData: FormData) {
   const monto = Number(formData.get("monto"));
   const tipo = (formData.get("tipo") as string) || "A";
   const targetUf = formData.get("target_uf") as string;
+  const categoria = Number(formData.get("categoria") || 10);
+  const cuotas = Number(formData.get("cuotas") || 1);
 
-  const period = await queryOne<{ consorcio_cuit: string }>(
-    "SELECT consorcio_cuit FROM app.periodos_expensas WHERE id = $1",
+  const period = await queryOne<{ consorcio_cuit: string; anio: number; mes: number }>(
+    "SELECT consorcio_cuit, anio, mes FROM app.periodos_expensas WHERE id = $1",
     [periodo_id]
   );
+  if (!period) throw new Error("Período no encontrado");
 
   let unidad_id = null;
-  if (targetUf && period) {
+  if (targetUf) {
     const ufNum = Number(targetUf.trim());
     if (!isNaN(ufNum)) {
       const unit = await queryOne<{ id: number }>(
@@ -42,11 +46,59 @@ export async function addGasto(formData: FormData) {
     }
   }
 
-  await queryOne(
-    `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id) 
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [periodo_id, 10, concepto, monto, tipo, unidad_id]
-  );
+  if (cuotas > 1) {
+    const baseInstallment = round2(monto / cuotas);
+    const lastInstallment = round2(monto - baseInstallment * (cuotas - 1));
+
+    for (let c = 1; c <= cuotas; c++) {
+      const currentMonto = c === cuotas ? lastInstallment : baseInstallment;
+
+      // Calculate year and month
+      let targetMonth = period.mes + (c - 1);
+      let targetYear = period.anio;
+      while (targetMonth > 12) {
+        targetMonth -= 12;
+        targetYear += 1;
+      }
+
+      // Check if target period exists
+      let targetPeriod = await queryOne<{ id: number }>(
+        "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 AND anio = $2 AND mes = $3",
+        [period.consorcio_cuit, targetYear, targetMonth]
+      );
+
+      // If it doesn't exist, create it
+      if (!targetPeriod) {
+        targetPeriod = await queryOne<{ id: number }>(
+          `INSERT INTO app.periodos_expensas (consorcio_cuit, anio, mes, estado) 
+           VALUES ($1, $2, $3, 'abierto') RETURNING id`,
+          [period.consorcio_cuit, targetYear, targetMonth]
+        );
+      }
+
+      const targetPeriodId = targetPeriod ? targetPeriod.id : periodo_id;
+
+      await queryOne(
+        `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id) 
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          targetPeriodId,
+          categoria,
+          `${concepto} (Cuota ${c}/${cuotas})`,
+          currentMonto,
+          tipo,
+          unidad_id,
+        ]
+      );
+    }
+  } else {
+    await queryOne(
+      `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [periodo_id, categoria, concepto, monto, tipo, unidad_id]
+    );
+  }
+
   revalidatePath("/expensas");
 }
 
@@ -78,6 +130,15 @@ export async function regenerarGastosFijos(periodoId: number) {
   if (!period) throw new Error(`Período ${periodoId} no encontrado`);
 
   const { consorcio_cuit, anio, mes } = period;
+  const periodDate = `${anio}-${String(mes).padStart(2, "0")}-01`;
+
+  // First trigger sueldos calculations for the period (Task 8)
+  try {
+    await calcularLiquidacionesPeriodo(periodDate);
+  } catch (err) {
+    console.error("Error running calcularLiquidacionesPeriodo during Category 1 regeneration:", err);
+  }
+
   const client = await pool.connect();
 
   try {

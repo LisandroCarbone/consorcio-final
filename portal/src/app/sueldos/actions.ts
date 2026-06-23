@@ -423,7 +423,7 @@ async function regenerateCategory1Expenses(
 
   // Set gastos_generados = true for all confirmed liquidaciones in the current period
   if (currentLiqsRes.rows.length > 0) {
-    const ids = currentLiqsRes.rows.map(l => l.id).join(",");
+    const ids = currentLiqsRes.rows.map((l: any) => l.id).join(",");
     await client.query(`
       UPDATE app.liquidaciones_sueldo
       SET gastos_generados = true

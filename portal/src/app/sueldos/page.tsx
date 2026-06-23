@@ -3,10 +3,11 @@ import { pool } from "@/lib/db";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 
-async function getSueldosStats(activeCuit: string) {
+async function getSueldosStats(activeCuit: string, activePeriodo?: string) {
   const db = pool;
   const now = new Date();
-  const periodo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const periodo = activePeriodo || defaultPeriod;
 
   const [{ rows: [stats] }, { rows: [escala] }] = await Promise.all([
     db.query(`
@@ -32,6 +33,7 @@ async function getSueldosStats(activeCuit: string) {
 export default async function SueldosPage() {
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+  const activePeriodo = cookieStore.get("active_periodo")?.value;
 
   const { rows: consorcios } = await pool.query(
     "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
@@ -46,7 +48,7 @@ export default async function SueldosPage() {
     );
   }
 
-  const stats = await getSueldosStats(activeCuit);
+  const stats = await getSueldosStats(activeCuit, activePeriodo);
 
   const mes = new Date(stats.periodo).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
   const escalaLabel = stats.ultima_escala

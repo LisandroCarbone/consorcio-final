@@ -48,15 +48,20 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
     );
   }
 
+  // Read active_periodo cookie
+  const activePeriodo = cookieStore.get("active_periodo")?.value;
+
   // For SAC periods, default to June (sac_1) or December (sac_2) of current year
   let periodo: string;
   if (!cleanedPeriodo) {
     if (tipo === "sac_1") {
-      periodo = `${now.getFullYear()}-06-01`;
+      const year = activePeriodo ? activePeriodo.slice(0, 4) : now.getFullYear();
+      periodo = `${year}-06-01`;
     } else if (tipo === "sac_2") {
-      periodo = `${now.getFullYear()}-12-01`;
+      const year = activePeriodo ? activePeriodo.slice(0, 4) : now.getFullYear();
+      periodo = `${year}-12-01`;
     } else {
-      periodo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      periodo = activePeriodo || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     }
   } else {
     periodo = cleanedPeriodo;
