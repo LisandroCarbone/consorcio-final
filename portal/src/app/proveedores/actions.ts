@@ -94,18 +94,23 @@ export async function completarOrdenTrabajo(formData: FormData) {
     [ot.consorcio_cuit]
   );
 
-  if (period) {
-    const concepto = `OT #${otId} — ${ticketTitulo || ot.descripcion}`;
-    const tipo = ticketUnidadId ? "Particular" : "A";
-
-    await queryOne(
-      `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id) 
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [period.id, Number(ticketCategoria), concepto, montoFinal, tipo, ticketUnidadId]
+  if (!period) {
+    throw new Error(
+      "No hay un período de expensas abierto para este consorcio. Por favor, abra un período en la sección de Expensas antes de completar la orden de trabajo para que el gasto pueda ser registrado."
     );
-
-    await runCalculateExpenses(period.id);
   }
+
+  const concepto = `OT #${otId} — ${ticketTitulo || ot.descripcion}`;
+  const tipo = ticketUnidadId ? "Particular" : "A";
+
+  await queryOne(
+    `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id) 
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [period.id, Number(ticketCategoria), concepto, montoFinal, tipo, ticketUnidadId]
+  );
+
+  await runCalculateExpenses(period.id);
+
 
   revalidatePath("/proveedores");
   revalidatePath("/tickets");
