@@ -7,10 +7,11 @@ const config: Config = {
       colors: {
         brand: {
           50: "#eff6ff",
-          100: "#dbeafe",
-          600: "#1a3c5e",
-          700: "#152f4a",
-          800: "#0f2236",
+          100: "var(--brand-100)",
+          200: "var(--brand-200)",
+          600: "var(--brand-600)",
+          700: "var(--brand-700)",
+          800: "var(--brand-800)",
         },
       },
     },

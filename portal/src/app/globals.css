@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --brand-100: #dbeafe;
+  --brand-200: #bfdbfe;
+  --brand-600: #1a3c5e;
+  --brand-700: #152f4a;
+  --brand-800: #0f2236;
+}
+
+[data-theme="orange"] {
+  --brand-100: #ffedd5;
+  --brand-200: #fed7aa;
+  --brand-600: #ea580c;
+  --brand-700: #c2410c;
+  --brand-800: #9a3412;
+}
+
 @layer base {
   body { @apply bg-gray-50 text-gray-900; }
 }

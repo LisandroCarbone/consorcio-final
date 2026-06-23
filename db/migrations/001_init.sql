@@ -105,15 +105,14 @@ CREATE TRIGGER trg_personas_updated_at BEFORE UPDATE ON app.personas
 CREATE TABLE IF NOT EXISTS app.unidades (
     id                SERIAL PRIMARY KEY,
     consorcio_cuit    VARCHAR(20) NOT NULL REFERENCES app.consorcios(cuit) ON DELETE CASCADE,
-    uf                INTEGER NOT NULL,           -- número de unidad funcional
+    uf                VARCHAR(50) NOT NULL,       -- número/identificador de unidad funcional
     piso              VARCHAR(10),
     depto             VARCHAR(10),
     coef_a            NUMERIC(7,4) NOT NULL CHECK (coef_a >= 0),
     coef_b            NUMERIC(7,4) NOT NULL DEFAULT 0 CHECK (coef_b >= 0),
     tipo              VARCHAR(50) DEFAULT 'departamento',
     created_at        TIMESTAMPTZ DEFAULT now() NOT NULL,
-    updated_at        TIMESTAMPTZ DEFAULT now() NOT NULL,
-    UNIQUE (consorcio_cuit, uf)
+    updated_at        TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 
 DROP TRIGGER IF EXISTS trg_unidades_updated_at ON app.unidades;
@@ -331,7 +330,7 @@ CREATE TABLE IF NOT EXISTS app.gastos_periodo (
     periodo_id      INTEGER NOT NULL REFERENCES app.periodos_expensas(id) ON DELETE CASCADE,
     categoria       SMALLINT NOT NULL CHECK (categoria BETWEEN 1 AND 10),
     descripcion     VARCHAR(500) NOT NULL,
-    monto           NUMERIC(12,2) NOT NULL CHECK (monto >= 0),
+    monto           NUMERIC(12,2) NOT NULL,
     tipo            VARCHAR(10) NOT NULL CHECK (tipo IN ('A','B','Particular')),
 
     -- Si tipo = 'Particular', a qué unidad se asigna

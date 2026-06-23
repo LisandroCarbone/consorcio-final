@@ -18,13 +18,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const now = new Date();
   const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const activePeriodo = activePeriodoRaw || defaultPeriod;
+  const theme = cookieStore.get("theme")?.value || "default";
 
   const consorcios = await query<{ cuit: string; nombre: string }>(
     "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
   );
 
   return (
-    <html lang="es">
+    <html lang="es" data-theme={theme}>
       <body>
         <Nav />
         <div className="ml-56 flex flex-col min-h-screen">
