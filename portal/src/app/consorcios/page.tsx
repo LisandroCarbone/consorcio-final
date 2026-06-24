@@ -3,14 +3,27 @@ export const dynamic = 'force-dynamic';
 import { query } from "@/lib/db";
 import Link from "next/link";
 import { createConsorcio } from "./actions";
+import { DataTable } from "@/components/ui/DataTable";
+import { ColumnDef } from "@tanstack/react-table";
+
+interface ConsorcioRow {
+  cuit: string;
+  nombre: string;
+  direccion: string;
+  codigo_postal: string | null;
+  categoria_edificio: string | null;
+  banco: string | null;
+  cant_uf: number | null;
+  tiene_cochera: boolean;
+  tiene_jardin: boolean;
+  tiene_pileta: boolean;
+  total_unidades: string;
+  total_empleados: string;
+  [key: string]: unknown;
+}
 
 async function getConsorcios() {
-  return query<{
-    cuit: string; nombre: string; direccion: string; codigo_postal: string | null;
-    categoria_edificio: string | null; banco: string | null; cant_uf: number | null;
-    tiene_cochera: boolean; tiene_jardin: boolean; tiene_pileta: boolean;
-    total_unidades: string; total_empleados: string;
-  }>(
+  return query<ConsorcioRow>(
     `SELECT c.cuit, c.nombre, c.direccion, c.codigo_postal,
             c.categoria_edificio, c.banco, c.cant_uf,
             c.tiene_cochera, c.tiene_jardin, c.tiene_pileta,
@@ -23,12 +36,87 @@ async function getConsorcios() {
   );
 }
 
-const CAT_COLORS: Record<string, string> = {
-  '1° Cat.': 'bg-purple-100 text-purple-700',
-  '2° Cat.': 'bg-blue-100 text-blue-700',
-  '3° Cat.': 'bg-green-100 text-green-700',
-  '4° Cat.': 'bg-gray-100 text-gray-600',
-};
+const columns: ColumnDef<ConsorcioRow>[] = [
+  {
+    accessorKey: "nombre",
+    header: "Nombre",
+    cell: ({ row }) => <span className="font-semibold text-gray-900">{row.original.nombre}</span>,
+  },
+  {
+    accessorKey: "direccion",
+    header: "Dirección",
+    cell: ({ row }) => (
+      <span className="text-gray-500 text-xs">
+        {row.original.direccion}
+        {row.original.codigo_postal ? ` (${row.original.codigo_postal})` : ""}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "cuit",
+    header: "CUIT",
+    cell: ({ row }) => <span className="text-gray-400 font-mono text-xs">{row.original.cuit ?? "—"}</span>,
+  },
+  {
+    accessorKey: "categoria_edificio",
+    header: "Cat.",
+    cell: ({ row }) => {
+      const cat = row.original.categoria_edificio;
+      if (!cat) return "—";
+      const colors = {
+        '1° Cat.': 'bg-purple-100 text-purple-700',
+        '2° Cat.': 'bg-blue-100 text-blue-700',
+        '3° Cat.': 'bg-green-100 text-green-700',
+        '4° Cat.': 'bg-gray-100 text-gray-600',
+      } as Record<string, string>;
+      return (
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors[cat] ?? 'bg-gray-100 text-gray-600'}`}>
+          {cat}
+        </span>
+      );
+    }
+  },
+  {
+    accessorKey: "cant_uf",
+    header: "UF",
+    cell: ({ row }) => <span className="text-gray-700 font-medium">{row.original.cant_uf ?? "—"}</span>,
+  },
+  {
+    accessorKey: "banco",
+    header: "Banco",
+    cell: ({ row }) => <span className="text-gray-500 text-xs">{row.original.banco ?? "—"}</span>,
+  },
+  {
+    id: "amenities",
+    header: "Amenities",
+    cell: ({ row }) => {
+      const icons = [
+        row.original.tiene_cochera && '🚗',
+        row.original.tiene_jardin && '🌳',
+        row.original.tiene_pileta && '🏊',
+      ].filter(Boolean);
+      return <span className="text-sm">{icons.length > 0 ? icons.join(" ") : "—"}</span>;
+    }
+  },
+  {
+    accessorKey: "total_empleados",
+    header: "Empleados",
+    cell: ({ row }) => <span className="text-gray-700 font-medium">{row.original.total_empleados}</span>,
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => (
+      <div className="flex gap-3 pr-4">
+        <Link href={`/consorcios/${row.original.cuit}`} className="text-brand-600 text-xs hover:underline font-semibold">
+          Ver →
+        </Link>
+        <Link href={`/consorcios/${row.original.cuit}/editar`} className="text-gray-400 text-xs hover:underline">
+          Editar
+        </Link>
+      </div>
+    )
+  }
+];
 
 export default async function ConsorciosPage() {
   const consorcios = await getConsorcios();
@@ -45,53 +133,7 @@ export default async function ConsorciosPage() {
         <div className="lg:col-span-2 order-1 lg:order-first">
           {consorcios.length > 0 ? (
             <div className="card overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="th">Nombre</th>
-                    <th className="th">Dirección</th>
-                    <th className="th">CUIT</th>
-                    <th className="th text-center">Cat.</th>
-                    <th className="th text-center">UF</th>
-                    <th className="th">Banco</th>
-                    <th className="th text-center">Amenities</th>
-                    <th className="th text-center">Empleados</th>
-                    <th className="th"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {consorcios.map((c) => (
-                    <tr key={c.cuit} className="table-row hover:bg-gray-50">
-                      <td className="td font-medium text-gray-900">{c.nombre}</td>
-                      <td className="td text-gray-500 text-xs">{c.direccion}{c.codigo_postal ? ` (${c.codigo_postal})` : ''}</td>
-                      <td className="td text-gray-500 text-xs font-mono">{c.cuit ?? '—'}</td>
-                      <td className="td text-center">
-                        {c.categoria_edificio ? (
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CAT_COLORS[c.categoria_edificio] ?? 'bg-gray-100 text-gray-600'}`}>
-                            {c.categoria_edificio}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td className="td text-center text-gray-700">{c.cant_uf ?? '—'}</td>
-                      <td className="td text-gray-500 text-xs">{c.banco ?? '—'}</td>
-                      <td className="td text-center text-gray-500 text-xs">
-                        {[
-                          c.tiene_cochera && '🚗',
-                          c.tiene_jardin && '🌳',
-                          c.tiene_pileta && '🏊',
-                        ].filter(Boolean).join(' ') || '—'}
-                      </td>
-                      <td className="td text-center text-gray-700">{c.total_empleados}</td>
-                      <td className="td">
-                        <div className="flex gap-3">
-                          <Link href={`/consorcios/${c.cuit}`} className="text-brand-600 text-sm hover:underline font-medium">Ver →</Link>
-                          <Link href={`/consorcios/${c.cuit}/editar`} className="text-gray-400 text-sm hover:underline">Editar</Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable columns={columns} data={consorcios} emptyMessage="No hay consorcios registrados." />
             </div>
           ) : (
             <div className="card p-8 text-center text-gray-500">
