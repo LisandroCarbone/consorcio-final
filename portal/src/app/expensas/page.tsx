@@ -4,6 +4,8 @@ import { createPeriodo, calcularExpensas, regenerarGastosFijos } from "./actions
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { AddGastoForm } from "./AddGastoForm";
+import { ExpensasTableClient } from "./ExpensasTableClient";
+import { CalendarDays } from "lucide-react";
 
 async function getData(activeCuit?: string) {
   const params: unknown[] = [];
@@ -50,11 +52,6 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
   return { gastos, unidades };
 }
 
-const TIPO_COLORS: Record<string, string> = {
-  A: "bg-blue-50 text-blue-700",
-  B: "bg-purple-50 text-purple-700",
-  Particular: "bg-green-50 text-green-700",
-};
 
 export default async function ExpensasPage({
   searchParams,
@@ -124,29 +121,48 @@ export default async function ExpensasPage({
         {/* Períodos */}
         <div className="lg:col-span-1 order-2 lg:order-last">
           <div className="card mb-4">
-            <div className="px-5 py-4 border-b border-gray-100">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+              <CalendarDays className="w-4.5 h-4.5 text-gray-400" />
               <h3 className="font-semibold text-gray-800">Períodos</h3>
             </div>
-            <ul className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
-              {periodos.map((p) => (
-                <li key={p.id}>
-                  <a
-                    href={`/expensas?periodo=${p.id}`}
-                    className={`flex items-center justify-between px-5 py-3 hover:bg-gray-50 ${selectedPeriodo === p.id ? "bg-brand-50" : ""}`}
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{formatMonth(p.anio, p.mes)}</p>
-                      <p className="text-xs text-gray-500">{p.consorcio_nombre}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className={`badge ${p.estado === "liquidado" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
-                        {p.estado}
-                      </span>
-                      <p className="text-xs text-gray-400 mt-1">{formatMoney(p.total_gastos)}</p>
-                    </div>
-                  </a>
-                </li>
-              ))}
+            <ul className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+              {periodos.map((p) => {
+                const isActive = selected?.id === p.id;
+                return (
+                  <li key={p.id}>
+                    <a
+                      href={`/expensas?periodo=${p.id}`}
+                      className={`flex items-center justify-between px-5 py-3.5 hover:bg-gray-50/50 transition-colors border-l-4 ${
+                        isActive
+                          ? "border-brand-600 bg-brand-50/20"
+                          : "border-transparent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <CalendarDays className={`w-4 h-4 ${isActive ? "text-brand-600" : "text-gray-400"}`} />
+                        <div>
+                          <p className={`text-sm font-semibold ${isActive ? "text-brand-700" : "text-gray-700"}`}>
+                            {formatMonth(p.anio, p.mes)}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">{p.consorcio_nombre}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span
+                          className={`badge text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            p.estado === "liquidado"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {p.estado}
+                        </span>
+                        <p className="text-xs font-semibold text-gray-600 mt-1 font-mono">{formatMoney(p.total_gastos)}</p>
+                      </div>
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
@@ -254,48 +270,12 @@ export default async function ExpensasPage({
               </div>
 
               {/* Gastos */}
-              <div className="card">
-                <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-gray-700">Gastos del período</h3>
-                  <p className="text-sm font-bold">{formatMoney(selected.total_gastos)}</p>
+              <div className="card overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-800 text-base">Gastos del período</h3>
+                  <p className="text-lg font-bold text-gray-900">{formatMoney(selected.total_gastos)}</p>
                 </div>
-                {/* Cat 1: Fijos e Impositivos */}
-                {detail && detail.gastos.some((g) => g.categoria === 1) && (
-                  <>
-                    <div className="px-5 py-2 bg-amber-50 border-b border-amber-100">
-                      <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">📋 Cat. 1 — Gastos Fijos e Impositivos (Sueldos)</span>
-                    </div>
-                    {detail.gastos.filter((g) => g.categoria === 1).map((g) => (
-                      <div key={g.id} className="flex items-center justify-between px-5 py-2 border-b border-gray-50 last:border-0 bg-amber-50/30">
-                        <div className="flex items-center gap-2">
-                          <span className={`badge ${TIPO_COLORS[g.tipo] ?? ""}`}>{g.tipo === "A" ? "Coef A" : g.tipo === "B" ? "Coef B" : g.tipo}</span>
-                          <span className="text-sm text-gray-700">{g.concepto}</span>
-                        </div>
-                        <span className="text-sm font-mono font-semibold">{formatMoney(g.monto)}</span>
-                      </div>
-                    ))}
-                  </>
-                )}
-                {/* Other categories */}
-                {detail && detail.gastos.some((g) => g.categoria !== 1) && (
-                  <>
-                    {detail.gastos.some((g) => g.categoria === 1) && (
-                      <div className="px-5 py-2 bg-gray-50 border-b border-gray-100">
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">📦 Cat. 2–10 — Gastos Variables</span>
-                      </div>
-                    )}
-                    {detail.gastos.filter((g) => g.categoria !== 1).map((g) => (
-                      <div key={g.id} className="flex items-center justify-between px-5 py-2.5 border-b border-gray-50 last:border-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`badge ${TIPO_COLORS[g.tipo] ?? ""}`}>{g.tipo === "A" ? "Coef A" : g.tipo === "B" ? "Coef B" : g.tipo}</span>
-                          <span className="text-sm">{g.concepto}</span>
-                        </div>
-                        <span className="text-sm font-mono">{formatMoney(g.monto)}</span>
-                      </div>
-                    ))}
-                  </>
-                )}
-                {/* Add gasto form */}
+                <ExpensasTableClient gastos={detail?.gastos ?? []} />
                 <AddGastoForm
                   periodoId={selected.id}
                   unidades={detail?.unidades ?? []}

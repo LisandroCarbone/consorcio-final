@@ -1,27 +1,15 @@
 import React from "react";
 import { query } from "@/lib/db";
 import { formatMoney, formatDate } from "@/lib/format";
-import { registrarPago } from "../actions";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import ManagePaymentsModal from "./ManagePaymentsModal";
+import { CuentaCorrienteTableClient, CuentaCorrienteRow } from "./CuentaCorrienteTableClient";
+import CobrosChartClient from "./CobrosChartClient";
+import { Landmark } from "lucide-react";
 
-type Row = {
-  unidad_id: number;
-  unidad_numero: string;
-  propietario: string | null;
-  total_expensas: string;
-  total_pagado: string;
-  total_pagado_count: number;
-  saldo: string;
-  ultimo_pago: string | null;
-  expensa_pendiente_id: number | null;
-  expensa_pendiente_monto: string | null;
-  [key: string]: unknown;
-};
-
-async function getCuentaCorriente(consorcioCuit: string): Promise<Row[]> {
-  return query<Row>(
+async function getCuentaCorriente(consorcioCuit: string): Promise<CuentaCorrienteRow[]> {
+  return query<CuentaCorrienteRow>(
     `SELECT
        u.id AS unidad_id,
        u.uf::text AS unidad_numero,
@@ -42,6 +30,26 @@ async function getCuentaCorriente(consorcioCuit: string): Promise<Row[]> {
   );
 }
 
+async function getCobrosTrend(consorcioCuit: string) {
+  const rows = await query<{ mes: string; cobrado: string; periodo_mes: string }>(
+    `SELECT
+       to_char(fecha, 'YYYY-MM') AS periodo_mes,
+       to_char(fecha, 'MM/YYYY') AS mes,
+       SUM(monto)::numeric AS cobrado
+     FROM app.pagos p
+     JOIN app.unidades u ON u.id = p.unidad_id
+     WHERE u.consorcio_cuit = $1
+     GROUP BY to_char(fecha, 'YYYY-MM'), to_char(fecha, 'MM/YYYY')
+     ORDER BY periodo_mes DESC
+     LIMIT 5`,
+    [consorcioCuit]
+  );
+  return rows.reverse().map(r => ({
+    mes: r.mes,
+    cobrado: Number(r.cobrado)
+  }));
+}
+
 export default async function CuentaCorrientePage({
   searchParams,
 }: {
@@ -50,22 +58,19 @@ export default async function CuentaCorrientePage({
     consorcio?: string;
     ver_historial?: string;
     ver_pagos?: string;
-    sort?: string;
-    dir?: string;
   }>;
 }) {
   const sp = await searchParams;
-  const sortCol = sp.sort || "";
-  const sortDir = sp.dir === "desc" ? "desc" : "asc";
 
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
 
-  const [consorcios, rows] = await Promise.all([
+  const [consorcios, rows, cobrosTrend] = await Promise.all([
     query<{ cuit: string; nombre: string }>(
       "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
     ),
-    activeCuit ? getCuentaCorriente(activeCuit) : Promise.resolve([] as Row[])
+    activeCuit ? getCuentaCorriente(activeCuit) : Promise.resolve([] as CuentaCorrienteRow[]),
+    activeCuit ? getCobrosTrend(activeCuit) : Promise.resolve([])
   ]);
 
   if (!activeCuit) {
@@ -79,31 +84,10 @@ export default async function CuentaCorrientePage({
 
   const selectedCuit = activeCuit;
   const selectedConsorcio = consorcios.find((c) => c.cuit === selectedCuit);
-  const pagoUnidadId = sp.pago ? Number(sp.pago) : null;
 
   const totalDeuda = rows.reduce((s, r) => s + Number(r.saldo), 0);
   const totalPagado = rows.reduce((s, r) => s + Number(r.total_pagado), 0);
   const unidadesDeudoras = rows.filter((r) => Number(r.saldo) > 0).length;
-
-  // Apply sorting in memory
-  const sortedRows = [...rows];
-  if (sortCol === "unidad") {
-    sortedRows.sort((a, b) => {
-      const valA = a.unidad_numero || "";
-      const valB = b.unidad_numero || "";
-      return sortDir === "asc"
-        ? valA.localeCompare(valB, undefined, { numeric: true })
-        : valB.localeCompare(valA, undefined, { numeric: true });
-    });
-  } else if (sortCol === "propietario") {
-    sortedRows.sort((a, b) => {
-      const valA = a.propietario || "";
-      const valB = b.propietario || "";
-      return sortDir === "asc"
-        ? valA.localeCompare(valB)
-        : valB.localeCompare(valA);
-    });
-  }
 
   // Query details if modals are active
   let historyUnitDetails: { uf: string; propietario: string }[] = [];
@@ -177,179 +161,55 @@ export default async function CuentaCorrientePage({
         </p>
       </div>
 
-      {/* Summary cards */}
-      {selectedCuit && (
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="card p-4 text-center">
-            <p className="text-xs text-gray-500 mb-1">Deuda total</p>
-            <p className="text-xl font-bold text-red-600">{formatMoney(totalDeuda)}</p>
-          </div>
-          <div className="card p-4 text-center">
-            <p className="text-xs text-gray-500 mb-1">Cobrado histórico</p>
-            <p className="text-xl font-bold text-green-600">{formatMoney(totalPagado)}</p>
-          </div>
-          <div className="card p-4 text-center">
-            <p className="text-xs text-gray-500 mb-1">Unidades con deuda</p>
-            <p className="text-xl font-bold text-gray-800">{unidadesDeudoras} / {rows.length}</p>
-          </div>
-        </div>
-      )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Lado Izquierdo (2/3 de ancho) - Grilla y Totales */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Summary cards */}
+          {selectedCuit && (
+            <div className="grid grid-cols-3 gap-4">
+              <div className="card p-4 text-center">
+                <p className="text-xs text-gray-500 mb-1">Deuda total</p>
+                <p className="text-xl font-bold text-red-600">{formatMoney(totalDeuda)}</p>
+              </div>
+              <div className="card p-4 text-center">
+                <p className="text-xs text-gray-500 mb-1">Cobrado histórico</p>
+                <p className="text-xl font-bold text-green-600">{formatMoney(totalPagado)}</p>
+              </div>
+              <div className="card p-4 text-center">
+                <p className="text-xs text-gray-500 mb-1">Unidades con deuda</p>
+                <p className="text-xl font-bold text-gray-800">{unidadesDeudoras} / {rows.length}</p>
+              </div>
+            </div>
+          )}
 
-      {/* Table */}
-      {sortedRows.length > 0 && (
-        <div className="card overflow-hidden w-full">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="th">
-                  <a
-                    href={`?consorcio=${selectedCuit}&sort=unidad&dir=${sortCol === "unidad" && sortDir === "asc" ? "desc" : "asc"}`}
-                    className="hover:text-brand-600 transition-colors inline-flex items-center gap-1 font-semibold text-gray-700 select-none"
-                  >
-                    Unidad {sortCol === "unidad" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
-                  </a>
-                </th>
-                <th className="th">
-                  <a
-                    href={`?consorcio=${selectedCuit}&sort=propietario&dir=${sortCol === "propietario" && sortDir === "asc" ? "desc" : "asc"}`}
-                    className="hover:text-brand-600 transition-colors inline-flex items-center gap-1 font-semibold text-gray-700 select-none"
-                  >
-                    Propietario {sortCol === "propietario" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
-                  </a>
-                </th>
-                <th className="th text-right">Expensas emitidas</th>
-                <th className="th text-right">Pagado</th>
-                <th className="th text-right">Saldo</th>
-                <th className="th text-center">Último pago</th>
-                <th className="th"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map((r) => {
-                const deuda = Number(r.saldo);
-                const isOpen = pagoUnidadId === r.unidad_id;
-                return (
-                  <React.Fragment key={r.unidad_id}>
-                    <tr className={`border-b border-gray-50 ${deuda > 0 ? "bg-red-50/30" : ""}`}>
-                      <td className="td font-semibold">{r.unidad_numero}</td>
-                      <td className="td text-gray-600">{r.propietario ?? "—"}</td>
-                      <td className="td text-right font-mono">{formatMoney(r.total_expensas)}</td>
-                      <td className="td text-right font-mono text-green-700">{formatMoney(r.total_pagado)}</td>
-                      <td className="td text-right font-mono font-bold">
-                        {deuda > 0 ? (
-                          <span className="text-red-600">- {formatMoney(deuda)}</span>
-                        ) : (
-                          <span className="text-green-600">Al día</span>
-                        )}
-                      </td>
-                      <td className="td text-center text-xs">
-                        {deuda > 0 && Number(r.total_pagado) > 0 && (
-                          <span className="badge bg-orange-100 text-orange-700">Pago Parcial</span>
-                        )}
-                        {deuda === 0 && Number(r.total_pagado) > 0 && (
-                          <span className="badge bg-green-100 text-green-700">Al día</span>
-                        )}
-                        {r.ultimo_pago && (
-                          <p className="text-gray-400 mt-0.5">{formatDate(r.ultimo_pago)}</p>
-                        )}
-                      </td>
-                      <td className="td">
-                        <div className="flex flex-col gap-1 items-end">
-                          <a
-                            href={`?consorcio=${selectedCuit}&pago=${isOpen ? "" : r.unidad_id}`}
-                            className="text-xs font-semibold text-brand-600 hover:text-brand-800 hover:underline whitespace-nowrap"
-                          >
-                            {isOpen ? "Cerrar" : "Registrar pago"}
-                          </a>
-                          <a
-                            href={`?consorcio=${selectedCuit}&ver_historial=${r.unidad_id}`}
-                            className="text-xs text-gray-500 hover:text-gray-900 hover:underline whitespace-nowrap"
-                          >
-                            Ver Historial
-                          </a>
-                          {r.total_pagado_count > 0 && (
-                            <a
-                              href={`?consorcio=${selectedCuit}&ver_pagos=${r.unidad_id}`}
-                              className="text-xs text-amber-600 hover:text-amber-800 hover:underline whitespace-nowrap font-medium"
-                            >
-                              Gestionar pagos ({r.total_pagado_count})
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {isOpen && (
-                      <tr key={`form-${r.unidad_id}`} className="bg-blue-50 border-b border-blue-100">
-                        <td colSpan={7} className="px-5 py-4">
-                          <form action={registrarPago} className="grid grid-cols-2 gap-3 max-w-lg">
-                            <input type="hidden" name="consorcio_id" value={selectedCuit} />
-                            <input type="hidden" name="unidad_id" value={r.unidad_id} />
-                            {r.expensa_pendiente_id && (
-                              <input type="hidden" name="expensa_id" value={r.expensa_pendiente_id} />
-                            )}
-                            <div>
-                              <label className="label">Fecha *</label>
-                              <input
-                                name="fecha"
-                                type="date"
-                                defaultValue={new Date().toISOString().slice(0, 10)}
-                                required
-                                className="input"
-                              />
-                            </div>
-                            <div>
-                              <label className="label">Monto *</label>
-                              <input
-                                name="monto"
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                defaultValue={r.expensa_pendiente_monto ?? ""}
-                                required
-                                className="input"
-                              />
-                            </div>
-                            <div>
-                              <label className="label">Medio de pago *</label>
-                              <select name="medio_pago" className="input">
-                                <option value="transferencia">Transferencia</option>
-                                <option value="deposito">Depósito</option>
-                                <option value="efectivo">Efectivo</option>
-                                <option value="debito_automatico">Débito automático</option>
-                                <option value="cheque">Cheque</option>
-                                <option value="otro">Otro</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="label">Referencia / Nro. operación</label>
-                              <input name="referencia" type="text" placeholder="Ej: TRF-20240601-123" className="input" />
-                            </div>
-                            <div className="col-span-2">
-                              <label className="label">Notas</label>
-                              <input name="notes" type="text" className="input" />
-                            </div>
-                            <div className="col-span-2 flex gap-2">
-                              <button type="submit" className="btn-primary">Registrar pago</button>
-                              <a href={`?consorcio=${selectedCuit}`} className="btn-secondary">Cancelar</a>
-                            </div>
-                          </form>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+          {/* Grilla principal */}
+          {rows.length > 0 ? (
+            <div className="card overflow-hidden">
+              <CuentaCorrienteTableClient consorcioCuit={selectedCuit} data={rows} />
+            </div>
+          ) : (
+            selectedCuit && (
+              <div className="card p-12 text-center text-gray-400">
+                <p className="text-3xl mb-2">📊</p>
+                <p>No hay unidades en este consorcio aún.</p>
+              </div>
+            )
+          )}
         </div>
-      )}
 
-      {rows.length === 0 && selectedCuit && (
-        <div className="card p-12 text-center text-gray-400">
-          <p className="text-3xl mb-2">📊</p>
-          <p>No hay unidades en este consorcio aún.</p>
+        {/* Lado Derecho (1/3 de ancho) - Gráfico de cobranza */}
+        <div className="lg:col-span-1 space-y-6">
+          {selectedCuit && (
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Landmark className="w-5 h-5 text-gray-400" />
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Histórico de Cobranzas</h3>
+              </div>
+              <CobrosChartClient data={cobrosTrend} />
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Modal Historial (6A) */}
       {sp.ver_historial && historyUnitDetails.length > 0 && (

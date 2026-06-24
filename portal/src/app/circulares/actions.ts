@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { query } from "@/lib/db";
 
 export async function sendCircular(formData: FormData) {
   const consorcio_id = formData.get("consorcio_id") as string;
@@ -21,6 +22,12 @@ export async function sendCircular(formData: FormData) {
   if (!res.ok) {
     throw new Error(`Error al enviar circular: ${res.status}`);
   }
+
+  // Guardar en la base de datos
+  await query(
+    "INSERT INTO app.circulares (consorcio_cuit, mensaje) VALUES ($1, $2)",
+    [consorcio_id, message]
+  );
 
   redirect("/circulares?sent=true");
 }

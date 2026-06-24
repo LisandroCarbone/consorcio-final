@@ -525,3 +525,15 @@ CREATE INDEX IF NOT EXISTS idx_pagos_unidad ON app.pagos (unidad_id);
 CREATE INDEX IF NOT EXISTS idx_res_cuenta_periodo_unidad ON app.res_cuenta_periodo (unidad_id);
 CREATE INDEX IF NOT EXISTS idx_ticket_mensajes_ticket ON app.ticket_mensajes (ticket_id);
 
+-- ============================================================
+-- CIRCULARES DE COMUNICACIÓN INTERNA (agregado para bitácora/historial)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS app.circulares (
+    id              SERIAL PRIMARY KEY,
+    consorcio_cuit  VARCHAR(20) REFERENCES app.consorcios(cuit) ON DELETE CASCADE,
+    mensaje         TEXT NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_circulares_consorcio ON app.circulares (consorcio_cuit);
+
