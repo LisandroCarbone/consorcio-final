@@ -107,7 +107,7 @@ export async function createEmpleado(data: EmpleadoForm) {
       data.plus_pileta, data.tiene_titulo, data.adicional_voluntario,
     ]
   );
-  revalidatePath("/sueldos/empleados");
+  revalidatePath("/sueldos");
 }
 
 // ─── Novedades ────────────────────────────────────────────────────────────────

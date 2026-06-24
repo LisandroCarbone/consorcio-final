@@ -31,6 +31,36 @@ async function getSueldosStats(activeCuit: string, activePeriodo?: string) {
   };
 }
 
+async function getEmpleadosActivos(activeCuit: string) {
+  const { rows: empleados } = await pool.query(`
+    SELECT e.*,
+           c.nombre AS consorcio_nombre,
+           EXTRACT(YEAR FROM AGE(NOW(), e.fecha_ingreso))::int AS antiguedad_anios
+    FROM app.empleados e
+    JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
+    WHERE e.estado = 'activo' AND e.consorcio_cuit = $1
+    ORDER BY e.nombre
+  `, [activeCuit]);
+  return empleados;
+}
+
+const JORNADA_BADGE: Record<string, string> = {
+  Completa: 'bg-green-100 text-green-700',
+  Media: 'bg-yellow-100 text-yellow-700',
+  Suplente: 'bg-gray-100 text-gray-500',
+};
+
+const FUNCION_SHORT: Record<string, string> = {
+  'Encargado Permanente con vivienda': 'Enc. Perm. c/viv.',
+  'Encargado Permanente sin vivienda': 'Enc. Perm. s/viv.',
+  'Encargado No Permanente con vivienda': 'Enc. No Perm. c/viv.',
+  'Encargado No Permanente Sin vivienda': 'Enc. No Perm. s/viv.',
+  'Ayudante Media jornada': 'Ayudante Media',
+  'Personal Vigilancia Diurna': 'Vigilancia Diurna',
+  'Personal Vigilancia Nocturna': 'Vigilancia Nocturna',
+  'Suplente eventual': 'Suplente',
+};
+
 export default async function SueldosPage() {
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
@@ -49,7 +79,10 @@ export default async function SueldosPage() {
     );
   }
 
-  const stats = await getSueldosStats(activeCuit, activePeriodo);
+  const [stats, empleados] = await Promise.all([
+    getSueldosStats(activeCuit, activePeriodo),
+    getEmpleadosActivos(activeCuit)
+  ]);
 
   const mes = new Date(stats.periodo).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
   const escalaLabel = stats.ultima_escala
@@ -63,12 +96,6 @@ export default async function SueldosPage() {
           <h1 className="text-2xl font-bold text-gray-900">Liquidación de Sueldos</h1>
           <p className="text-gray-500 text-sm mt-1">Período actual: {mes}</p>
         </div>
-        <Link
-          href={`/sueldos/novedades?periodo=${stats.periodo}`}
-          className="btn-primary"
-        >
-          Cargar novedades del mes
-        </Link>
       </div>
 
       {/* Stats */}
@@ -82,33 +109,144 @@ export default async function SueldosPage() {
         />
       </div>
 
-      {/* Escalas */}
-      <div className="card mb-6 flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-500">Escalas SUTERH cargadas</p>
-          <p className="font-semibold">{escalaLabel}</p>
-        </div>
-        <Link href="/sueldos/escalas" className="btn-secondary text-sm">
-          Ver escalas
-        </Link>
-      </div>
+      {/* Grid Principal */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Lado Izquierdo (2/3 de ancho) - Nómina de Empleados */}
+        <div className="lg:col-span-2 order-1 lg:order-first space-y-6">
+          <div className="card">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-800 text-base">Nómina de Empleados</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{empleados.length} empleado{empleados.length !== 1 ? 's' : ''} activo{empleados.length !== 1 ? 's' : ''}</p>
+              </div>
+              <Link href="/sueldos/empleados/nuevo" className="btn-primary py-1.5 text-xs">
+                + Agregar empleado
+              </Link>
+            </div>
+            
+            {empleados.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                No hay empleados activos en este consorcio. Crea uno usando el botón superior.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-gray-400 text-left text-xs uppercase tracking-wide bg-gray-50/50">
+                      <th className="px-4 py-2.5">Nombre</th>
+                      <th className="px-3 py-2.5">CUIL</th>
+                      <th className="px-3 py-2.5">Función</th>
+                      <th className="px-3 py-2.5">Jornada</th>
+                      <th className="px-3 py-2.5 text-center">Cat.</th>
+                      <th className="px-3 py-2.5">Obra Social</th>
+                      <th className="px-3 py-2.5">Banco</th>
+                      <th className="px-3 py-2.5 text-center">Plus</th>
+                      <th className="px-3 py-2.5 text-center">Ant.</th>
+                      <th className="px-3 py-2.5"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {empleados.map((e: any) => {
+                      const plus = [
+                        e.retiro_residuos && '🗑️',
+                        e.plus_cocheras && '🚗',
+                        e.plus_movimiento_coches && '🔄',
+                        e.plus_jardin && '🌳',
+                        e.tiene_pileta && '🏊',
+                        e.plus_zona_desfavorable && '⚠️',
+                        e.tiene_titulo && '🎓',
+                      ].filter(Boolean);
 
-      {/* Accesos rápidos */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <QuickLink href="/sueldos/empleados" title="Empleados" desc="Altas, bajas y modificaciones" />
-        <QuickLink
-          href={`/sueldos/novedades?periodo=${stats.periodo}`}
-          title="Novedades del mes"
-          desc="Horas extras, ausencias, eventualidades"
-        />
-        <QuickLink
-          href={`/sueldos/liquidaciones?periodo=${stats.periodo}`}
-          title="Liquidaciones"
-          desc="Calcular y confirmar recibos"
-        />
-        <QuickLink href="/sueldos/sac" title="SAC" desc="Liquidar 1° y 2° semestre" />
-        <QuickLink href="/sueldos/despido" title="Egreso / Despido" desc="Indemnización y liquidación final" />
-        <QuickLink href="/sueldos/escalas" title="Escalas SUTERH" desc="Básicos y adicionales vigentes" />
+                      return (
+                        <tr key={e.cuil} className="border-b last:border-0 hover:bg-gray-50/70 transition-colors">
+                          <td className="px-4 py-3 font-medium text-gray-900">
+                            {e.nombre}
+                            {e.tiene_vivienda && (
+                              <span className="ml-1.5 text-xs text-blue-500" title="Con vivienda">🏠</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-gray-400 font-mono text-xs">{e.cuil}</td>
+                          <td className="px-3 py-3 text-gray-600 text-xs">
+                            {FUNCION_SHORT[e.funcion] ?? e.funcion}
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${JORNADA_BADGE[e.jornada] ?? 'bg-gray-100 text-gray-500'}`}>
+                              {e.jornada}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-center text-gray-600 text-xs">{e.categoria_edificio}°</td>
+                          <td className="px-3 py-3 text-gray-500 text-xs">{e.obra_social}</td>
+                          <td className="px-3 py-3 text-gray-500 text-xs">{e.banco ?? '—'}</td>
+                          <td className="px-3 py-3 text-center text-sm">
+                            {plus.length > 0 ? plus.join(' ') : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-3 py-3 text-center text-gray-600 text-xs">
+                            {e.antiguedad_anios > 0 ? `${e.antiguedad_anios}a` : '<1a'}
+                          </td>
+                          <td className="px-3 py-3 text-right pr-4">
+                            <Link
+                              href={`/sueldos/empleados/${e.cuil}/editar`}
+                              className="text-brand-600 hover:underline text-xs font-semibold"
+                            >
+                              Editar
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Lado Derecho (1/3 de ancho) - Acciones y Escalas */}
+        <div className="lg:col-span-1 order-2 lg:order-last space-y-5">
+          {/* Panel de Acciones */}
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wider">Acciones de Liquidación</h3>
+            <div className="flex flex-col gap-3">
+              <QuickActionLink
+                href={`/sueldos/novedades?periodo=${stats.periodo}`}
+                title="📝 Novedades del mes"
+                desc="Registrar horas extras, licencias, eventualidades."
+              />
+              <QuickActionLink
+                href={`/sueldos/liquidaciones?periodo=${stats.periodo}`}
+                title="⚙️ Liquidar Recibos"
+                desc="Calcular conceptos, aportes y generar los PDF."
+              />
+              <QuickActionLink
+                href="/sueldos/sac"
+                title="💰 Liquidar SAC (Aguinaldo)"
+                desc="Cálculo de primer o segundo SAC del año."
+              />
+              <QuickActionLink
+                href="/sueldos/despido"
+                title="💼 Egreso o Despido"
+                desc="Cálculo de indemnización y liquidación final."
+              />
+            </div>
+          </div>
+
+          {/* Panel de Escalas */}
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wider">Escalas SUTERH</h3>
+            <div className="bg-gray-50 rounded-lg p-3.5 border border-gray-100 mb-4">
+              <p className="text-xs text-gray-400 font-medium">Básicos y adicionales vigentes al:</p>
+              <p className="font-bold text-gray-800 text-lg mt-0.5">{escalaLabel}</p>
+            </div>
+            <Link
+              href="/sueldos/escalas"
+              className="btn-secondary w-full justify-center text-sm font-medium"
+            >
+              Ver escalas vigentes
+            </Link>
+          </div>
+        </div>
+        
       </div>
     </div>
   );
@@ -123,11 +261,14 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function QuickLink({ href, title, desc }: { href: string; title: string; desc: string }) {
+function QuickActionLink({ href, title, desc }: { href: string; title: string; desc: string }) {
   return (
-    <Link href={href} className="card hover:shadow-md transition-shadow">
-      <p className="font-semibold text-gray-900">{title}</p>
-      <p className="text-sm text-gray-500 mt-1">{desc}</p>
+    <Link
+      href={href}
+      className="block p-3 rounded-lg border border-gray-200 hover:border-brand-500 hover:bg-brand-50/20 transition-all group"
+    >
+      <p className="font-semibold text-gray-800 group-hover:text-brand-700 text-sm transition-colors">{title}</p>
+      <p className="text-xs text-gray-500 mt-1">{desc}</p>
     </Link>
   );
 }

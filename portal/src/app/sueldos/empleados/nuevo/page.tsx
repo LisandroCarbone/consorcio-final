@@ -4,6 +4,7 @@ import { pool } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { FUNCIONES } from "../constants";
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 
 async function getConsorcios() {
   const { rows } = await pool.query("SELECT cuit, nombre FROM app.consorcios ORDER BY nombre");
@@ -51,7 +52,8 @@ async function crearEmpleado(formData: FormData) {
     }
     throw err;
   }
-  redirect('/sueldos/empleados');
+  revalidatePath('/sueldos');
+  redirect('/sueldos');
 }
 
 export default async function NuevoEmpleadoPage({
@@ -211,7 +213,7 @@ export default async function NuevoEmpleadoPage({
         </div>
 
         <div className="flex gap-3 justify-end">
-          <a href="/sueldos/empleados" className="btn-secondary">Cancelar</a>
+          <a href="/sueldos" className="btn-secondary">Cancelar</a>
           <button type="submit" className="btn-primary">Guardar empleado</button>
         </div>
       </form>

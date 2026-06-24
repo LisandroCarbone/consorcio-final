@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { pool } from "@/lib/db";
 import { redirect, notFound } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 import { FUNCIONES } from "../../constants";
 
@@ -59,7 +60,8 @@ async function actualizarEmpleado(cuil: string, formData: FormData) {
       cuil,
     ]
   );
-  redirect('/sueldos/empleados');
+  revalidatePath('/sueldos');
+  redirect('/sueldos');
 }
 
 export default async function EditarEmpleadoPage({
@@ -228,7 +230,7 @@ export default async function EditarEmpleadoPage({
         </div>
 
         <div className="flex gap-3 justify-end">
-          <a href="/sueldos/empleados" className="btn-secondary">Cancelar</a>
+          <a href="/sueldos" className="btn-secondary">Cancelar</a>
           <button type="submit" className="btn-primary">Guardar cambios</button>
         </div>
       </form>
