@@ -4,8 +4,7 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { createProveedor, createOrdenTrabajo, completarOrdenTrabajo } from "./actions";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
-import { DataTable } from "@/components/ui/DataTable";
-import { ColumnDef } from "@tanstack/react-table";
+import { ProveedoresTableClient } from "./ProveedoresTableClient";
 import {
   ClipboardList,
   AlertTriangle,
@@ -89,42 +88,6 @@ interface ProveedorRow {
   whatsapp: string | null;
   activo: boolean;
 }
-
-const proveedorColumns: ColumnDef<ProveedorRow>[] = [
-  {
-    accessorKey: "nombre",
-    header: "Nombre",
-    cell: ({ row }) => <span className="font-semibold text-gray-900">{row.original.nombre}</span>,
-  },
-  {
-    accessorKey: "rubro",
-    header: "Rubro",
-    cell: ({ row }) => <span className="text-gray-500 capitalize text-xs">{row.original.rubro ?? "—"}</span>,
-  },
-  {
-    accessorKey: "telefono",
-    header: "Teléfono",
-    cell: ({ row }) => <span className="text-gray-500 text-xs">{row.original.telefono ?? "—"}</span>,
-  },
-  {
-    accessorKey: "whatsapp",
-    header: "WhatsApp",
-    cell: ({ row }) => {
-      const wa = row.original.whatsapp;
-      if (!wa) return <span className="text-gray-300">—</span>;
-      return (
-        <a
-          href={`https://wa.me/${wa.replace(/\D/g, "")}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-green-600 hover:underline text-xs flex items-center gap-1 font-medium"
-        >
-          💬 {wa}
-        </a>
-      );
-    }
-  }
-];
 
 export default async function ProveedoresPage({
   searchParams,
@@ -286,7 +249,7 @@ export default async function ProveedoresPage({
               <Users className="w-5 h-5 text-gray-400" />
               <h3 className="font-semibold text-gray-800">Proveedores registrados</h3>
             </div>
-            <DataTable columns={proveedorColumns} data={proveedores} emptyMessage="No hay proveedores registrados." />
+            <ProveedoresTableClient proveedores={proveedores} />
           </div>
         </div>
 

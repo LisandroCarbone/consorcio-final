@@ -1,0 +1,75 @@
+========================================================================
+INSTRUCCIONES PARA DESCARGAR Y LEVANTAR LA APLICACIÓN LOCALMENTE
+========================================================================
+
+Este documento contiene los pasos detallados para que puedas descargar y ejecutar el proyecto completo en tu computadora.
+
+------------------------------------------------------------------------
+REQUISITOS PREVIOS
+------------------------------------------------------------------------
+Antes de empezar, asegurate de tener instalado y abierto lo siguiente:
+1. Docker Desktop: https://www.docker.com/products/docker-desktop/
+   (Debe estar abierto y ejecutándose en segundo plano)
+2. Git: https://git-scm.com/
+3. Node.js (versión 18 o superior) - Solo si vas a desarrollar o editar el portal localmente en modo desarrollo: https://nodejs.org/
+
+------------------------------------------------------------------------
+PASO 1: BAJAR O ACTUALIZAR EL REPOSITORIO
+------------------------------------------------------------------------
+- Si NO tenés el proyecto en tu máquina:
+  Abre una terminal/consola y ejecuta:
+  git clone https://github.com/LisandroCarbone/consorcio-final.git
+  cd consorcio-final
+
+- Si YA tenés la carpeta del proyecto y querés bajarte la última versión:
+  Abre la terminal dentro de la carpeta del proyecto y ejecuta:
+  git pull origin master
+
+------------------------------------------------------------------------
+PASO 2: CONFIGURAR VARIABLES DE ENTORNO
+------------------------------------------------------------------------
+En la raíz del proyecto (la carpeta principal "consorcio-final"):
+1. Duplica el archivo "env.example" y renombralo como ".env" (o copia y pega).
+   En la consola podés hacer:
+   cp env.example .env
+2. Abre el archivo `.env` recién creado con un editor de texto (como VS Code, Sublime o Bloc de Notas). Para desarrollo local, los valores por defecto que ya vienen en el archivo sirven perfectamente para levantar todo de inmediato.
+
+------------------------------------------------------------------------
+PASO 3: LEVANTAR LA INFRAESTRUCTURA Y LA APP
+------------------------------------------------------------------------
+Tenés dos opciones para correr la aplicación dependiendo de lo que quieras hacer:
+
+OPCIÓN A: Levantar todo en contenedores Docker (Rápido y listo para ver)
+----------------------------------------------------------------------
+Con Docker Desktop abierto, ejecuta este comando en la raíz del proyecto:
+docker compose up -d
+
+Este comando descargará las imágenes y levantará todos los servicios en segundo plano:
+- El Portal Web quedará disponible en: http://localhost:3010
+- La base de datos (PostgreSQL) se inicializa y crea automáticamente las tablas y esquemas.
+- El panel de n8n (automatizaciones) estará en: http://localhost:5678 (Usuario: admin, Contraseña: admin_secret)
+
+OPCIÓN B: Modo Desarrollo Híbrido (Para programar y ver cambios al instante)
+---------------------------------------------------------------------------
+Si vas a editar código del portal y querés que se recargue solo al guardar:
+1. Levanta únicamente la base de datos, n8n y redis en Docker:
+   docker compose up -d postgres redis n8n
+2. Entra en la carpeta del portal y copia el archivo de entorno:
+   cd portal
+   cp .env.example .env.local
+3. Instala los paquetes de Node y corre el portal en tu máquina:
+   npm install
+   npm run dev
+4. El portal en desarrollo con recarga rápida (hot-reload) quedará disponible en: http://localhost:3000
+
+------------------------------------------------------------------------
+¿CÓMO VERIFICAR QUE TODO ESTÉ CORRIENDO BIEN?
+------------------------------------------------------------------------
+Para verificar el estado de los contenedores de Docker, ejecuta:
+docker compose ps
+
+Deberías ver todos los contenedores con estado "running" (o "healthy" para la base de datos).
+
+Para apagar todo el entorno de Docker cuando termines de usarlo:
+docker compose down
+========================================================================

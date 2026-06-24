@@ -28,7 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="es" data-theme={theme}>
       <body>
         <Nav />
-        <div className="ml-56 flex flex-col min-h-screen">
+        <div className="ml-64 flex flex-col min-h-screen">
           <TopBar consorcios={consorcios} activeCuit={activeCuit} activePeriodo={activePeriodo} />
           <main className="flex-1 p-8 bg-gray-50">{children}</main>
         </div>
