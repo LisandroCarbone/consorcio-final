@@ -537,3 +537,7 @@ CREATE TABLE IF NOT EXISTS app.circulares (
 
 CREATE INDEX IF NOT EXISTS idx_circulares_consorcio ON app.circulares (consorcio_cuit);
 
+CREATE INDEX IF NOT EXISTS idx_pagos_consorcio_fecha ON app.pagos (consorcio_cuit, fecha DESC);
+CREATE INDEX IF NOT EXISTS idx_res_cuenta_periodo_estado ON app.res_cuenta_periodo (estado);
+CREATE INDEX IF NOT EXISTS idx_novedades_sueldo_periodo ON app.novedades_sueldo (periodo);
+
