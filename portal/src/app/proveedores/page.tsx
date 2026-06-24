@@ -79,7 +79,17 @@ export default async function ProveedoresPage({
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
 
-  const { proveedores, ordenes, consorcios, ticketsAbiertos, ticketsPendientes } = await getData(activeCuit);
+  const prefillTicketId = sp.ticket_id ? Number(sp.ticket_id) : null;
+
+  const [{ proveedores, ordenes, consorcios, ticketsAbiertos, ticketsPendientes }, prefilledTicket] = await Promise.all([
+    getData(activeCuit),
+    prefillTicketId
+      ? queryOne<{ id: number; titulo: string; descripcion: string | null }>(
+          "SELECT id, titulo, descripcion FROM app.tickets WHERE id=$1",
+          [prefillTicketId]
+        )
+      : Promise.resolve(null),
+  ]);
 
   if (!activeCuit) {
     return (
@@ -92,14 +102,6 @@ export default async function ProveedoresPage({
       </div>
     );
   }
-
-  const prefillTicketId = sp.ticket_id ? Number(sp.ticket_id) : null;
-  const prefilledTicket = prefillTicketId
-    ? await queryOne<{ id: number; titulo: string; descripcion: string | null }>(
-        "SELECT id, titulo, descripcion FROM app.tickets WHERE id=$1",
-        [prefillTicketId]
-      )
-    : null;
 
   const otCompletarId = sp.ot_completar ? Number(sp.ot_completar) : null;
 

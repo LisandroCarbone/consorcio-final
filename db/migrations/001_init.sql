@@ -513,3 +513,15 @@ CREATE TABLE IF NOT EXISTS app.ordenes_trabajo (
 DROP TRIGGER IF EXISTS trg_ordenes_updated_at ON app.ordenes_trabajo;
 CREATE TRIGGER trg_ordenes_updated_at BEFORE UPDATE ON app.ordenes_trabajo
     FOR EACH ROW EXECUTE FUNCTION app.set_updated_at();
+
+-- Índices de Optimización de Rendimiento
+CREATE INDEX IF NOT EXISTS idx_tickets_consorcio ON app.tickets (consorcio_cuit);
+CREATE INDEX IF NOT EXISTS idx_tickets_estado ON app.tickets (estado);
+CREATE INDEX IF NOT EXISTS idx_unidades_consorcio ON app.unidades (consorcio_cuit);
+CREATE INDEX IF NOT EXISTS idx_ordenes_trabajo_consorcio ON app.ordenes_trabajo (consorcio_cuit);
+CREATE INDEX IF NOT EXISTS idx_ordenes_trabajo_proveedor ON app.ordenes_trabajo (proveedor_id);
+CREATE INDEX IF NOT EXISTS idx_ordenes_trabajo_ticket ON app.ordenes_trabajo (ticket_id);
+CREATE INDEX IF NOT EXISTS idx_pagos_unidad ON app.pagos (unidad_id);
+CREATE INDEX IF NOT EXISTS idx_res_cuenta_periodo_unidad ON app.res_cuenta_periodo (unidad_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_mensajes_ticket ON app.ticket_mensajes (ticket_id);
+

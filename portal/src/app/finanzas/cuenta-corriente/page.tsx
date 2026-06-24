@@ -58,12 +58,15 @@ export default async function CuentaCorrientePage({
   const sortCol = sp.sort || "";
   const sortDir = sp.dir === "desc" ? "desc" : "asc";
 
-  const consorcios = await query<{ cuit: string; nombre: string }>(
-    "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
-  );
-
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
+  const [consorcios, rows] = await Promise.all([
+    query<{ cuit: string; nombre: string }>(
+      "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
+    ),
+    activeCuit ? getCuentaCorriente(activeCuit) : Promise.resolve([] as Row[])
+  ]);
 
   if (!activeCuit) {
     return (
@@ -76,7 +79,6 @@ export default async function CuentaCorrientePage({
 
   const selectedCuit = activeCuit;
   const selectedConsorcio = consorcios.find((c) => c.cuit === selectedCuit);
-  const rows = await getCuentaCorriente(selectedCuit);
   const pagoUnidadId = sp.pago ? Number(sp.pago) : null;
 
   const totalDeuda = rows.reduce((s, r) => s + Number(r.saldo), 0);
