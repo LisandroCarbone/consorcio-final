@@ -72,4 +72,29 @@ Deberías ver todos los contenedores con estado "running" (o "healthy" para la b
 
 Para apagar todo el entorno de Docker cuando termines de usarlo:
 docker compose down
+
+------------------------------------------------------------------------
+REGLAS DE GIT Y AGENTES DE IA (PARA EL EQUIPO DE DESARROLLO)
+------------------------------------------------------------------------
+1. Repositorio Oficial Único:
+   El único repositorio centralizado para este proyecto es:
+   https://github.com/LisandroCarbone/consorcio-final.git
+
+2. Configurar el origen en local:
+   Asegúrate de que tu rama local 'master' esté vinculada a este origen.
+   Puedes verificarlo y configurarlo en la terminal con:
+   git remote set-url origin https://github.com/LisandroCarbone/consorcio-final.git
+
+3. Permisos para Agentes IA (Subidas Automáticas):
+   Si trabajas con un asistente de codificación de IA (como Antigravity u otros) 
+   y quieres que realice commits y pushes automáticamente a GitHub:
+   - Genera un Token de Acceso Personal (PAT - Classic) en tu cuenta de GitHub con alcance 'repo'.
+   - Configura la URL remota del agente con el token insertado:
+     git remote set-url origin https://<TU-TOKEN-DE-GITHUB>@github.com/LisandroCarbone/consorcio-final.git
+
+4. Flujo Operativo Diario:
+   - Antes de realizar cualquier tarea: git pull origin master
+   - Para verificar la consistencia del tipado de TypeScript antes de commitear:
+     cd portal
+     npx tsc --noEmit
 ========================================================================
