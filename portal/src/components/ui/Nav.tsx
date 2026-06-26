@@ -10,8 +10,15 @@ const generalLinks = [
   { href: "/consorcios", label: "Consorcios", icon: "🏢" },
 ];
 
+const sueldosSublinks = [
+  { href: "/sueldos/empleados", label: "Empleados" },
+  { href: "/sueldos/escalas", label: "Escalas" },
+  { href: "/sueldos/novedades", label: "Novedades" },
+  { href: "/sueldos/liquidaciones", label: "Liquidaciones" },
+  { href: "/sueldos/sac", label: "SAC" },
+];
+
 const operationalLinks = [
-  { href: "/sueldos", label: "Sueldos", icon: "👷" },
   { href: "/expensas", label: "Expensas", icon: "💰" },
   { href: "/finanzas/cuenta-corriente", label: "Cuenta Cte.", icon: "📊" },
   { href: "/proveedores", label: "Proveedores", icon: "🔨" },
@@ -22,6 +29,12 @@ const operationalLinks = [
 export function Nav() {
   const pathname = usePathname();
   const [theme, setTheme] = useState<string>("default");
+  const inSueldos = pathname.startsWith("/sueldos");
+  const [sueldosOpen, setSueldosOpen] = useState(inSueldos);
+
+  useEffect(() => {
+    if (inSueldos) setSueldosOpen(true);
+  }, [inSueldos]);
 
   useEffect(() => {
     // Leer el tema inicial del atributo del html
@@ -77,6 +90,41 @@ export function Nav() {
             Gestión Operativa
           </p>
           <div className="space-y-1">
+            {/* Sueldos — expandible */}
+            <button
+              onClick={() => setSueldosOpen((o) => !o)}
+              className={clsx(
+                "w-full flex items-center gap-4 rounded-xl px-4 py-3 text-base font-semibold transition-colors",
+                inSueldos
+                  ? "bg-white/20 text-white shadow-sm"
+                  : "text-brand-100 hover:bg-white/10 hover:text-white"
+              )}
+            >
+              <span className="text-xl select-none">👷</span>
+              <span className="flex-1 text-left">Sueldos</span>
+              <span className="text-xs opacity-60">{sueldosOpen ? "▲" : "▼"}</span>
+            </button>
+            {sueldosOpen && (
+              <div className="ml-9 space-y-0.5">
+                {sueldosSublinks.map(({ href, label }) => {
+                  const active = pathname === href || pathname.startsWith(href + "/");
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={clsx(
+                        "block rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-white/20 text-white"
+                          : "text-brand-200 hover:bg-white/10 hover:text-white"
+                      )}
+                    >
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
             {operationalLinks.map(renderLink)}
           </div>
         </div>
