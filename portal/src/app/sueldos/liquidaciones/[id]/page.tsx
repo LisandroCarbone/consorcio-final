@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { getLiquidacionDetalle } from "../../actions";
+import { getLiquidacionDetalle } from "../queries";
 import { notFound } from "next/navigation";
 import { PrintButton } from "./PrintButton";
 import { numberToWords } from "@/lib/format";
@@ -237,8 +237,11 @@ export default async function ReciboPage({
     <div className="bg-white min-h-screen print:text-[10px]">
       <div className="max-w-4xl mx-auto p-6 print:p-2">
 
-        {/* Print button */}
-        <div className="print:hidden flex justify-end mb-4">
+        {/* Toolbar */}
+        <div className="print:hidden flex justify-between items-center mb-4">
+          <a href="/sueldos/liquidaciones" className="btn-secondary text-sm flex items-center gap-1">
+            ← Volver a liquidaciones
+          </a>
           <PrintButton />
         </div>
 

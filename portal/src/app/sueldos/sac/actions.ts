@@ -15,7 +15,12 @@ export async function accionLiquidarSAC(formData: FormData) {
 
   const semestre = semestreRaw as 1 | 2;
 
-  await liquidarSAC(empleadoCuil, anio, semestre);
+  try {
+    await liquidarSAC(empleadoCuil, anio, semestre);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    redirect(`/sueldos/sac?empleado_cuil=${empleadoCuil}&anio=${anio}&semestre=${semestre}&error=${encodeURIComponent(msg)}`);
+  }
   revalidatePath("/sueldos/sac");
   redirect(`/sueldos/sac?empleado_cuil=${empleadoCuil}&anio=${anio}&semestre=${semestre}&liquidado=1`);
 }

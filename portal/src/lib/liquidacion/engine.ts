@@ -233,12 +233,14 @@ export async function calcularLiquidacion(
 
   const escalaMap: Record<string, Record<string, number>> = {};
   for (const row of escalaRows.rows) {
-    escalaMap[row.funcion] = {
+    const entry = {
       cat_1: Number(row.cat_1),
       cat_2: Number(row.cat_2),
       cat_3: Number(row.cat_3),
       cat_4: Number(row.cat_4),
     };
+    escalaMap[row.funcion] = entry;
+    escalaMap[row.funcion.toLowerCase()] = entry;
   }
 
   // Novedades (empty object if none)
@@ -261,6 +263,15 @@ export async function calcularLiquidacion(
       anticipo: null,
       muerte: null,
     } as Novedades);
+
+  // Skip suplentes with no days worked — delete any stale liquidación and return
+  if (emp.jornada === "Suplente" && !Number(nov.dias_trabajados_suplente ?? 0) && !Number(nov.suplencia_100_hs ?? 0)) {
+    await pool.query(
+      `DELETE FROM app.liquidaciones_sueldo WHERE empleado_cuil = $1 AND periodo = $2 AND tipo = 'mensual' AND estado != 'confirmada'`,
+      [empleadoCuil, periodo]
+    );
+    return;
+  }
 
   // Coerce numeric DB fields to JS numbers (pg returns NUMERIC as strings)
   const novN = {
@@ -285,18 +296,36 @@ export async function calcularLiquidacion(
 
   const catKey = `cat_${emp.categoria_edificio}` as "cat_1" | "cat_2" | "cat_3" | "cat_4";
 
-  // Find escala for this function
-  let escalaFuncion = escalaMap[emp.funcion];
+  // Find escala for this function (case-insensitive fallback)
+  let escalaFallbackPeriodo: string | null = null;
+  let escalaFuncion = escalaMap[emp.funcion] ?? escalaMap[emp.funcion.toLowerCase()];
   if (!escalaFuncion) {
     // Suplente fallback
     escalaFuncion =
       escalaMap["Suplente con horario por dia"] ??
+      escalaMap["suplente con horario por dia"] ??
       escalaMap["Suplente eventual"] ??
+      escalaMap["suplente eventual"] ??
       null;
     if (!escalaFuncion) {
-      throw new Error(
-        `No se encontró escala para función '${emp.funcion}' en período ${periodo} (empleado ${empleadoCuil})`
+      // Fallback: use the most recent previous period available for this function
+      const fallbackRow = await pool.query<EscalaRow & { periodo: string }>(
+        `SELECT funcion, cat_1::numeric, cat_2::numeric, cat_3::numeric, cat_4::numeric, periodo::text
+         FROM app.escalas_suterh
+         WHERE funcion ILIKE $1 AND periodo < $2
+         ORDER BY periodo DESC
+         LIMIT 1`,
+        [emp.funcion, periodo]
       );
+      if (fallbackRow.rows.length > 0) {
+        const r = fallbackRow.rows[0];
+        escalaFuncion = { cat_1: Number(r.cat_1), cat_2: Number(r.cat_2), cat_3: Number(r.cat_3), cat_4: Number(r.cat_4) };
+        escalaFallbackPeriodo = r.periodo;
+      } else {
+        throw new Error(
+          `No se encontró escala para función '${emp.funcion}' en período ${periodo} (empleado ${empleadoCuil})`
+        );
+      }
     }
   }
 
@@ -774,6 +803,11 @@ export async function calcularLiquidacion(
       conceptos.push([liquidacionId, "9000", "no_remunerativo", "Redondeo", roundingVal, 50]);
     }
 
+    if (escalaFallbackPeriodo) {
+      const fallbackLabel = new Date(escalaFallbackPeriodo).toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" });
+      conceptos.push([liquidacionId, "9999", "no_remunerativo", `Escala aplicada: ${fallbackLabel} (sin escala para este período)`, 0, 99]);
+    }
+
     if (conceptos.length > 0) {
       const placeholders = conceptos
         .map(
@@ -809,6 +843,7 @@ export interface SACPreview {
   mesesTrabajados: number;
   mesesTotales: number;
   sacBase: number;
+  bonificacionSAC: number;
   jubilacion: number;
   pami: number;
   obraSocial: number;
@@ -862,11 +897,28 @@ export async function calcularSACPreview(
     sacBase = Math.round(sacBase * 100) / 100;
   }
 
+  // Bonificación remunerativa del 20% sobre básico de categoría (Res. MT 1934/2015)
+  const periodoSAC = semestre === 1 ? `${anio}-06-01` : `${anio}-12-01`;
+  const catKey = `cat_${emp.categoria_edificio}` as "cat_1" | "cat_2" | "cat_3" | "cat_4";
+  let bonificacionSAC = 0;
+  const escalaRow = await pool.query<EscalaRow>(
+    `SELECT cat_1::numeric, cat_2::numeric, cat_3::numeric, cat_4::numeric
+     FROM app.escalas_suterh
+     WHERE funcion ILIKE $1 AND periodo <= $2
+     ORDER BY periodo DESC LIMIT 1`,
+    [emp.funcion, periodoSAC]
+  );
+  if (escalaRow.rows.length > 0) {
+    const basicoCat = Number(escalaRow.rows[0][catKey]);
+    bonificacionSAC = Math.round(basicoCat * 0.20 * 100) / 100;
+  }
+
+  const totalBruto = sacBase + bonificacionSAC;
   const esSuplente = emp.jornada === "Suplente";
-  const desc = calcDescuentosEmpleado(sacBase, esSuplente);
+  const desc = calcDescuentosEmpleado(totalBruto, esSuplente);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = desc;
   const totalDescuentos = desc.total;
-  const totalPatronal = cons ? calcContribPatronal(sacBase, cons).total : 0;
+  const totalPatronal = cons ? calcContribPatronal(totalBruto, cons).total : 0;
 
   return {
     empleadoNombre: emp.nombre,
@@ -874,6 +926,7 @@ export async function calcularSACPreview(
     mesesTrabajados,
     mesesTotales,
     sacBase,
+    bonificacionSAC,
     jubilacion,
     pami,
     obraSocial,
@@ -883,8 +936,8 @@ export async function calcularSACPreview(
     seguroVital,
     totalDescuentos,
     totalPatronal,
-    netoAPagar: sacBase - totalDescuentos,
-    periodo: semestre === 1 ? `${anio}-06-01` : `${anio}-12-01`,
+    netoAPagar: totalBruto - totalDescuentos,
+    periodo: periodoSAC,
     tipo: semestre === 1 ? "sac_1" : "sac_2",
   };
 }
@@ -912,7 +965,7 @@ export async function liquidarSAC(
          neto_a_pagar              = EXCLUDED.neto_a_pagar,
          estado = CASE WHEN app.liquidaciones_sueldo.estado = 'confirmada' THEN 'confirmada' ELSE 'borrador' END
        RETURNING id`,
-      [empleadoCuil, p.periodo, p.tipo, safe(p.sacBase), safe(p.totalDescuentos), safe(p.totalPatronal), safe(p.netoAPagar)]
+      [empleadoCuil, p.periodo, p.tipo, safe(p.sacBase + p.bonificacionSAC), safe(p.totalDescuentos), safe(p.totalPatronal), safe(p.netoAPagar)]
     );
 
     const liqId = res.rows[0].id;
@@ -920,6 +973,7 @@ export async function liquidarSAC(
 
     const conceptos: [number, string, string, string, number, number][] = [
       [liqId, "2200", "haber", "Sueldo Anual Complementario", safe(p.sacBase), 1],
+      ...(p.bonificacionSAC > 0 ? [[liqId, "2210", "haber", "Bonificación SAC (20% básico categoría)", safe(p.bonificacionSAC), 2] as [number, string, string, string, number, number]] : []),
     ];
     if (p.jubilacion > 0)    conceptos.push([liqId, "5000", "descuento", "Jubilación", safe(p.jubilacion), 30]);
     if (p.pami > 0)          conceptos.push([liqId, "5050", "descuento", "PAMI", safe(p.pami), 31]);

@@ -2,15 +2,24 @@
 
 import { useState } from "react";
 
-export function TriggerN8nButton() {
+export function TriggerN8nButton({ periodo }: { periodo: string }) {
   const [status, setStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
 
   async function trigger() {
     setStatus("loading");
     try {
-      const res = await fetch("/api/sueldos/trigger-escalas", { method: "POST" });
+      const res = await fetch("/api/sueldos/trigger-escalas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ periodo }),
+      });
       setStatus(res.ok ? "ok" : "error");
-      if (res.ok) setTimeout(() => setStatus("idle"), 4000);
+      if (res.ok) setTimeout(() => {
+        setStatus("idle");
+        const url = new URL(window.location.href);
+        url.searchParams.set('periodo', periodo);
+        window.location.href = url.toString();
+      }, 3000);
     } catch {
       setStatus("error");
     }

@@ -4,6 +4,7 @@ import { pool } from "@/lib/db";
 import { getEmpleados } from "../../actions";
 import { formatMoney0, formatEmpleadoOption } from "@/lib/format";
 import Link from "next/link";
+import { EmpleadoSelect } from "./EmpleadoSelect";
 
 interface Props {
   searchParams: Promise<{ empleado_cuil?: string; desde?: string; hasta?: string }>;
@@ -30,8 +31,10 @@ export default async function HistoriaPage({ searchParams }: Props) {
   const desdeDefault = `${now.getFullYear() - 1}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const hastaDefault = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
-  const desdeVal = desde ?? desdeDefault;
-  const hastaVal = hasta ?? hastaDefault;
+  const toFirstOfMonth = (s: string) =>
+    s.length === 7 ? `${s}-01` : s.length === 10 ? s : s;
+  const desdeVal = toFirstOfMonth(desde ?? desdeDefault);
+  const hastaVal = toFirstOfMonth(hasta ?? hastaDefault);
 
   let liquidaciones: any[] = [];
   let empleadoNombre = "";
@@ -76,12 +79,7 @@ export default async function HistoriaPage({ searchParams }: Props) {
       <form method="GET" className="card p-5 mb-6 grid grid-cols-4 gap-4 items-end">
         <div className="col-span-2">
           <label className="label">Empleado</label>
-          <select name="empleado_cuil" defaultValue={empleado_cuil ?? ""} className="input" required>
-            <option value="">Seleccionar...</option>
-            {empleados.map((e: any) => (
-              <option key={e.cuil} value={e.cuil}>{formatEmpleadoOption(e)}</option>
-            ))}
-          </select>
+          <EmpleadoSelect empleados={empleados} value={empleado_cuil ?? ""} />
         </div>
         <div>
           <label className="label">Desde</label>

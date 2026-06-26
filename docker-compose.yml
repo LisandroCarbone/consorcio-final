@@ -97,6 +97,7 @@ services:
       AGENT_API_KEY: ${AGENT_API_KEY:-changeme}
       N8N_BASE_URL: http://n8n:5678
       N8N_API_KEY: ${N8N_API_KEY:-}
+      N8N_WORKFLOW_ID: ${N8N_WORKFLOW_ID:-}
     ports:
       - "3010:3000"
 

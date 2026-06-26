@@ -9,9 +9,10 @@ import { pool } from "@/lib/db";
 export default async function SACPage({
   searchParams,
 }: {
-  searchParams: Promise<{ empleado_cuil?: string; anio?: string; semestre?: string; liquidado?: string }>;
+  searchParams: Promise<{ empleado_cuil?: string; anio?: string; semestre?: string; liquidado?: string; error?: string }>;
 }) {
   const sp = await searchParams;
+  const actionError = sp.error ? decodeURIComponent(sp.error) : null;
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
 
@@ -87,19 +88,25 @@ export default async function SACPage({
           <input name="anio" type="number" defaultValue={anio} min="2020" max="2099" className="input" />
         </div>
         <div className="col-span-3">
-          <button type="submit" className="btn-primary">Calcular preview</button>
+          <button type="submit" className="btn-primary">Cálculo estimado</button>
         </div>
       </form>
 
-      {previewError && (
+      {(previewError || actionError) && (
         <div className="card border border-red-200 bg-red-50 p-4 mb-4 text-red-700 text-sm">
-          {previewError}
+          {previewError || actionError}
         </div>
       )}
 
       {yaLiquidado && (
-        <div className="card border border-green-200 bg-green-50 p-4 mb-4 text-green-700 text-sm">
-          SAC liquidado correctamente. Podés verlo en la lista de liquidaciones.
+        <div className="card border border-green-200 bg-green-50 p-4 mb-4 text-green-700 text-sm flex items-center justify-between gap-4">
+          <span>SAC liquidado correctamente.</span>
+          <a
+            href={`/sueldos/liquidaciones?periodo=${anio}-${semestre === 1 ? "06" : "12"}-01&tipo=sac_${semestre}`}
+            className="btn-primary text-xs whitespace-nowrap"
+          >
+            Ver SAC {semestre}° en liquidaciones →
+          </a>
         </div>
       )}
 
@@ -124,6 +131,12 @@ export default async function SACPage({
                   <td className="py-1.5 text-gray-600">SAC bruto</td>
                   <td className="py-1.5 text-right font-mono font-semibold">{formatMoney(preview.sacBase)}</td>
                 </tr>
+                {preview.bonificacionSAC > 0 && (
+                  <tr className="border-b border-gray-100">
+                    <td className="py-1.5 text-gray-600">Bonificación SAC (20% básico categoría)</td>
+                    <td className="py-1.5 text-right font-mono font-semibold">{formatMoney(preview.bonificacionSAC)}</td>
+                  </tr>
+                )}
                 <tr className="border-b border-gray-100">
                   <td className="py-1.5 text-gray-500 pl-4">Jubilación (11%)</td>
                   <td className="py-1.5 text-right font-mono text-red-600">- {formatMoney(preview.jubilacion)}</td>
@@ -170,14 +183,22 @@ export default async function SACPage({
             </p>
           </div>
 
-          <form action={accionLiquidarSAC}>
-            <input type="hidden" name="empleado_cuil" value={empleadoCuil!} />
-            <input type="hidden" name="anio" value={anio} />
-            <input type="hidden" name="semestre" value={semestre} />
-            <button type="submit" className="btn-primary">
-              Confirmar y guardar liquidación SAC
-            </button>
-          </form>
+          <div className="flex gap-3 items-center">
+            <form action={accionLiquidarSAC}>
+              <input type="hidden" name="empleado_cuil" value={empleadoCuil!} />
+              <input type="hidden" name="anio" value={anio} />
+              <input type="hidden" name="semestre" value={semestre} />
+              <button type="submit" className="btn-primary">
+                Confirmar y guardar liquidación SAC
+              </button>
+            </form>
+            <a
+              href={`/sueldos/liquidaciones?periodo=${anio}-${semestre === 1 ? "06" : "12"}-01&tipo=sac_${semestre}`}
+              className="btn-secondary text-sm"
+            >
+              Ver SAC en liquidaciones →
+            </a>
+          </div>
         </>
       )}
     </div>

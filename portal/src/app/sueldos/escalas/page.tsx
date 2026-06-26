@@ -4,6 +4,7 @@ import { pool } from "@/lib/db";
 import { PeriodoSelect } from "./PeriodoSelect";
 import { TriggerN8nButton } from "./TriggerN8nButton";
 import { cleanPeriodo } from "@/lib/format";
+import { cookies } from "next/headers";
 
 async function getEscalasData(periodo?: string) {
   const { rows: periodos } = await pool.query(
@@ -30,7 +31,9 @@ export default async function EscalasPage({
   searchParams: Promise<{ periodo?: string }>;
 }) {
   const { periodo: periodoParam } = await searchParams;
-  const cleanedPeriodo = cleanPeriodo(periodoParam);
+  const cookieStore = await cookies();
+  const activePeriodoCookie = cookieStore.get("active_periodo")?.value;
+  const cleanedPeriodo = cleanPeriodo(periodoParam) ?? cleanPeriodo(activePeriodoCookie);
   const { periodos, escalas, adicionales, selected } = await getEscalasData(cleanedPeriodo);
 
   const selectOptions = periodos.map((p) => ({
@@ -48,13 +51,7 @@ export default async function EscalasPage({
           )}
         </div>
         <div className="flex items-center gap-3">
-          {periodos.length > 1 && (
-            <PeriodoSelect
-              options={selectOptions}
-              selected={selected ?? ''}
-            />
-          )}
-          <TriggerN8nButton />
+          <TriggerN8nButton periodo={cleanedPeriodo ?? selected ?? ''} />
           <a
             href="https://suterh.org.ar/planillas-salariales/"
             target="_blank"

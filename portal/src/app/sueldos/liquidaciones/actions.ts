@@ -3,6 +3,7 @@
 import { calcularLiquidacionesPeriodo, confirmarLiquidacion } from "../actions";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { pool } from "@/lib/db";
 
 export async function recalcularPeriodoAction(formData: FormData) {
   const periodo = String(formData.get("periodo"));
@@ -12,8 +13,14 @@ export async function recalcularPeriodoAction(formData: FormData) {
     redirect(`/sueldos/liquidaciones?periodo=${periodo}&tipo=${tipo}&ok=sac_noop`);
   }
 
-  await calcularLiquidacionesPeriodo(periodo);
+  const result = await calcularLiquidacionesPeriodo(periodo);
   revalidatePath("/sueldos/liquidaciones");
+  if (result.errores.length > 0 && result.ok === 0) {
+    redirect(`/sueldos/liquidaciones?periodo=${periodo}&tipo=${tipo}&ok=error`);
+  }
+  if (result.errores.length > 0) {
+    redirect(`/sueldos/liquidaciones?periodo=${periodo}&tipo=${tipo}&ok=recalculado_parcial&errores=${result.errores.length}`);
+  }
   redirect(`/sueldos/liquidaciones?periodo=${periodo}&tipo=${tipo}&ok=recalculado`);
 }
 

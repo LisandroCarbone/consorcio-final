@@ -10,6 +10,7 @@ import { ActionFeedback } from "@/components/ui/ActionFeedback";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { pool } from "@/lib/db";
+import { FileCheck, Clock, ShieldCheck, Wallet, CalendarDays, TrendingUp, UserMinus, Scale, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface LiquidacionRow {
   id: number;
@@ -96,137 +97,198 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
   const totalNeto = liquidaciones
     .filter((l) => l.estado !== "anulada")
     .reduce((s, l) => s + Number(l.neto_a_pagar), 0);
+  const confirmadas = liquidaciones.filter((l) => l.estado === "confirmada").length;
+  const borradores = liquidaciones.filter((l) => l.estado === "borrador").length;
 
   return (
     <div className="p-6 w-full">
       <Suspense><ActionFeedback /></Suspense>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Liquidaciones</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {periodoLabel}
-            {" · "}
-            <Link href="/sueldos/liquidaciones/historia" className="text-blue-600 hover:underline text-xs">
-              Ver histórico por persona →
-            </Link>
-          </p>
+
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Liquidaciones</h1>
+        <p className="text-gray-500 text-sm mt-1">Período: {periodoLabel}</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Clock className="w-4 h-4 text-gray-400" />
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Generadas</p>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{liquidaciones.length}</p>
         </div>
-        <div className="flex gap-2 flex-wrap justify-end">
-          {tipo === "mensual" ? (
-            <>
-              <a href={`?periodo=${prevMes}&tipo=mensual`} className="btn-secondary text-sm">← Anterior</a>
-              <a href={`?periodo=${nextMes}&tipo=mensual`} className="btn-secondary text-sm">Siguiente →</a>
-              <a href={`?periodo=${sac1Periodo}&tipo=sac_1`} className="btn-secondary text-sm text-indigo-700 border-indigo-300">SAC 1°</a>
-              <a href={`?periodo=${sac2Periodo}&tipo=sac_2`} className="btn-secondary text-sm text-indigo-700 border-indigo-300">SAC 2°</a>
-            </>
-          ) : (
-            <>
-              <a
-                href={`?periodo=${sac1Periodo}&tipo=sac_1`}
-                className={`btn-secondary text-sm ${tipo === "sac_1" ? "font-semibold underline" : ""}`}
-              >
-                SAC 1° {sacYear}
-              </a>
-              <a
-                href={`?periodo=${sac2Periodo}&tipo=sac_2`}
-                className={`btn-secondary text-sm ${tipo === "sac_2" ? "font-semibold underline" : ""}`}
-              >
-                SAC 2° {sacYear}
-              </a>
-              <a href={`?periodo=${periodo}&tipo=mensual`} className="btn-secondary text-sm">← Volver a mensual</a>
-            </>
-          )}
-          <form action={recalcularPeriodoAction}>
-            <input type="hidden" name="periodo" value={periodo} />
-            <input type="hidden" name="tipo" value={tipo} />
-            <button type="submit" className="btn-primary">
-              Recalcular todo
-            </button>
-          </form>
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <ShieldCheck className="w-4 h-4 text-gray-400" />
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Confirmadas</p>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{confirmadas}</p>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <FileCheck className="w-4 h-4 text-gray-400" />
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Borradores</p>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{borradores}</p>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Wallet className="w-4 h-4 text-gray-400" />
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total neto</p>
+          </div>
+          <p className="text-xl font-bold text-gray-900">{formatMoney0(totalNeto)}</p>
         </div>
       </div>
 
-      {liquidaciones.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
-          <p className="mb-4">No hay liquidaciones para este período.</p>
-          {tipo === "mensual" ? (
-            <p className="text-sm">Cargá las novedades del mes y hacé clic en "Recalcular todo".</p>
-          ) : (
-            <p className="text-sm">Usá la página de SAC para liquidar individualmente y luego recalculá.</p>
-          )}
+      {/* Main grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Left — tabla (2/3) */}
+        <div className="lg:col-span-2">
+          <div className="card">
+            {/* Card header */}
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="font-semibold text-gray-800 text-base">Recibos del período</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{periodoLabel}</p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {tipo === "mensual" ? (
+                  <>
+                    <a href={`?periodo=${prevMes}&tipo=mensual`} className="btn-secondary py-1.5 text-xs flex items-center gap-1">
+                      <ChevronLeft className="w-3.5 h-3.5" />Anterior
+                    </a>
+                    <a href={`?periodo=${nextMes}&tipo=mensual`} className="btn-secondary py-1.5 text-xs flex items-center gap-1">
+                      Siguiente<ChevronRight className="w-3.5 h-3.5" />
+                    </a>
+                    <a href={`?periodo=${sac1Periodo}&tipo=sac_1`} className="btn-secondary py-1.5 text-xs text-indigo-700 border-indigo-300">SAC 1°</a>
+                    <a href={`?periodo=${sac2Periodo}&tipo=sac_2`} className="btn-secondary py-1.5 text-xs text-indigo-700 border-indigo-300">SAC 2°</a>
+                  </>
+                ) : (
+                  <>
+                    <a href={`?periodo=${sac1Periodo}&tipo=sac_1`} className={`btn-secondary py-1.5 text-xs ${tipo === "sac_1" ? "font-semibold" : ""}`}>SAC 1° {sacYear}</a>
+                    <a href={`?periodo=${sac2Periodo}&tipo=sac_2`} className={`btn-secondary py-1.5 text-xs ${tipo === "sac_2" ? "font-semibold" : ""}`}>SAC 2° {sacYear}</a>
+                    <a href="/sueldos/sac" className="btn-primary py-1.5 text-xs">Liquidar SAC →</a>
+                    <a href={`?periodo=${periodo}&tipo=mensual`} className="btn-secondary py-1.5 text-xs">← Mensual</a>
+                  </>
+                )}
+                <form action={recalcularPeriodoAction}>
+                  <input type="hidden" name="periodo" value={periodo} />
+                  <input type="hidden" name="tipo" value={tipo} />
+                  <button type="submit" className="btn-primary py-1.5 text-xs">Recalcular todo</button>
+                </form>
+              </div>
+            </div>
+
+            {liquidaciones.length === 0 ? (
+              <div className="text-center py-16 text-gray-500 text-sm">
+                <p className="mb-2">No hay liquidaciones para este período.</p>
+                {tipo === "mensual"
+                  ? <p className="text-xs text-gray-400">Cargá las novedades del mes y hacé clic en "Recalcular todo".</p>
+                  : <p className="text-xs text-gray-400">Usá "Liquidar SAC" y luego recalculá.</p>}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Nombre</th>
+                      <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Función</th>
+                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Bruto</th>
+                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Desc.</th>
+                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Neto</th>
+                      <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Estado</th>
+                      <th className="px-3 py-2.5" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {liquidaciones.map((l) => (
+                      <tr key={l.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-2.5 font-semibold text-gray-900">{l.empleado_nombre}</td>
+                        <td className="px-3 py-2.5 text-gray-500">{l.funcion}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-700">{formatMoney0(Number(l.remuneracion_bruta))}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-red-500">-{formatMoney0(Number(l.total_descuentos_empleado))}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-bold text-gray-900">{formatMoney0(Number(l.neto_a_pagar))}</td>
+                        <td className="px-3 py-2.5"><EstadoBadge estado={l.estado} /></td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex gap-3">
+                            <a href={`/sueldos/liquidaciones/${l.id}`} className="text-blue-600 hover:text-blue-800 font-medium">Ver recibo</a>
+                            {l.estado === "borrador" && (
+                              <form action={confirmarLiquidacionAction}>
+                                <input type="hidden" name="id" value={l.id} />
+                                <input type="hidden" name="periodo" value={periodo} />
+                                <input type="hidden" name="tipo" value={tipo} />
+                                <button type="submit" className="text-green-600 hover:text-green-800 font-medium">Confirmar</button>
+                              </form>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
-      ) : (
-        <>
-          <div className="card mb-4 flex justify-between items-center">
-            <span className="text-gray-500 text-sm">Total neto a pagar</span>
-            <span className="text-xl font-bold text-gray-900">
-              {formatMoney0(totalNeto)}
-            </span>
+
+        {/* Right — acciones (1/3) */}
+        <div className="space-y-4">
+          {/* Acciones */}
+          <div className="card">
+            <div className="px-5 py-3 border-b border-gray-100">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Acciones de liquidación</p>
+            </div>
+            <div className="divide-y divide-gray-50">
+              <Link href="/sueldos/novedades" className="flex items-start gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                <CalendarDays className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Novedades del mes</p>
+                  <p className="text-xs text-gray-500">Horas extras, licencias, mensualidades</p>
+                </div>
+              </Link>
+              <Link href="/sueldos/sac" className="flex items-start gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                <TrendingUp className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Liquidar SAC (Aguinaldo)</p>
+                  <p className="text-xs text-gray-500">Cálculo de 1° o 2° semestre</p>
+                </div>
+              </Link>
+              <Link href="/sueldos/liquidaciones/historia" className="flex items-start gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                <FileCheck className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Histórico por empleado</p>
+                  <p className="text-xs text-gray-500">Ver recibos anteriores de cada persona</p>
+                </div>
+              </Link>
+              <Link href="/sueldos/despido" className="flex items-start gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                <UserMinus className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Egreso o Despido</p>
+                  <p className="text-xs text-gray-500">Liquidación final e indemnización</p>
+                </div>
+              </Link>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-gray-500 text-left">
-                  <th className="pb-2 pr-4">Empleado</th>
-                  <th className="pb-2 pr-4">Consorcio</th>
-                  <th className="pb-2 pr-4 text-right">Bruto</th>
-                  <th className="pb-2 pr-4 text-right">Descuentos</th>
-                  <th className="pb-2 pr-4 text-right">Neto</th>
-                  <th className="pb-2 pr-4">Estado</th>
-                  <th className="pb-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {liquidaciones.map((l) => (
-                  <tr key={l.id} className="border-b last:border-0">
-                    <td className="py-3 pr-4">
-                      <p className="font-medium text-gray-900">{l.empleado_nombre}</p>
-                      <p className="text-gray-400 text-xs">{l.funcion}</p>
-                    </td>
-                    <td className="py-3 pr-4 text-gray-600">{l.consorcio_nombre}</td>
-                    <td className="py-3 pr-4 text-right text-gray-700">
-                      {formatMoney0(Number(l.remuneracion_bruta))}
-                    </td>
-                    <td className="py-3 pr-4 text-right text-red-600">
-                      -{formatMoney0(Number(l.total_descuentos_empleado))}
-                    </td>
-                    <td className="py-3 pr-4 text-right font-semibold text-gray-900">
-                      {formatMoney0(Number(l.neto_a_pagar))}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <EstadoBadge estado={l.estado} />
-                    </td>
-                    <td className="py-3">
-                      <div className="flex gap-2">
-                        <Link
-                          href={`/sueldos/liquidaciones/${l.id}`}
-                          className="text-blue-600 hover:underline text-xs"
-                        >
-                          Ver recibo
-                        </Link>
-                        {l.estado === "borrador" && (
-                          <form action={confirmarLiquidacionAction}>
-                            <input type="hidden" name="id" value={l.id} />
-                            <input type="hidden" name="periodo" value={periodo} />
-                            <input type="hidden" name="tipo" value={tipo} />
-                            <button
-                              type="submit"
-                              className="text-green-600 hover:underline text-xs"
-                            >
-                              Confirmar
-                            </button>
-                          </form>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Escalas SUTERH */}
+          <div className="card">
+            <div className="px-5 py-3 border-b border-gray-100">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Scale className="w-3.5 h-3.5" /> Escalas SUTERH
+              </p>
+            </div>
+            <div className="px-5 py-4">
+              <Link href="/sueldos/escalas" className="btn-secondary text-xs w-full text-center block">
+                Ver escalas vigentes
+              </Link>
+            </div>
           </div>
-        </>
-      )}
+        </div>
+
+      </div>
     </div>
   );
 }
