@@ -334,7 +334,8 @@ export async function calcularLiquidacion(
 
   let sueldoBasico = 0;
   if (emp.jornada === "Suplente") {
-    const hs = novN.horas_jornada ?? 8;
+    // Art. 7 inc. P: máximo 18 horas por jornada para suplentes y personal jornalizado
+    const hs = Math.min(novN.horas_jornada ?? 8, 18);
     sueldoBasico = (valorEscala / 8) * hs * novN.dias_trabajados_suplente;
   } else {
     sueldoBasico = valorEscala;
@@ -346,9 +347,9 @@ export async function calcularLiquidacion(
 
   const aniosAntig = Math.max(0, calcAniosAntigüedad(emp.fecha_ingreso, periodo));
 
-  // For suplentes, total hours = regular days × hs + suplencia_100_hs hours
+  // For suplentes, total hours = regular days × hs (capped at 18 per Art. 7 inc. P) + suplencia_100_hs
   const horasTotalesSuplente =
-    novN.dias_trabajados_suplente * (novN.horas_jornada ?? 8) +
+    novN.dias_trabajados_suplente * Math.min(novN.horas_jornada ?? 8, 18) +
     novN.suplencia_100_hs;
 
   const plusAntig1pct = adic("plus_antig_1pct", PLUS_ANTIG_1PCT_SUPLENTE);

@@ -84,17 +84,17 @@ export default function NovedadesForm({ empleado, periodo, novedades }: Props) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {empleado.jornada === "Suplente" && (
               <>
-                <Field label="Días trabajados" name="dias_trabajados_suplente" defaultValue={def("dias_trabajados_suplente")} step="0.5" />
-                <Field label="Hs por jornada" name="horas_jornada" defaultValue={def("horas_jornada", 8)} step="0.5" />
+                <Field label="Días trabajados" name="dias_trabajados_suplente" defaultValue={def("dias_trabajados_suplente")} step="0.5" max={31} />
+                <Field label="Hs por jornada (máx. 18 — Art. 7 inc. P)" name="horas_jornada" defaultValue={def("horas_jornada", 8)} step="0.5" max={18} />
               </>
             )}
-            <Field label="Hs extras 50%" name="horas_extras_50" defaultValue={def("horas_extras_50")} step="0.5" />
-            <Field label="Hs extras 100%" name="horas_extras_100" defaultValue={def("horas_extras_100")} step="0.5" />
-            <Field label="Feriados trabajados (hs)" name="feriados_trabajados_hs" defaultValue={def("feriados_trabajados_hs")} step="0.5" />
-            <Field label="Suplencia 100% (hs)" name="suplencia_100_hs" defaultValue={def("suplencia_100_hs")} step="0.5" />
-            <Field label="Plus vacaciones (días)" name="plus_vacaciones_dias" defaultValue={def("plus_vacaciones_dias")} step="0.5" />
-            <Field label="Días no trabajados" name="dias_no_trabajados" defaultValue={def("dias_no_trabajados")} step="0.5" />
-            <Field label="Lic. enfermedad (días)" name="licencia_enfermedad" defaultValue={def("licencia_enfermedad")} step="0.5" />
+            <Field label="Hs extras 50%" name="horas_extras_50" defaultValue={def("horas_extras_50")} step="0.5" max={200} />
+            <Field label="Hs extras 100%" name="horas_extras_100" defaultValue={def("horas_extras_100")} step="0.5" max={200} />
+            <Field label="Feriados trabajados (hs)" name="feriados_trabajados_hs" defaultValue={def("feriados_trabajados_hs")} step="0.5" max={200} />
+            <Field label="Suplencia 100% (hs)" name="suplencia_100_hs" defaultValue={def("suplencia_100_hs")} step="0.5" max={200} />
+            <Field label="Plus vacaciones (días)" name="plus_vacaciones_dias" defaultValue={def("plus_vacaciones_dias")} step="0.5" max={31} />
+            <Field label="Días no trabajados" name="dias_no_trabajados" defaultValue={def("dias_no_trabajados")} step="0.5" max={31} />
+            <Field label="Lic. enfermedad (días)" name="licencia_enfermedad" defaultValue={def("licencia_enfermedad")} step="0.5" max={31} />
             <Field label="Adicional voluntario ($)" name="adicional_voluntario" defaultValue={def("adicional_voluntario")} step="1" />
             <Field label="Embargo ($)" name="embargo" defaultValue={def("embargo")} step="1" />
             <Field label="Anticipo ($)" name="anticipo" defaultValue={def("anticipo")} step="1" />
@@ -132,9 +132,9 @@ export default function NovedadesForm({ empleado, periodo, novedades }: Props) {
 }
 
 function Field({
-  label, name, defaultValue, step,
+  label, name, defaultValue, step, max,
 }: {
-  label: string; name: string; defaultValue: number; step: string;
+  label: string; name: string; defaultValue: number; step: string; max?: number;
 }) {
   return (
     <div>
@@ -145,6 +145,7 @@ function Field({
         defaultValue={defaultValue}
         step={step}
         min="0"
+        max={max}
         className="input w-full text-sm"
       />
     </div>
