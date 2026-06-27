@@ -484,3 +484,76 @@ export async function calcularLiquidacionesPeriodo(periodo: string) {
   revalidatePath("/sueldos/liquidaciones");
   return result;
 }
+
+export async function getFondoEducacion(periodo: string): Promise<boolean> {
+  const row = await queryOne<{ valor: string }>(
+    `SELECT valor FROM app.adicionales_suterh WHERE periodo = $1 AND concepto_key = 'fondo_educacion'`,
+    [periodo]
+  );
+  return !!row;
+}
+
+export async function upsertFondoEducacion(periodo: string, activo: boolean): Promise<void> {
+  if (activo) {
+    await query(
+      `INSERT INTO app.adicionales_suterh (periodo, concepto, concepto_key, valor, fuente_url)
+       VALUES ($1, 'Fondo Educación y Comunicación Art. 19 bis', 'fondo_educacion', 1, 'manual')
+       ON CONFLICT (periodo, concepto) DO UPDATE SET concepto_key = EXCLUDED.concepto_key, valor = EXCLUDED.valor`,
+      [periodo]
+    );
+  } else {
+    await query(
+      `DELETE FROM app.adicionales_suterh WHERE periodo = $1 AND concepto_key = 'fondo_educacion'`,
+      [periodo]
+    );
+  }
+  revalidatePath("/sueldos/novedades");
+}
+
+export async function getConceptosAdicionalesPeriodo(
+  periodo: string, consorcioCuit: string
+): Promise<{ id: number; concepto: string; tipo: string; importe: number; es_porcentaje: boolean }[]> {
+  const { rows } = await pool.query(
+    `SELECT id, concepto, tipo, importe::numeric AS importe, es_porcentaje
+     FROM app.conceptos_adicionales_periodo
+     WHERE periodo = $1 AND consorcio_cuit = $2 ORDER BY id`,
+    [periodo, consorcioCuit]
+  );
+  return rows.map(r => ({ ...r, importe: Number(r.importe), es_porcentaje: Boolean(r.es_porcentaje) }));
+}
+
+export async function upsertConceptoAdicionalPeriodo(
+  periodo: string, consorcioCuit: string, concepto: string, tipo: string, importe: number, esPorcentaje = false
+): Promise<void> {
+  await query(
+    `INSERT INTO app.conceptos_adicionales_periodo (periodo, consorcio_cuit, concepto, tipo, importe, es_porcentaje)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (periodo, consorcio_cuit, concepto) DO UPDATE SET tipo = EXCLUDED.tipo, importe = EXCLUDED.importe, es_porcentaje = EXCLUDED.es_porcentaje`,
+    [periodo, consorcioCuit, concepto, tipo, importe, esPorcentaje]
+  );
+  revalidatePath("/sueldos/novedades");
+}
+
+export async function deleteConceptoAdicionalPeriodo(id: number): Promise<void> {
+  await query(`DELETE FROM app.conceptos_adicionales_periodo WHERE id = $1`, [id]);
+  revalidatePath("/sueldos/novedades");
+}
+
+export async function getAdicionalRemuneratorio(periodo: string): Promise<number | null> {
+  const row = await queryOne<{ valor: string }>(
+    `SELECT valor::numeric::text AS valor FROM app.adicionales_suterh
+     WHERE periodo = $1 AND concepto_key = 'adicional_remuneratorio_mensual'`,
+    [periodo]
+  );
+  return row ? Number(row.valor) : null;
+}
+
+export async function upsertAdicionalRemuneratorio(periodo: string, valor: number): Promise<void> {
+  await query(
+    `INSERT INTO app.adicionales_suterh (periodo, concepto, concepto_key, valor, fuente_url)
+     VALUES ($1, 'Adicional Remuneratorio Mensual', 'adicional_remuneratorio_mensual', $2, 'manual')
+     ON CONFLICT (periodo, concepto) DO UPDATE SET valor = EXCLUDED.valor, concepto_key = EXCLUDED.concepto_key`,
+    [periodo, valor]
+  );
+  revalidatePath("/sueldos/novedades");
+}

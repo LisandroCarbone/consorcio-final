@@ -6,17 +6,6 @@ import { updateConsorcio } from "../../actions";
 import { Suspense } from "react";
 import { ActionFeedback } from "@/components/ui/ActionFeedback";
 
-// Auto-category detection: CCT SUTERH defines category by UF count + amenities
-function inferCategoria(cant_uf: number | null, amenities: { pileta: boolean; jardin: boolean; cochera: boolean; caldera: boolean }): string | null {
-  if (!cant_uf) return null;
-  // Rough thresholds (CCT SUTERH): ≥10 UF + amenity → 1°, ≥10 sin → 2°, ≥4 → 3°, resto → 4°
-  const hasAmenity = amenities.pileta || amenities.jardin || amenities.cochera || amenities.caldera;
-  if (cant_uf >= 10 && hasAmenity) return "1° Cat.";
-  if (cant_uf >= 10) return "2° Cat.";
-  if (cant_uf >= 4) return "3° Cat.";
-  return "4° Cat.";
-}
-
 interface Props {
   params: Promise<{ id: string }>;
 }
@@ -29,27 +18,33 @@ export default async function EditarConsorcioPage({ params }: Props) {
     cant_uf: number | null; categoria_edificio: string | null; banco: string | null;
     tiene_cochera: boolean; tiene_movimiento_coches: boolean; tiene_jardin: boolean;
     zona_desfavorable: boolean; tiene_pileta: boolean; tiene_caldera: boolean;
+    tiene_ascensor: boolean; tiene_agua_caliente_central: boolean;
+    tiene_calefaccion_central: boolean; tiene_aire_acondicionado_central: boolean;
+    tiene_grupo_electrogeno: boolean; tiene_seguridad_centralizada: boolean;
+    tiene_compactador: boolean; tiene_montacargas: boolean;
+    tiene_otros_servicios_centrales: boolean;
     interest_rate: string | null;
   }>("SELECT * FROM app.consorcios WHERE cuit = $1", [id]);
 
   if (!c) notFound();
 
-  const sugerida = inferCategoria(c.cant_uf, {
-    pileta: c.tiene_pileta, jardin: c.tiene_jardin,
-    cochera: c.tiene_cochera, caldera: c.tiene_caldera,
-  });
-
   const interesesPct = c.interest_rate
     ? (Number(c.interest_rate) * 100).toFixed(2)
     : "";
 
-  const CHECKBOXES = [
-    { name: "tiene_cochera", label: "Cochera", checked: c.tiene_cochera },
-    { name: "tiene_movimiento_coches", label: "Mov. de coches", checked: c.tiene_movimiento_coches },
-    { name: "tiene_jardin", label: "Jardín", checked: c.tiene_jardin },
-    { name: "zona_desfavorable", label: "Zona desfavorable", checked: c.zona_desfavorable },
+  const SERVICIOS_CENTRALES = [
+    { name: "tiene_ascensor", label: "Ascensor", checked: c.tiene_ascensor },
+    { name: "tiene_agua_caliente_central", label: "Agua caliente central", checked: c.tiene_agua_caliente_central },
+    { name: "tiene_calefaccion_central", label: "Calefacción central", checked: c.tiene_calefaccion_central },
+    { name: "tiene_aire_acondicionado_central", label: "Aire acondicionado central", checked: c.tiene_aire_acondicionado_central },
+    { name: "tiene_cochera", label: "Cocheras", checked: c.tiene_cochera },
+    { name: "tiene_grupo_electrogeno", label: "Grupo electrógeno", checked: c.tiene_grupo_electrogeno },
     { name: "tiene_pileta", label: "Pileta", checked: c.tiene_pileta },
-    { name: "tiene_caldera", label: "Caldera", checked: c.tiene_caldera },
+    { name: "tiene_jardin", label: "Jardín", checked: c.tiene_jardin },
+    { name: "tiene_seguridad_centralizada", label: "Seguridad centralizada", checked: c.tiene_seguridad_centralizada },
+    { name: "tiene_compactador", label: "Compactador", checked: c.tiene_compactador },
+    { name: "tiene_montacargas", label: "Montacargas", checked: c.tiene_montacargas },
+    { name: "tiene_otros_servicios_centrales", label: "Otros servicios centrales", checked: c.tiene_otros_servicios_centrales },
   ];
 
   return (
@@ -81,7 +76,7 @@ export default async function EditarConsorcioPage({ params }: Props) {
           </div>
           <div>
             <label className="label">CUIT</label>
-            <input name="cuit_disabled" defaultValue={c.cuit} className="input bg-gray-100 cursor-not-allowed" readOnly disabled />
+            <input defaultValue={c.cuit} className="input bg-gray-100 cursor-not-allowed" readOnly disabled />
           </div>
           <div>
             <label className="label">Código Postal</label>
@@ -92,18 +87,12 @@ export default async function EditarConsorcioPage({ params }: Props) {
             <input name="nro_cta_suterh" defaultValue={c.suterh_key ?? ""} className="input" />
           </div>
           <div>
-            <label className="label">Cant. UF</label>
+            <label className="label">UF p/ Retiro de Residuos</label>
             <input name="cant_uf" type="number" defaultValue={c.cant_uf ?? ""} className="input" />
+            <p className="text-xs text-gray-400 mt-0.5">Solo las UF alcanzadas por el servicio de retiro</p>
           </div>
           <div>
-            <label className="label">
-              Categoría edificio
-              {sugerida && sugerida !== c.categoria_edificio && (
-                <span className="ml-2 text-xs text-amber-600 font-normal">
-                  (sugerida: {sugerida})
-                </span>
-              )}
-            </label>
+            <label className="label">Categoría edificio</label>
             <select name="categoria_edificio" defaultValue={c.categoria_edificio ?? ""} className="input">
               <option value="">— seleccionar —</option>
               <option>1° Cat.</option>
@@ -111,17 +100,13 @@ export default async function EditarConsorcioPage({ params }: Props) {
               <option>3° Cat.</option>
               <option>4° Cat.</option>
             </select>
-            {sugerida && (
-              <p className="text-xs text-gray-400 mt-0.5">
-                Por UF + amenities el sistema sugiere: <strong>{sugerida}</strong>
-              </p>
-            )}
+            <p className="text-xs text-gray-400 mt-0.5">Según Art. 6 CCT 589/10</p>
           </div>
           <div>
             <label className="label">Banco</label>
             <input name="banco" defaultValue={c.banco ?? ""} className="input" />
           </div>
-          <div>
+          <div className="col-span-2">
             <label className="label">Intereses por mora (%)</label>
             <input
               name="intereses_mora_pct"
@@ -130,17 +115,18 @@ export default async function EditarConsorcioPage({ params }: Props) {
               min="0"
               max="100"
               defaultValue={interesesPct}
-              className="input"
-              placeholder="Ej: 3.5 (definido en asamblea)"
+              className="input w-40"
+              placeholder="Ej: 3.5"
             />
             <p className="text-xs text-gray-400 mt-0.5">Porcentaje mensual definido en asamblea</p>
           </div>
         </div>
 
         <div className="border-t pt-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Amenities / Plus salarial</p>
-          <div className="flex flex-wrap gap-5">
-            {CHECKBOXES.map((f) => (
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Servicios centrales</p>
+          <p className="text-xs text-gray-400 mb-3">Art. 6 CCT 589/10 — determinan la categoría del edificio</p>
+          <div className="grid grid-cols-2 gap-2">
+            {SERVICIOS_CENTRALES.map((f) => (
               <label key={f.name} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input
                   type="checkbox"

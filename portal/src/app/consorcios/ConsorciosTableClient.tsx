@@ -62,9 +62,9 @@ const columns: ColumnDef<ConsorcioRow>[] = [
     }
   },
   {
-    accessorKey: "cant_uf",
+    accessorKey: "total_unidades",
     header: "UF",
-    cell: ({ row }) => <span className="text-gray-700 font-medium">{row.original.cant_uf ?? "—"}</span>,
+    cell: ({ row }) => <span className="text-gray-700 font-medium">{row.original.total_unidades ?? "—"}</span>,
   },
   {
     accessorKey: "banco",

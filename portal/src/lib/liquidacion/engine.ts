@@ -131,6 +131,7 @@ interface DescuentosEmpleado {
   cajaProtFlia: number;
   fateryh: number;
   seguroVital: number;
+  fondoEducacion: number;
   total: number;
 }
 
@@ -148,7 +149,8 @@ interface ContribPatronal {
 function calcDescuentosEmpleado(
   base: number,
   esSuplente: boolean,
-  difObraSocial = 0
+  difObraSocial = 0,
+  aplicarFondoEducacion = false
 ): DescuentosEmpleado {
   const jubilacion    = base * 0.11;
   const pami          = base * 0.03;
@@ -157,8 +159,9 @@ function calcDescuentosEmpleado(
   const cajaProtFlia  = base * 0.01;
   const fateryh       = !esSuplente ? base * 0.01 : 0;
   const seguroVital   = base * 0.0075;
-  const total = jubilacion + pami + obraSocial + difObraSocial + suterh + cajaProtFlia + fateryh + seguroVital;
-  return { jubilacion, pami, obraSocial, difObraSocial, suterh, cajaProtFlia, fateryh, seguroVital, total };
+  const fondoEducacion = aplicarFondoEducacion && !esSuplente ? base * 0.02 : 0;
+  const total = jubilacion + pami + obraSocial + difObraSocial + suterh + cajaProtFlia + fateryh + seguroVital + fondoEducacion;
+  return { jubilacion, pami, obraSocial, difObraSocial, suterh, cajaProtFlia, fateryh, seguroVital, fondoEducacion, total };
 }
 
 function calcContribPatronal(base: number, cons: Consorcio): ContribPatronal {
@@ -197,14 +200,15 @@ export async function calcularLiquidacion(
     ),
   ]);
 
+  // Load employee's consorcio_cuit early (needed for custom adicionales)
   if (empRows.rows.length === 0) {
     throw new Error(`Empleado con CUIL ${empleadoCuil} no encontrado`);
   }
 
   const emp = empRows.rows[0];
 
-  // Load consorcio and escalas (depend on emp)
-  const [consRow, escalaRows] = await Promise.all([
+  // Load consorcio, escalas and custom period adicionales in parallel
+  const [consRow, escalaRows, customAdicionalesRows] = await Promise.all([
     pool.query<Consorcio>(
       `SELECT * FROM app.consorcios WHERE cuit = $1`,
       [emp.consorcio_cuit]
@@ -213,6 +217,12 @@ export async function calcularLiquidacion(
       `SELECT funcion, cat_1::numeric, cat_2::numeric, cat_3::numeric, cat_4::numeric
        FROM app.escalas_suterh WHERE periodo = $1`,
       [periodo]
+    ),
+    pool.query<{ concepto: string; tipo: string; importe: number; es_porcentaje: boolean }>(
+      `SELECT concepto, tipo, importe::numeric AS importe, es_porcentaje
+       FROM app.conceptos_adicionales_periodo
+       WHERE periodo = $1 AND consorcio_cuit = $2`,
+      [periodo, emp.consorcio_cuit]
     ),
   ]);
 
@@ -439,19 +449,17 @@ export async function calcularLiquidacion(
   // 10. Viáticos
   // ---------------------------------------------------------------------------
 
-  const viaticosKey = "Adicional Viaticos";
   const tieneViaticos =
     !emp.tiene_vivienda && emp.jornada !== "Suplente";
   const adicionalViaticos = tieneViaticos
-    ? (adicionales[viaticosKey] ?? 0)
+    ? adic("adicional_viaticos", 0)
     : 0;
 
   // ---------------------------------------------------------------------------
   // 11. Adicional remuneratorio mensual
   // ---------------------------------------------------------------------------
 
-  const adicRemKey = "Adicional Remuneratorio Mensual";
-  const adicRemBase = adicionales[adicRemKey] ?? 0;
+  const adicRemBase = adicionalesByKey["adicional_remuneratorio_mensual"] ?? adicionales["Adicional Remuneratorio Mensual"] ?? 0;
 
   let adicionalRemEfectivo = 0;
   if (emp.adicional_remuneratorio !== null && emp.adicional_remuneratorio !== undefined) {
@@ -565,6 +573,17 @@ export async function calcularLiquidacion(
   // 18. Total remunerativo
   // ---------------------------------------------------------------------------
 
+  // Custom period adicionales — fixed amounts only for now; % descuentos resolved after totalRemunerativoFinal
+  const customHaberes = customAdicionalesRows.rows
+    .filter(r => r.tipo === "haber")
+    .reduce((s, r) => s + Number(r.importe), 0);
+  const customDescuentosFijos = customAdicionalesRows.rows
+    .filter(r => r.tipo === "descuento" && !r.es_porcentaje)
+    .reduce((s, r) => s + Number(r.importe), 0);
+
+  // Fondo Educación y Comunicación Art. 19 bis — only when explicitly set for this period
+  const aplicarFondoEducacion = !!(adicionalesByKey["fondo_educacion"] ?? adicionales["fondo_educacion"]);
+
   const totalRemunerativo =
     haberesFijos +
     importeHE50 +
@@ -572,7 +591,8 @@ export async function calcularLiquidacion(
     importeFeriados +
     descuentoDias +
     licenciaEnfermedad +
-    plusVacacional;
+    plusVacacional +
+    customHaberes;
 
   // ---------------------------------------------------------------------------
   // 18b. Diferencia SAC (diciembre: si bruto dic > mejor bruto jul-nov del SAC2)
@@ -610,6 +630,12 @@ export async function calcularLiquidacion(
 
   const totalRemunerativoFinal = totalRemunerativo + diferenciaSAC;
 
+  // Percentage-based custom descuentos — resolved against totalRemunerativoFinal
+  const customDescuentosPct = customAdicionalesRows.rows
+    .filter(r => r.tipo === "descuento" && r.es_porcentaje)
+    .reduce((s, r) => s + totalRemunerativoFinal * (Number(r.importe) / 100), 0);
+  const customDescuentos = customDescuentosFijos + customDescuentosPct;
+
   // ---------------------------------------------------------------------------
   // 20. Descuentos empleado
   // ---------------------------------------------------------------------------
@@ -636,9 +662,9 @@ export async function calcularLiquidacion(
   const embargo = novN.embargo;
   const anticipo = novN.anticipo;
 
-  const desc = calcDescuentosEmpleado(totalRemunerativoFinal, esSuplente, difObraSocial);
-  const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = desc;
-  const totalDescuentos = desc.total + descVivienda + embargo + anticipo;
+  const desc = calcDescuentosEmpleado(totalRemunerativoFinal, esSuplente, difObraSocial, aplicarFondoEducacion);
+  const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital, fondoEducacion } = desc;
+  const totalDescuentos = desc.total + descVivienda + embargo + anticipo + customDescuentos;
 
   // ---------------------------------------------------------------------------
   // 21. Contribuciones patronales
@@ -663,7 +689,7 @@ export async function calcularLiquidacion(
     adicionalViaticos, adicionalRemEfectivo, adicionalVoluntario, suplencia100,
     haberesFijos, importeHE50, importeHE100, importeFeriados, descuentoDias,
     licenciaEnfermedad, plusVacacional, diferenciaSAC, totalRemunerativoFinal,
-    jubilacion, pami, obraSocial, difObraSocial, suterh, cajaProtFlia, fateryh, seguroVital,
+    jubilacion, pami, obraSocial, difObraSocial, suterh, cajaProtFlia, fateryh, seguroVital, fondoEducacion,
     totalDescuentos, totalPatronal, netoAPagar,
   };
   const nanFields = Object.entries(debugValues).filter(([, v]) => isNaN(v));
@@ -796,7 +822,20 @@ export async function calcularLiquidacion(
     addDescuento("5250", "Caja Protección Familiar", cajaProtFlia, 35);
     addDescuento("5300", "FATERYH", fateryh, 36);
     addDescuento("5350", "Seguro Vitalicio", seguroVital, 37);
-    addDescuento("5400", "Descuento Vivienda", descVivienda, 38);
+    addDescuento("5360", "Fondo Educación y Comunicación Art. 19 bis", fondoEducacion, 38);
+    addDescuento("5400", "Descuento Vivienda", descVivienda, 39);
+
+    // Custom period adicionales
+    customAdicionalesRows.rows.forEach((r, i) => {
+      if (r.tipo === "haber") {
+        addHaber(null, r.concepto, Number(r.importe), 23 + i);
+      } else {
+        const importe = r.es_porcentaje
+          ? totalRemunerativoFinal * (Number(r.importe) / 100)
+          : Number(r.importe);
+        addDescuento(null, r.concepto, importe, 41 + i);
+      }
+    });
     if (embargo > 0) addDescuento("5450", "Embargo", embargo, 39);
     if (anticipo > 0) addDescuento("5500", "Anticipo", anticipo, 40);
 
