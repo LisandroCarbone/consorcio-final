@@ -11,7 +11,7 @@ const fmt = (n: number) =>
   n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmt0 = (n: number) =>
-  n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`;
 

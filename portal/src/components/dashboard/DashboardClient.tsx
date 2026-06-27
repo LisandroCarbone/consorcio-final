@@ -83,7 +83,7 @@ const columns: ColumnDef<MorosidadRow>[] = [
     header: "Deuda Total",
     cell: ({ row }) => {
       const val = row.getValue("totalDeuda") as number;
-      return `$${val.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`;
+      return `$${val.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     },
   },
   {
@@ -125,7 +125,7 @@ export function DashboardClient({ stats, tickets }: DashboardClientProps) {
 
   // Format currency helper
   const formatMoney = (val: number) => {
-    return `$${val.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`;
+    return `$${val.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   // Pie chart calculation (real data + ratio)
@@ -203,39 +203,68 @@ export function DashboardClient({ stats, tickets }: DashboardClientProps) {
 
       {/* Fila de Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Flujo de caja */}
+        {/* Secuencia Correcta del Cierre */}
         <div className="card col-span-2 p-5 flex flex-col justify-between">
-          <div className="flex items-center justify-between border-b pb-4 mb-4">
-            <div>
-              <h3 className="font-bold text-gray-800 text-base">Flujo de Caja Consolidado</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Ingresos contra egresos consolidados (últimos 6 meses)</p>
-            </div>
-            <span className="text-xs bg-gray-100 font-semibold px-2.5 py-1 rounded text-gray-600">Ejemplo ilustrativo</span>
+          <div className="border-b pb-4 mb-4">
+            <h3 className="font-bold text-gray-800 text-base">Secuencia Correcta del Cierre</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Guía paso a paso de buenas prácticas para el procesamiento mensual de los consorcios</p>
           </div>
-          <div className="w-full h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={cashFlowData}
-                margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} />
-                <YAxis
-                  stroke="#9ca3af"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `$${v / 1000}k`}
-                />
-                <Tooltip
-                  formatter={(value: any) => [formatMoney(value), undefined]}
-                  contentStyle={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                <Bar dataKey="Ingresos" fill="#1a3c5e" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Egresos" fill="#ea580c" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="divide-y divide-gray-100 flex-1 flex flex-col justify-center">
+            {/* Step 1 */}
+            <div className="py-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0">1</span>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-800">Cargar Gastos Mensuales</h4>
+                  <p className="text-xs text-gray-400">Registrar abonos de mantenimiento, seguros, servicios públicos e imprevistos.</p>
+                </div>
+              </div>
+              <a href="/expensas" className="btn-secondary py-1 text-xs shrink-0 hover:bg-brand-50 hover:text-brand-600">Cargar Gastos</a>
+            </div>
+            {/* Step 2 */}
+            <div className="py-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0">2</span>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-800">Novedades y Sueldos</h4>
+                  <p className="text-xs text-gray-400">Registrar horas extras, suplencias y liquidar haberes (genera el gasto de sueldo automático).</p>
+                </div>
+              </div>
+              <a href="/sueldos" className="btn-secondary py-1 text-xs shrink-0 hover:bg-brand-50 hover:text-brand-600">Ver Sueldos</a>
+            </div>
+            {/* Step 3 */}
+            <div className="py-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-full bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-sm shrink-0">3</span>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-800">Prorratear Expensas</h4>
+                  <p className="text-xs text-gray-400">Calcular e imputar el cobro a cada Unidad Funcional según sus coeficientes de copropiedad.</p>
+                </div>
+              </div>
+              <a href="/expensas" className="btn-secondary py-1 text-xs shrink-0 hover:bg-brand-50 hover:text-brand-600">Prorratear</a>
+            </div>
+            {/* Step 4 */}
+            <div className="py-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-full bg-green-50 text-green-700 flex items-center justify-center font-bold text-sm shrink-0">4</span>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-800">Registrar Cobranzas</h4>
+                  <p className="text-xs text-gray-400">Conciliar transferencias y depósitos bancarios, cargándolos en la cuenta corriente de las UFs.</p>
+                </div>
+              </div>
+              <a href="/finanzas/cuenta-corriente" className="btn-secondary py-1 text-xs shrink-0 hover:bg-brand-50 hover:text-brand-600">Ver Cuenta Cte.</a>
+            </div>
+            {/* Step 5 */}
+            <div className="py-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-full bg-orange-50 text-orange-700 flex items-center justify-center font-bold text-sm shrink-0">5</span>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-800">Cierre del Período y Envíos</h4>
+                  <p className="text-xs text-gray-400">Cerrar el mes en estado liquidado, descargar reportes y enviar expensas / circulares por WhatsApp y Mail.</p>
+                </div>
+              </div>
+              <a href="/circulares" className="btn-secondary py-1 text-xs shrink-0 hover:bg-brand-50 hover:text-brand-600">Enviar Circulares</a>
+            </div>
           </div>
         </div>
 

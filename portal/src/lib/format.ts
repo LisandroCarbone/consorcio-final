@@ -3,12 +3,7 @@ export function formatMoney(n: number | string): string {
 }
 
 export function formatMoney0(n: number | string): string {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Number(n));
+  return formatMoney(n);
 }
 
 export function formatEmpleadoOption(e: { nombre: string; legajo: string | null }): string {
@@ -26,7 +21,7 @@ export function formatMonth(anio: number, mes: number): string {
 
 export function formatDate(d: string | Date | null): string {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("es-AR");
+  return new Date(d).toLocaleDateString("es-AR", { timeZone: "UTC" });
 }
 
 export function numberToWords(n: number): string {

@@ -103,9 +103,9 @@ export default async function SueldosPage() {
     getEmpleadosActivos(activeCuit)
   ]);
 
-  const mes = new Date(stats.periodo).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  const mes = new Date(stats.periodo).toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" });
   const escalaLabel = stats.ultima_escala
-    ? new Date(stats.ultima_escala).toLocaleDateString("es-AR", { month: "long", year: "numeric" })
+    ? new Date(stats.ultima_escala).toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" })
     : "Sin datos";
 
   return (
@@ -124,7 +124,7 @@ export default async function SueldosPage() {
         <StatCard label="Confirmadas" value={stats.confirmadas} icon={ShieldCheck} />
         <StatCard
           label="Total neto a pagar"
-          value={`$${Number(stats.total_neto).toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
+          value={`$${Number(stats.total_neto).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           icon={Wallet}
         />
       </div>

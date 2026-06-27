@@ -52,6 +52,34 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
   return { gastos, unidades };
 }
 
+async function getPeriodoChecklist(periodoId: number, consorcioCuit: string, anio: number, mes: number) {
+  const periodStr = `${anio}-${String(mes).padStart(2, "0")}-01`;
+  const [gastosRes, liqsRes, expensasRes, pagosRes, empRes] = await Promise.all([
+    query<{ count: string }>("SELECT COUNT(*) FROM app.gastos_periodo WHERE periodo_id = $1", [periodoId]),
+    query<{ count: string }>(
+      `SELECT COUNT(*) FROM app.liquidaciones_sueldo l 
+       JOIN app.empleados e ON e.cuil = l.empleado_cuil 
+       WHERE e.consorcio_cuit = $1 AND l.periodo = $2`,
+      [consorcioCuit, periodStr]
+    ),
+    query<{ count: string }>("SELECT COUNT(*) FROM app.res_cuenta_periodo WHERE periodo_id = $1", [periodoId]),
+    query<{ count: string }>(
+      `SELECT COUNT(*) FROM app.pagos p 
+       JOIN app.unidades u ON u.id = p.unidad_id 
+       WHERE u.consorcio_cuit = $1 AND p.fecha >= $2::date AND p.fecha < $2::date + interval '1 month'`,
+      [consorcioCuit, periodStr]
+    ),
+    query<{ count: string }>("SELECT COUNT(*) FROM app.empleados WHERE consorcio_cuit = $1 AND estado = 'activo'", [consorcioCuit]),
+  ]);
+
+  return {
+    gastosCount: Number(gastosRes[0]?.count ?? 0),
+    liquidacionesCount: Number(liqsRes[0]?.count ?? 0),
+    expensasCount: Number(expensasRes[0]?.count ?? 0),
+    pagosCount: Number(pagosRes[0]?.count ?? 0),
+    activeEmployeesCount: Number(empRes[0]?.count ?? 0),
+  };
+}
 
 export default async function ExpensasPage({
   searchParams,
@@ -103,6 +131,10 @@ export default async function ExpensasPage({
 
   const detail = selected
     ? await getPeriodoDetail(selected.id, selected.consorcio_id)
+    : null;
+
+  const checklist = selected
+    ? await getPeriodoChecklist(selected.id, selected.consorcio_id, selected.anio, selected.mes)
     : null;
 
   // El botón "Recalcular prorrateo" solo aparece en el período más reciente del consorcio.
@@ -228,6 +260,83 @@ export default async function ExpensasPage({
             </div>
           ) : (
             <div className="space-y-5">
+              {/* Pasos del Período Checklist */}
+              {checklist && (
+                <div className="card p-5">
+                  <h3 className="font-semibold text-gray-800 text-sm mb-3">Pasos del período</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                    {/* Step 1 */}
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
+                        checklist.gastosCount > 0 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                      }`}>
+                        {checklist.gastosCount > 0 ? "✓" : "1"}
+                      </span>
+                      <p className="text-xs font-semibold text-gray-800">1. Cargar Gastos</p>
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        {checklist.gastosCount > 0 ? `${checklist.gastosCount} cargados` : "Ninguno"}
+                      </p>
+                    </div>
+
+                    {/* Step 2 */}
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
+                        checklist.activeEmployeesCount === 0 || checklist.liquidacionesCount >= checklist.activeEmployeesCount
+                          ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                      }`}>
+                        {checklist.activeEmployeesCount === 0 || checklist.liquidacionesCount >= checklist.activeEmployeesCount ? "✓" : "2"}
+                      </span>
+                      <p className="text-xs font-semibold text-gray-800">2. Liquidar Sueldos</p>
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        {checklist.activeEmployeesCount === 0 
+                          ? "Sin empleados" 
+                          : `${checklist.liquidacionesCount} de ${checklist.activeEmployeesCount} liq.`}
+                      </p>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
+                        checklist.expensasCount > 0 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                      }`}>
+                        {checklist.expensasCount > 0 ? "✓" : "3"}
+                      </span>
+                      <p className="text-xs font-semibold text-gray-800">3. Prorratear</p>
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        {checklist.expensasCount > 0 ? "Generado" : "Pendiente"}
+                      </p>
+                    </div>
+
+                    {/* Step 4 */}
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
+                        checklist.pagosCount > 0 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                      }`}>
+                        {checklist.pagosCount > 0 ? "✓" : "4"}
+                      </span>
+                      <p className="text-xs font-semibold text-gray-800">4. Cobranzas</p>
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        {checklist.pagosCount > 0 ? `${checklist.pagosCount} recibidos` : "Ninguno"}
+                      </p>
+                    </div>
+
+                    {/* Step 5 */}
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
+                        selected.estado === "liquidado" || selected.estado === "cerrado"
+                          ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                      }`}>
+                        {selected.estado === "liquidado" || selected.estado === "cerrado" ? "✓" : "5"}
+                      </span>
+                      <p className="text-xs font-semibold text-gray-800">5. Cerrar Período</p>
+                      <p className="text-[10px] text-gray-500 mt-1 capitalize">
+                        {selected.estado}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div>

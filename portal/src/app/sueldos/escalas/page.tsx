@@ -82,24 +82,24 @@ export default async function EscalasPage({
       ) : (
         <>
           <div className="card mb-6 overflow-x-auto">
-            <p className="font-semibold text-gray-700 mb-3">Sueldos básicos por función y categoría</p>
+            <p className="font-semibold text-gray-700 mb-3 mt-2 ml-2">Sueldos básicos por función y categoría</p>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-gray-500 text-left">
-                  <th className="pb-2 pr-4">Función</th>
+                  <th className="pb-2 pr-4 pl-2">Función</th>
                   <th className="pb-2 pr-3 text-right">1° Cat.</th>
                   <th className="pb-2 pr-3 text-right">2° Cat.</th>
                   <th className="pb-2 pr-3 text-right">3° Cat.</th>
-                  <th className="pb-2 text-right">4° Cat.</th>
+                  <th className="pb-2 pr-3 text-right">4° Cat.</th>
                 </tr>
               </thead>
               <tbody>
                 {escalas.map((e: any) => (
                   <tr key={e.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 text-gray-800">{e.funcion}</td>
+                    <td className="py-2 pr-4 text-gray-800 pl-2">{e.funcion}</td>
                     {[e.cat_1, e.cat_2, e.cat_3, e.cat_4].map((v, i) => (
                       <td key={i} className="py-2 pr-3 text-right text-gray-700">
-                        {v ? `$${Number(v).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "-"}
+                        {v ? `$${Number(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
                       </td>
                     ))}
                   </tr>
