@@ -72,12 +72,53 @@ async function getPeriodoChecklist(periodoId: number, consorcioCuit: string, ani
     query<{ count: string }>("SELECT COUNT(*) FROM app.empleados WHERE consorcio_cuit = $1 AND estado = 'activo'", [consorcioCuit]),
   ]);
 
+  const gastosCount = Number(gastosRes[0]?.count ?? 0);
+  const liquidacionesCount = Number(liqsRes[0]?.count ?? 0);
+  const expensasCount = Number(expensasRes[0]?.count ?? 0);
+  const pagosCount = Number(pagosRes[0]?.count ?? 0);
+  const activeEmployeesCount = Number(empRes[0]?.count ?? 0);
+
+  // Synchrony checks:
+  let isProrrateoDesactualizado = false;
+  let diffGastos = 0;
+  let diffPagos = 0;
+
+  if (expensasCount > 0) {
+    const [totalGastosRealRes, totalProrrateadoRes, totalPagosRealRes, totalSuPagoProrrateadoRes] = await Promise.all([
+      query<{ sum: string }>("SELECT COALESCE(SUM(monto), 0) AS sum FROM app.gastos_periodo WHERE periodo_id = $1", [periodoId]),
+      query<{ sum: string }>("SELECT COALESCE(SUM(expensas_a + expensas_b + gast_part), 0) AS sum FROM app.res_cuenta_periodo WHERE periodo_id = $1", [periodoId]),
+      query<{ sum: string }>(
+        `SELECT COALESCE(SUM(monto), 0) AS sum FROM app.pagos p 
+         JOIN app.unidades u ON u.id = p.unidad_id 
+         WHERE u.consorcio_cuit = $1 AND p.fecha >= $2::date AND p.fecha < $2::date + interval '1 month'`,
+        [consorcioCuit, periodStr]
+      ),
+      query<{ sum: string }>("SELECT COALESCE(SUM(su_pago), 0) AS sum FROM app.res_cuenta_periodo WHERE periodo_id = $1", [periodoId]),
+    ]);
+
+    const realGastos = Number(totalGastosRealRes[0]?.sum ?? 0);
+    const prorrateadoGastos = Number(totalProrrateadoRes[0]?.sum ?? 0);
+    const realPagos = Number(totalPagosRealRes[0]?.sum ?? 0);
+    const prorrateadoPagos = Number(totalSuPagoProrrateadoRes[0]?.sum ?? 0);
+
+    diffGastos = Math.abs(realGastos - prorrateadoGastos);
+    diffPagos = Math.abs(realPagos - prorrateadoPagos);
+
+    // Difference greater than 1 ARS is considered out of sync
+    if (diffGastos > 1.0 || diffPagos > 1.0) {
+      isProrrateoDesactualizado = true;
+    }
+  }
+
   return {
-    gastosCount: Number(gastosRes[0]?.count ?? 0),
-    liquidacionesCount: Number(liqsRes[0]?.count ?? 0),
-    expensasCount: Number(expensasRes[0]?.count ?? 0),
-    pagosCount: Number(pagosRes[0]?.count ?? 0),
-    activeEmployeesCount: Number(empRes[0]?.count ?? 0),
+    gastosCount,
+    liquidacionesCount,
+    expensasCount,
+    pagosCount,
+    activeEmployeesCount,
+    isProrrateoDesactualizado,
+    diffGastos,
+    diffPagos,
   };
 }
 
@@ -297,13 +338,25 @@ export default async function ExpensasPage({
                     {/* Step 3 */}
                     <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
                       <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
-                        checklist.expensasCount > 0 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                        checklist.isProrrateoDesactualizado
+                          ? "bg-amber-100 text-amber-700"
+                          : checklist.expensasCount > 0
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-400"
                       }`}>
-                        {checklist.expensasCount > 0 ? "✓" : "3"}
+                        {checklist.isProrrateoDesactualizado ? "⚠️" : checklist.expensasCount > 0 ? "✓" : "3"}
                       </span>
                       <p className="text-xs font-semibold text-gray-800">3. Prorratear</p>
-                      <p className="text-[10px] text-gray-500 mt-1">
-                        {checklist.expensasCount > 0 ? "Generado" : "Pendiente"}
+                      <p className={`text-[10px] mt-1 font-semibold ${
+                        checklist.isProrrateoDesactualizado
+                          ? "text-amber-700"
+                          : "text-gray-500"
+                      }`}>
+                        {checklist.isProrrateoDesactualizado 
+                          ? "Desactualizado" 
+                          : checklist.expensasCount > 0 
+                          ? "Generado" 
+                          : "Pendiente"}
                       </p>
                     </div>
 
@@ -334,6 +387,19 @@ export default async function ExpensasPage({
                       </p>
                     </div>
                   </div>
+
+                  {checklist.isProrrateoDesactualizado && (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs flex items-start gap-2">
+                      <span className="text-base leading-none">⚠️</span>
+                      <div>
+                        <p className="font-bold">El prorrateo está desactualizado</p>
+                        <p className="mt-0.5 text-amber-700">
+                          Se detectaron modificaciones en los gastos, sueldos o cobranzas registrados desde el último cálculo de expensas. 
+                          Por favor, haga clic en el botón <strong className="font-semibold">"Recalcular prorrateo"</strong> para sincronizar los importes antes de cerrar el período.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -355,7 +421,11 @@ export default async function ExpensasPage({
                     </form>
                     {isUltimoPeriodo && (
                       <form action={calcularExpensas.bind(null, selected.id)}>
-                        <button type="submit" className="btn-primary">
+                        <button type="submit" className={`btn-primary transition-all duration-300 ${
+                          checklist?.isProrrateoDesactualizado 
+                            ? "bg-amber-600 hover:bg-amber-700 border-amber-600 shadow-md text-white animate-pulse" 
+                            : ""
+                        }`}>
                           🔁 Recalcular prorrateo
                         </button>
                       </form>
