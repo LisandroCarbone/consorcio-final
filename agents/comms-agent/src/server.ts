@@ -255,6 +255,28 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Send single WhatsApp (admin/agent endpoint, requires API key)
+  if (req.method === "POST" && url.pathname === "/send-whatsapp") {
+    if (API_KEY && req.headers["x-api-key"] !== API_KEY) {
+      res.writeHead(401);
+      res.end(JSON.stringify({ error: "Unauthorized" }));
+      return;
+    }
+    const body = await readBody(req);
+    try {
+      const { to, message, mediaUrl } = JSON.parse(body) as { to: string; message: string; mediaUrl?: string };
+      if (!to || !message) throw new Error("to and message are required");
+      await sendReply(to, message, mediaUrl);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: msg }));
+    }
+    return;
+  }
+
   res.writeHead(404);
   res.end(JSON.stringify({ error: "Not found" }));
 });
@@ -264,6 +286,7 @@ server.listen(PORT, () => {
   console.log(`  Twilio webhook: POST /webhook/twilio`);
   console.log(`  Meta webhook:   POST /webhook/meta  |  GET /webhook/meta`);
   console.log(`  Circulares:     POST /send-circular`);
+  console.log(`  Single WhatsApp: POST /send-whatsapp`);
 });
 
 process.on("SIGTERM", async () => {

@@ -252,7 +252,7 @@ export default async function ReciboPage({
           <a href="/sueldos/liquidaciones" className="btn-secondary text-sm flex items-center gap-1">
             ← Volver a liquidaciones
           </a>
-          <PrintButton />
+          <PrintButton liquidacionId={liq.id} empleadoEmail={liq.email} empleadoWhatsapp={liq.whatsapp} />
         </div>
 
         {/* ══════════════════════════════════════════════════

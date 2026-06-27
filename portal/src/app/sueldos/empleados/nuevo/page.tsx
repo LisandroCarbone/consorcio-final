@@ -30,8 +30,8 @@ async function crearEmpleado(formData: FormData) {
         tiene_vivienda, banco, cbu,
         retiro_residuos, clasificacion_residuos,
         plus_cocheras, plus_movimiento_coches, plus_jardin, plus_zona_desfavorable, plus_pileta,
-        tiene_titulo, adicional_voluntario, estado)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,'activo')`,
+        tiene_titulo, adicional_voluntario, email, whatsapp, estado)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,'activo')`,
       [
         get('cuil'), get('nombre'), get('legajo') || null,
         get('fecha_nacimiento') || null, get('fecha_ingreso') || null,
@@ -43,6 +43,7 @@ async function crearEmpleado(formData: FormData) {
         bool('plus_cocheras'), bool('plus_movimiento_coches'),
         bool('plus_jardin'), bool('plus_zona_desfavorable'), bool('plus_pileta'),
         bool('tiene_titulo'), Number(get('adicional_voluntario')) || 0,
+        get('email') || null, get('whatsapp') || null,
       ]
     );
   } catch (err: unknown) {
@@ -109,6 +110,14 @@ export default async function NuevoEmpleadoPage({
             <div>
               <label className="label">Fecha de ingreso *</label>
               <input name="fecha_ingreso" type="date" required className="input" />
+            </div>
+            <div>
+              <label className="label">Email del Empleado</label>
+              <input name="email" type="email" className="input" placeholder="empleado@mail.com" />
+            </div>
+            <div>
+              <label className="label">WhatsApp (Celular)</label>
+              <input name="whatsapp" className="input" placeholder="+54911..." />
             </div>
           </div>
         </div>

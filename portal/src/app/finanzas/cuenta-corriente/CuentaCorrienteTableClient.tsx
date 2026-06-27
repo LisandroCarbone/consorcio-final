@@ -110,25 +110,25 @@ export function CuentaCorrienteTableClient({
       cell: ({ row }) => {
         const r = row.original;
         return (
-          <div className="flex flex-col gap-1 items-end pr-4">
+          <div className="flex items-center justify-end gap-2 pr-2">
             <Link
               href={`?consorcio=${consorcioCuit}&pago=${r.unidad_id}`}
-              className="text-xs font-semibold text-brand-600 hover:underline whitespace-nowrap"
+              className="btn-primary text-xs py-1.5 px-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white flex items-center justify-center gap-1 transition-all whitespace-nowrap font-medium shadow-sm"
             >
-              Registrar pago
+              💸 Pagar
             </Link>
             <Link
               href={`?consorcio=${consorcioCuit}&ver_historial=${r.unidad_id}`}
-              className="text-xs text-gray-400 hover:text-gray-600 hover:underline whitespace-nowrap"
+              className="btn-secondary text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 flex items-center justify-center gap-1 transition-all whitespace-nowrap font-medium"
             >
-              Ver Historial
+              📋 Historial
             </Link>
             {r.total_pagado_count > 0 && (
               <Link
                 href={`?consorcio=${consorcioCuit}&ver_pagos=${r.unidad_id}`}
-                className="text-xs text-amber-600 hover:text-amber-700 hover:underline whitespace-nowrap font-medium"
+                className="btn-secondary text-xs py-1.5 px-2.5 rounded-lg border border-amber-300 text-amber-700 bg-amber-50/50 hover:bg-amber-50 flex items-center justify-center gap-1 transition-all whitespace-nowrap font-medium"
               >
-                Gestionar pagos ({r.total_pagado_count})
+                ⚙️ Gestionar ({r.total_pagado_count})
               </Link>
             )}
           </div>

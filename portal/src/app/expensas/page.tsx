@@ -6,6 +6,8 @@ import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { AddGastoForm } from "./AddGastoForm";
 import { ExpensasTableClient } from "./ExpensasTableClient";
 import { CalendarDays, HelpCircle } from "lucide-react";
+import { BulkSendButton } from "./SendExpensasButtons";
+import { UfLiquidacionesTableClient } from "./UfLiquidacionesTableClient";
 
 async function getData(activeCuit?: string) {
   const params: unknown[] = [];
@@ -177,6 +179,37 @@ export default async function ExpensasPage({
   const checklist = selected
     ? await getPeriodoChecklist(selected.id, selected.consorcio_id, selected.anio, selected.mes)
     : null;
+
+  const resCuentaRows = selected
+    ? await query<{
+        id: number;
+        unidad_id: number;
+        uf: string;
+        propietario: string | null;
+        monto_ordinario: string;
+        monto_extraordinario: string;
+        monto_fondo_reserva: string;
+        total_pagar: string;
+        enviada: boolean;
+        pdf_url: string | null;
+      }>(
+        `SELECT rcp.id, rcp.unidad_id, u.uf::text,
+                NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '') AS propietario,
+                rcp.expensas_a::text AS monto_ordinario,
+                rcp.expensas_b::text AS monto_extraordinario,
+                (rcp.s_asamblea + rcp.otros + rcp.gast_part)::text AS monto_fondo_reserva,
+                rcp.total_pagar::text,
+                rcp.enviada,
+                rcp.pdf_url
+         FROM app.res_cuenta_periodo rcp
+         JOIN app.unidades u ON u.id = rcp.unidad_id
+         LEFT JOIN app.ocupantes o ON o.unidad_id = u.id AND o.activo = true AND o.rol = 'propietario'
+         LEFT JOIN app.personas p ON p.id = o.persona_id
+         WHERE rcp.periodo_id = $1
+         ORDER BY u.uf`,
+        [selected.id]
+      )
+    : [];
 
   // El botón "Recalcular prorrateo" solo aparece en el período más reciente del consorcio.
   // periodos viene ordenado por anio DESC, mes DESC, así que el primero con el mismo
@@ -470,6 +503,16 @@ export default async function ExpensasPage({
                 />
               </div>
 
+              {/* Liquidación por UF */}
+              {selected.estado === "liquidado" && resCuentaRows.length > 0 && (
+                <div className="card overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-800 text-base">Liquidación por Unidad (UF)</h3>
+                    <BulkSendButton periodoId={selected.id} />
+                  </div>
+                  <UfLiquidacionesTableClient data={resCuentaRows} />
+                </div>
+              )}
 
             </div>
           )}

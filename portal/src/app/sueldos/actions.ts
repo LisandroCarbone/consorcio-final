@@ -220,7 +220,7 @@ export async function getLiquidacionDetalle(liquidacionId: number) {
   const liq = await queryOne(
     `SELECT l.*, e.nombre AS empleado_nombre, e.cuil, e.legajo, e.funcion, e.jornada,
             e.obra_social, e.cod_obra_social, e.banco, e.cbu,
-            e.fecha_ingreso,
+            e.fecha_ingreso, e.email, e.whatsapp,
             EXTRACT(YEAR FROM AGE(l.periodo::date, e.fecha_ingreso))::int AS antiguedad_anios,
             c.nombre AS consorcio_nombre, c.cuit AS consorcio_cuit,
             c.suterh_key,
@@ -556,4 +556,26 @@ export async function upsertAdicionalRemuneratorio(periodo: string, valor: numbe
     [periodo, valor]
   );
   revalidatePath("/sueldos/novedades");
+}
+
+export async function distribuirSueldo(liquidacionId: number) {
+  const agentUrl = process.env.EXPENSAS_AGENT_URL ?? "http://localhost:3001";
+  const apiKey = process.env.AGENT_API_KEY ?? "changeme";
+
+  const res = await fetch(`${agentUrl}/run-sueldo`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey
+    },
+    body: JSON.stringify({ liquidacion_id: liquidacionId })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Error en el agente de sueldos: ${text}`);
+  }
+
+  revalidatePath("/sueldos/liquidaciones");
+  return await res.json();
 }

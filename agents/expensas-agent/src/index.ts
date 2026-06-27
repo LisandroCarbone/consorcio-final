@@ -28,7 +28,7 @@ const PDF_OUTPUT_DIR = process.env.PDF_OUTPUT_DIR ?? "./pdfs";
 
 interface Periodo {
   id: number;
-  consorcio_id: number;
+  consorcio_cuit: string;
   anio: number;
   mes: number;
   estado: string;
@@ -56,7 +56,6 @@ interface ExpensaRow {
   monto_extraordinario: string;
   monto_fondo_reserva: string;
   monto_total: string;
-  estado: string;
   enviada: boolean;
   ocupante_nombre: string | null;
   ocupante_email: string | null;
@@ -69,15 +68,15 @@ async function run(): Promise<void> {
 
   // 1. Load period
   const periodo = await queryOne<Periodo>(
-    "SELECT * FROM periodos WHERE id=$1",
+    "SELECT id, consorcio_cuit, anio, mes, estado, fecha_vencimiento FROM periodos_expensas WHERE id=$1",
     [periodoId]
   );
   if (!periodo) throw new Error(`Periodo ${periodoId} not found`);
 
   // 2. Load consorcio
   const consorcio = await queryOne<Consorcio>(
-    "SELECT * FROM consorcios WHERE id=$1",
-    [periodo.consorcio_id]
+    "SELECT id, nombre, direccion, cuit FROM consorcios WHERE cuit=$1",
+    [periodo.consorcio_cuit]
   );
   if (!consorcio) throw new Error(`Consorcio not found`);
 
@@ -86,59 +85,35 @@ async function run(): Promise<void> {
   console.log(`   Estado del período: ${periodo.estado}`);
   if (DRY_RUN) console.log("   ⚠️  DRY RUN — no emails will be sent\n");
 
-  // 3. Ensure period is liquidated (calculate if needed)
+  // 3. Ensure period is liquidated
   if (periodo.estado !== "liquidado") {
-    console.log("   ⚙️  Calculando expensas...");
-    await query(
-      `WITH coef_total AS (
-         SELECT SUM(coeficiente) AS total FROM unidades WHERE consorcio_id=$1
-       ),
-       totales AS (
-         SELECT
-           COALESCE(SUM(monto) FILTER (WHERE tipo='ordinario'), 0) AS ord,
-           COALESCE(SUM(monto) FILTER (WHERE tipo='extraordinario'), 0) AS ext,
-           COALESCE(SUM(monto) FILTER (WHERE tipo='fondo_reserva'), 0) AS fondo
-         FROM gastos WHERE periodo_id=$2
-       )
-       INSERT INTO expensas (periodo_id, unidad_id, monto_ordinario, monto_extraordinario, monto_fondo_reserva)
-       SELECT $2, u.id,
-         ROUND((totales.ord * u.coeficiente / coef_total.total)::numeric, 2),
-         ROUND((totales.ext * u.coeficiente / coef_total.total)::numeric, 2),
-         ROUND((totales.fondo * u.coeficiente / coef_total.total)::numeric, 2)
-       FROM unidades u, totales, coef_total
-       WHERE u.consorcio_id=$1
-       ON CONFLICT (periodo_id, unidad_id) DO UPDATE SET
-         monto_ordinario=EXCLUDED.monto_ordinario,
-         monto_extraordinario=EXCLUDED.monto_extraordinario,
-         monto_fondo_reserva=EXCLUDED.monto_fondo_reserva`,
-      [periodo.consorcio_id, periodoId]
-    );
-    await query(
-      "UPDATE periodos SET estado='liquidado', fecha_cierre=CURRENT_DATE WHERE id=$1",
-      [periodoId]
-    );
-    console.log("   ✅ Expensas calculadas");
+    console.log("   ⚙️  El período no está liquidado. Por favor, liquídelo en el portal primero.");
+    return;
   }
 
   // 4. Load gastos for the receipt detail
   const gastos = await query<Gasto>(
-    "SELECT concepto, monto, tipo FROM gastos WHERE periodo_id=$1 ORDER BY tipo, concepto",
+    "SELECT descripcion AS concepto, monto, tipo FROM gastos_periodo WHERE periodo_id=$1 ORDER BY tipo, descripcion",
     [periodoId]
   );
 
   // 5. Load expensas with occupant info
   const expensas = await query<ExpensaRow>(
-    `SELECT e.*,
-            u.numero AS unidad_numero,
+    `SELECT e.id, e.unidad_id, u.uf AS unidad_numero,
+            e.expensas_a AS monto_ordinario,
+            e.expensas_b AS monto_extraordinario,
+            (e.s_asamblea + e.otros + e.gast_part) AS monto_fondo_reserva,
+            e.total_pagar AS monto_total,
+            e.enviada,
             p.nombre || ' ' || p.apellido AS ocupante_nombre,
             p.email AS ocupante_email,
             p.whatsapp AS ocupante_whatsapp
-     FROM expensas e
+     FROM res_cuenta_periodo e
      JOIN unidades u ON u.id = e.unidad_id
      LEFT JOIN ocupantes o ON o.unidad_id = u.id AND o.activo=true AND o.rol='propietario'
      LEFT JOIN personas p ON p.id = o.persona_id
      WHERE e.periodo_id=$1
-     ORDER BY u.numero`,
+     ORDER BY u.uf`,
     [periodoId]
   );
 
@@ -197,7 +172,7 @@ async function run(): Promise<void> {
 
         // Mark as sent and store PDF path
         await query(
-          "UPDATE expensas SET enviada=true, pdf_url=$1 WHERE id=$2",
+          "UPDATE res_cuenta_periodo SET enviada=true, pdf_url=$1 WHERE id=$2",
           [pdfPath, exp.id]
         );
       }

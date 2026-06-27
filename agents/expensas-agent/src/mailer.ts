@@ -75,3 +75,55 @@ export async function sendExpensaEmail(opts: {
     ],
   });
 }
+
+export async function sendSueldoEmail(opts: {
+  to: string;
+  empleado_nombre: string;
+  consorcio_nombre: string;
+  mes_nombre: string;
+  anio: number;
+  neto_a_pagar: number;
+  pdf_path: string;
+}): Promise<void> {
+  const cfg = getMailConfig();
+  const transporter = nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    auth: { user: cfg.user, pass: cfg.pass },
+  });
+
+  const montoStr = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(opts.neto_a_pagar);
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+      <div style="background:#333;padding:20px 24px;border-radius:8px 8px 0 0">
+        <h2 style="color:white;margin:0">${opts.consorcio_nombre}</h2>
+        <p style="color:rgba(255,255,255,0.8);margin:4px 0 0">Recibo de Haberes — ${opts.mes_nombre} ${opts.anio}</p>
+      </div>
+      <div style="background:#f5f7fa;padding:24px;border-radius:0 0 8px 8px">
+        <p>Estimado/a <strong>${opts.empleado_nombre}</strong>,</p>
+        <p style="margin-top:12px">Adjunto a este correo encontrará su recibo de haberes correspondiente al período <strong>${opts.mes_nombre} ${opts.anio}</strong>.</p>
+        <div style="background:white;border:1px solid #e8ecf0;border-radius:6px;padding:16px;margin:20px 0;text-align:center">
+          <p style="color:#888;font-size:12px;margin:0">NETO A PERCIBIR</p>
+          <p style="font-size:32px;font-weight:700;color:#333;margin:8px 0">${montoStr}</p>
+        </div>
+        <p style="font-size:12px;color:#666">Encontrará el recibo detallado adjunto a este correo.</p>
+        <p style="font-size:12px;color:#999;margin-top:24px">Este mensaje fue generado automáticamente por Consorcio Admin. Por consultas, contacte a la administración.</p>
+      </div>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"${opts.consorcio_nombre}" <${cfg.from}>`,
+    to: opts.to,
+    subject: `Recibo de Haberes ${opts.mes_nombre} ${opts.anio} — ${montoStr}`,
+    html,
+    attachments: [
+      {
+        filename: `Recibo_Haberes_${opts.mes_nombre}_${opts.anio}.pdf`,
+        path: opts.pdf_path,
+      },
+    ],
+  });
+}

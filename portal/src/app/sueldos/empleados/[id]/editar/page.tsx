@@ -44,8 +44,9 @@ async function actualizarEmpleado(cuil: string, formData: FormData) {
        plus_cocheras = $17, plus_movimiento_coches = $18,
        plus_jardin = $19, plus_zona_desfavorable = $20, plus_pileta = $21,
        tiene_titulo = $22, adicional_voluntario = $23,
+       email = $24, whatsapp = $25,
        updated_at = now()
-     WHERE cuil = $24`,
+     WHERE cuil = $26`,
     [
       get('cuil'), get('nombre'), get('legajo') || null,
       get('fecha_nacimiento') || null, get('fecha_ingreso') || null,
@@ -57,6 +58,7 @@ async function actualizarEmpleado(cuil: string, formData: FormData) {
       bool('plus_cocheras'), bool('plus_movimiento_coches'),
       bool('plus_jardin'), bool('plus_zona_desfavorable'), bool('plus_pileta'),
       bool('tiene_titulo'), Number(get('adicional_voluntario')) || 0,
+      get('email') || null, get('whatsapp') || null,
       cuil,
     ]
   );
@@ -121,6 +123,14 @@ export default async function EditarEmpleadoPage({
             <div>
               <label className="label">Fecha de ingreso *</label>
               <input name="fecha_ingreso" type="date" required className="input" defaultValue={fmt(emp.fecha_ingreso)} />
+            </div>
+            <div>
+              <label className="label">Email del Empleado</label>
+              <input name="email" type="email" className="input" defaultValue={emp.email ?? ''} placeholder="empleado@mail.com" />
+            </div>
+            <div>
+              <label className="label">WhatsApp (Celular)</label>
+              <input name="whatsapp" className="input" defaultValue={emp.whatsapp ?? ''} placeholder="+54911..." />
             </div>
           </div>
         </div>

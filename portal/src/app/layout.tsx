@@ -27,10 +27,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="es" data-theme={theme}>
       <body>
-        <Nav />
-        <div className="ml-64 flex flex-col min-h-screen">
-          <TopBar consorcios={consorcios} activeCuit={activeCuit} activePeriodo={activePeriodo} />
-          <main className="flex-1 p-8 bg-gray-50">{children}</main>
+        <div className="print:hidden">
+          <Nav />
+        </div>
+        <div className="ml-64 print:ml-0 flex flex-col min-h-screen">
+          <div className="print:hidden">
+            <TopBar consorcios={consorcios} activeCuit={activeCuit} activePeriodo={activePeriodo} />
+          </div>
+          <main className="flex-1 p-8 print:p-0 bg-gray-50 print:bg-white">{children}</main>
         </div>
       </body>
     </html>

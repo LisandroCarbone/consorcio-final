@@ -273,3 +273,63 @@ export async function regenerarGastosFijos(periodoId: number) {
   revalidatePath("/expensas");
   redirect(`/expensas?periodo=${periodoId}`);
 }
+
+export async function distribuirExpensasMasivo(periodoId: number) {
+  const period = await queryOne<{ consorcio_cuit: string; anio: number; mes: number }>(
+    "SELECT consorcio_cuit, anio, mes FROM app.periodos_expensas WHERE id = $1",
+    [periodoId]
+  );
+  if (!period) throw new Error("Período no encontrado");
+
+  const consorcio = await queryOne<{ id: number }>(
+    "SELECT id FROM app.consorcios WHERE cuit = $1",
+    [period.consorcio_cuit]
+  );
+  if (!consorcio) throw new Error("Consorcio no encontrado");
+
+  const agentUrl = process.env.EXPENSAS_AGENT_URL ?? "http://localhost:3001";
+  const apiKey = process.env.AGENT_API_KEY ?? "changeme";
+
+  const res = await fetch(`${agentUrl}/run-expensas`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey
+    },
+    body: JSON.stringify({
+      consorcio_id: consorcio.id,
+      anio: period.anio,
+      mes: period.mes
+    })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Error en el agente de expensas: ${text}`);
+  }
+
+  revalidatePath("/expensas");
+  return await res.json();
+}
+
+export async function distribuirExpensaIndividual(resCuentaId: number) {
+  const agentUrl = process.env.EXPENSAS_AGENT_URL ?? "http://localhost:3001";
+  const apiKey = process.env.AGENT_API_KEY ?? "changeme";
+
+  const res = await fetch(`${agentUrl}/send-expensa`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey
+    },
+    body: JSON.stringify({ res_cuenta_id: resCuentaId })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Error en el agente de expensas: ${text}`);
+  }
+
+  revalidatePath("/expensas");
+  return await res.json();
+}
