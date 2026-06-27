@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { AddGastoForm } from "./AddGastoForm";
 import { ExpensasTableClient } from "./ExpensasTableClient";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, HelpCircle } from "lucide-react";
 
 async function getData(activeCuit?: string) {
   const params: unknown[] = [];
@@ -304,7 +304,16 @@ export default async function ExpensasPage({
               {/* Pasos del Período Checklist */}
               {checklist && (
                 <div className="card p-5">
-                  <h3 className="font-semibold text-gray-800 text-sm mb-3">Pasos del período</h3>
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <h3 className="font-semibold text-gray-800 text-sm">Pasos del período</h3>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-help hover:text-gray-600 transition-colors" />
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-56 bg-gray-900 text-white text-[10px] p-2 rounded shadow-lg text-center normal-case font-normal z-50">
+                        Checklist inteligente: monitorea y detecta automáticamente si algún dato queda desactualizado.
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                     {/* Step 1 */}
                     <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">

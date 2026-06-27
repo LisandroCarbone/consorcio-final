@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Clock,
   ArrowUpRight,
+  HelpCircle,
 } from "lucide-react";
 
 interface RealStats {
@@ -88,7 +89,18 @@ const columns: ColumnDef<MorosidadRow>[] = [
   },
   {
     accessorKey: "tasaMorosidad",
-    header: "Tasa Morosidad",
+    header: () => (
+      <div className="flex items-center gap-1">
+        <span>Tasa Morosidad</span>
+        <div className="group relative inline-block">
+          <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-help hover:text-gray-600 transition-colors" />
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 bg-gray-900 text-white text-[10px] p-2 rounded shadow-lg text-center normal-case font-normal z-50">
+            Proporción de deuda vencida sobre el total liquidado.
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+          </div>
+        </div>
+      </div>
+    ),
     cell: ({ row }) => {
       const val = row.getValue("tasaMorosidad") as number;
       return (
@@ -206,7 +218,16 @@ export function DashboardClient({ stats, tickets }: DashboardClientProps) {
         {/* Secuencia Correcta del Cierre */}
         <div className="card col-span-2 p-5 flex flex-col justify-between">
           <div className="border-b pb-4 mb-4">
-            <h3 className="font-bold text-gray-800 text-base">Secuencia Correcta del Cierre</h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-bold text-gray-800 text-base">Secuencia Correcta del Cierre</h3>
+              <div className="group relative inline-block">
+                <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-help hover:text-gray-600 transition-colors" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-52 bg-gray-900 text-white text-[10px] p-2 rounded shadow-lg text-center font-normal normal-case z-50">
+                  Guía paso a paso recomendada para realizar el cierre del período sin cometer errores.
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+            </div>
             <p className="text-xs text-gray-400 mt-0.5">Guía paso a paso de buenas prácticas para el procesamiento mensual de los consorcios</p>
           </div>
           <div className="divide-y divide-gray-100 flex-1 flex flex-col justify-center">

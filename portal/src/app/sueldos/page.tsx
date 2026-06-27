@@ -15,6 +15,7 @@ import {
   PlusCircle,
   Clock,
   ShieldCheck,
+  HelpCircle,
 } from "lucide-react";
 
 interface EmpleadoRow {
@@ -126,6 +127,7 @@ export default async function SueldosPage() {
           label="Total neto a pagar"
           value={`$${Number(stats.total_neto).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           icon={Wallet}
+          tooltip="Monto total a transferir a los empleados luego de descuentos."
         />
       </div>
 
@@ -207,14 +209,25 @@ export default async function SueldosPage() {
   );
 }
 
-function StatCard({ label, value, icon: Icon }: { label: string; value: string | number; icon: React.ComponentType<any> }) {
+function StatCard({ label, value, icon: Icon, tooltip }: { label: string; value: string | number; icon: React.ComponentType<any>; tooltip?: string }) {
   return (
     <div className="card p-5 flex items-start gap-4 hover:shadow-sm transition-shadow">
       <div className="p-3 rounded-lg bg-gray-50 text-gray-500 shrink-0">
         <Icon className="w-5 h-5 text-brand-600" />
       </div>
       <div>
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</p>
+          {tooltip && (
+            <div className="group relative inline-block">
+              <HelpCircle className="w-3 h-3 text-gray-400 cursor-help hover:text-gray-600 transition-colors" />
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 bg-gray-900 text-white text-[10px] p-2 rounded shadow-lg text-center normal-case font-normal z-50">
+                {tooltip}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
+          )}
+        </div>
         <p className="text-2xl font-extrabold text-gray-800 mt-1">{value}</p>
       </div>
     </div>
