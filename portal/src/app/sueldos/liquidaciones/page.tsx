@@ -107,6 +107,11 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
 
       {/* Header */}
       <div className="mb-6">
+        <p className="text-sm text-gray-500 mb-1">
+          <a href="/sueldos" className="hover:underline text-brand-600">Sueldos</a>
+          {" / "}
+          <span>Liquidaciones</span>
+        </p>
         <h1 className="text-2xl font-bold text-gray-900">Liquidaciones</h1>
         <p className="text-gray-500 text-sm mt-1">Período: {periodoLabel}</p>
       </div>

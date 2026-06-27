@@ -70,6 +70,13 @@ export default async function HistoriaPage({ searchParams }: Props) {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
+        <p className="text-sm text-gray-500 mb-1">
+          <a href="/sueldos" className="hover:underline text-brand-600">Sueldos</a>
+          {" / "}
+          <a href="/sueldos/liquidaciones" className="hover:underline text-brand-600">Liquidaciones</a>
+          {" / "}
+          <span>Histórico por empleado</span>
+        </p>
         <h1 className="text-2xl font-bold text-gray-900">Histórico por empleado</h1>
         {empleadoNombre && (
           <p className="text-gray-500 text-sm mt-1">{empleadoNombre}</p>

@@ -43,6 +43,13 @@ export default async function EscalasPage({
 
   return (
     <div className="p-6 w-full">
+      <div className="mb-2">
+        <p className="text-sm text-gray-500">
+          <a href="/sueldos" className="hover:underline text-brand-600">Sueldos</a>
+          {" / "}
+          <span>Escalas SUTERH</span>
+        </p>
+      </div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Escalas SUTERH</h1>

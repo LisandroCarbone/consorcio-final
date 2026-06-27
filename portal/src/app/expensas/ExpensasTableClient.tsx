@@ -63,7 +63,7 @@ const columns: ColumnDef<GastoRow>[] = [
     accessorKey: "monto",
     header: () => <div className="text-right">Monto</div>,
     cell: ({ row }) => (
-      <div className="text-right font-mono font-semibold text-gray-900">
+      <div className="text-xs font-mono font-semibold text-gray-900">
         {formatMoney(row.original.monto)}
       </div>
     ),

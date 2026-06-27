@@ -69,7 +69,14 @@ export default async function NuevoEmpleadoPage({
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Nuevo empleado</h1>
+      <div className="mb-6">
+        <p className="text-sm text-gray-500 mb-1">
+          <a href="/sueldos" className="hover:underline text-brand-600">Sueldos</a>
+          {" / "}
+          <span>Nuevo empleado</span>
+        </p>
+        <h1 className="text-2xl font-bold text-gray-900">Nuevo empleado</h1>
+      </div>
 
       {error === 'cuil_duplicado' && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">

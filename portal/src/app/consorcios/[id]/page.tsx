@@ -50,7 +50,9 @@ export default async function ConsorcioDetailPage({ params }: Props) {
     <div className="w-full">
       <div className="mb-6">
         <p className="text-sm text-gray-500 mb-1">
-          <a href="/consorcios" className="hover:underline text-brand-600">Consorcios</a> /
+          <a href="/consorcios" className="hover:underline text-brand-600">Consorcios</a>
+          {" / "}
+          <span>Detalle</span>
         </p>
         <h2 className="text-2xl font-bold text-gray-900">{consorcio.nombre}</h2>
         <p className="text-gray-500 text-sm">{consorcio.direccion}{consorcio.cuit ? ` · CUIT: ${consorcio.cuit}` : ""}</p>

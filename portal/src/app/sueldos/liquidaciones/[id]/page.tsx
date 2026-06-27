@@ -238,6 +238,16 @@ export default async function ReciboPage({
       <div className="max-w-4xl mx-auto p-6 print:p-2">
 
         {/* Toolbar */}
+        <div className="print:hidden mb-4">
+          <p className="text-sm text-gray-500">
+            <a href="/sueldos" className="hover:underline text-brand-600">Sueldos</a>
+            {" / "}
+            <a href="/sueldos/liquidaciones" className="hover:underline text-brand-600">Liquidaciones</a>
+            {" / "}
+            <span>Recibo</span>
+          </p>
+        </div>
+
         <div className="print:hidden flex justify-between items-center mb-4">
           <a href="/sueldos/liquidaciones" className="btn-secondary text-sm flex items-center gap-1">
             ← Volver a liquidaciones

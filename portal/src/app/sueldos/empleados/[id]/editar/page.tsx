@@ -86,8 +86,15 @@ export default async function EditarEmpleadoPage({
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Editar empleado</h1>
-      <p className="text-gray-500 text-sm mb-6">{emp.nombre}</p>
+      <div className="mb-6">
+        <p className="text-sm text-gray-500 mb-1">
+          <a href="/sueldos" className="hover:underline text-brand-600">Sueldos</a>
+          {" / "}
+          <span>Editar empleado</span>
+        </p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Editar empleado</h1>
+        <p className="text-gray-500 text-sm">{emp.nombre}</p>
+      </div>
 
       <form action={action} className="space-y-6">
 

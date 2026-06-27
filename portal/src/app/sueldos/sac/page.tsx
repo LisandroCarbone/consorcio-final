@@ -58,6 +58,11 @@ export default async function SACPage({
   return (
     <div className="max-w-3xl">
       <div className="mb-6">
+        <p className="text-sm text-gray-500 mb-1">
+          <a href="/sueldos" className="hover:underline text-brand-600">Sueldos</a>
+          {" / "}
+          <span>Liquidación SAC</span>
+        </p>
         <h2 className="text-2xl font-bold text-gray-900">Liquidación SAC</h2>
         <p className="text-gray-500 text-sm mt-1">
           SAC 1° semestre: mejor bruto enero–junio / 2 · SAC 2° semestre: mejor bruto julio–noviembre / 2 (pago antes del 18/12)
