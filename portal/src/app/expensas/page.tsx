@@ -87,7 +87,7 @@ export default async function ExpensasPage({
     activeYear = Number(parts[0]);
     activeMonth = Number(parts[1]);
   }
-  if (!activeYear || isNaN(activeYear) || !activeMonth || isNaN(activeMonth)) {
+  if (!activeYear || isNaN(activeYear) || activeYear < 2000 || !activeMonth || isNaN(activeMonth)) {
     const now = new Date();
     activeYear = now.getFullYear();
     activeMonth = now.getMonth() + 1;

@@ -2,6 +2,7 @@
 
 import { query, queryOne, pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { runCalculateExpenses, calculateEmployerObligations, round2 } from "@/lib/expenses/engine";
 import { calcularLiquidacionesPeriodo } from "@/app/sueldos/actions";
 
@@ -10,11 +11,12 @@ export async function createPeriodo(formData: FormData) {
   const anio = Number(formData.get("anio"));
   const mes = Number(formData.get("mes"));
   const fecha_vencimiento = (formData.get("fecha_vencimiento") as string) || null;
-  await queryOne(
-    "INSERT INTO app.periodos_expensas (consorcio_cuit, anio, mes, estado, fecha_vencimiento) VALUES ($1,$2,$3,'abierto',$4) ON CONFLICT DO NOTHING",
+  const row = await queryOne<{ id: number }>(
+    "INSERT INTO app.periodos_expensas (consorcio_cuit, anio, mes, estado, fecha_vencimiento) VALUES ($1,$2,$3,'abierto',$4) ON CONFLICT DO NOTHING RETURNING id",
     [consorcio_cuit, anio, mes, fecha_vencimiento]
   );
   revalidatePath("/expensas");
+  if (row?.id) redirect(`/expensas?periodo=${row.id}`);
 }
 
 export async function addGasto(formData: FormData) {
@@ -269,4 +271,5 @@ export async function regenerarGastosFijos(periodoId: number) {
   }
 
   revalidatePath("/expensas");
+  redirect(`/expensas?periodo=${periodoId}`);
 }
