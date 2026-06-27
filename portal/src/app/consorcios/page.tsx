@@ -81,15 +81,9 @@ export default async function ConsorciosPage() {
                   <input name="codigo_postal" className="input" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Clave SUTERH</label>
-                  <input name="suterh_key" className="input" />
-                </div>
-                <div>
-                  <label className="label">Cant. UF</label>
-                  <input name="cant_uf" type="number" className="input" />
-                </div>
+              <div>
+                <label className="label">Clave SUTERH</label>
+                <input name="suterh_key" className="input" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -109,15 +103,22 @@ export default async function ConsorciosPage() {
               </div>
               
               <div className="border-t pt-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Amenities / Plus salarial</p>
-                <div className="grid grid-cols-2 gap-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Servicios centrales</p>
+                <p className="text-xs text-gray-400 mb-2">Art. 6 CCT 589/10</p>
+                <div className="grid grid-cols-2 gap-1.5">
                   {[
-                    { name: 'tiene_cochera', label: '🚗 Cochera' },
-                    { name: 'tiene_movimiento_coches', label: '🔄 Mov. coches' },
-                    { name: 'tiene_jardin', label: '🌳 Jardín' },
-                    { name: 'zona_desfavorable', label: '⚠️ Zona desf.' },
-                    { name: 'tiene_pileta', label: '🏊 Pileta' },
-                    { name: 'tiene_caldera', label: '🔥 Caldera' },
+                    { name: 'tiene_ascensor', label: 'Ascensor' },
+                    { name: 'tiene_agua_caliente_central', label: 'Agua caliente central' },
+                    { name: 'tiene_calefaccion_central', label: 'Calefacción central' },
+                    { name: 'tiene_aire_acondicionado_central', label: 'Aire acond. central' },
+                    { name: 'tiene_cochera', label: 'Cocheras' },
+                    { name: 'tiene_grupo_electrogeno', label: 'Grupo electrógeno' },
+                    { name: 'tiene_pileta', label: 'Pileta' },
+                    { name: 'tiene_jardin', label: 'Jardín' },
+                    { name: 'tiene_seguridad_centralizada', label: 'Seguridad centralizada' },
+                    { name: 'tiene_compactador', label: 'Compactador' },
+                    { name: 'tiene_montacargas', label: 'Montacargas' },
+                    { name: 'tiene_otros_servicios_centrales', label: 'Otros servicios centrales' },
                   ].map((f) => (
                     <label key={f.name} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
                       <input type="checkbox" name={f.name} value="true" className="rounded" />

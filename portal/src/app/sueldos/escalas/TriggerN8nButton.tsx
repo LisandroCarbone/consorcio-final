@@ -17,7 +17,7 @@ export function TriggerN8nButton({ periodo }: { periodo: string }) {
       if (res.ok) setTimeout(() => {
         setStatus("idle");
         const url = new URL(window.location.href);
-        url.searchParams.delete('periodo');
+        if (periodo) url.searchParams.set('periodo', periodo);
         window.location.href = url.toString();
       }, 3000);
     } catch {

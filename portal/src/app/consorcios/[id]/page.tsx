@@ -108,24 +108,10 @@ export default async function ConsorcioDetailPage({ params }: Props) {
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Nueva unidad</h3>
           <form action={createUnidad} className="space-y-3">
             <input type="hidden" name="consorcio_cuit" value={id} />
-            <div>
-              <label className="label">Número UF *</label>
-              <input name="numero" type="number" required className="input" placeholder="Ej: 1" />
-            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Piso</label>
-                <input name="piso" className="input" placeholder="1" />
-              </div>
-              <div>
-                <label className="label">Depto</label>
-                <input name="departamento" className="input" placeholder="A" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Coeficiente A *</label>
-                <input name="coeficiente" type="number" step="0.0001" required className="input" placeholder="0.0500" />
+                <label className="label">Unidad *</label>
+                <input name="uf" required className="input" placeholder="Ej: 1-03, LOC 1, 5" />
               </div>
               <div>
                 <label className="label">Tipo</label>
@@ -135,6 +121,26 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                   <option value="local">Local</option>
                   <option value="baulera">Baulera</option>
                 </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Coeficiente A *</label>
+                <input name="coef_a" type="number" step="0.0001" required className="input" placeholder="0.0500" />
+              </div>
+              <div>
+                <label className="label">Coeficiente B</label>
+                <input name="coef_b" type="number" step="0.0001" className="input" placeholder="0.0500" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Piso</label>
+                <input name="piso" className="input" placeholder="1" />
+              </div>
+              <div>
+                <label className="label">Depto</label>
+                <input name="depto" className="input" placeholder="A" />
               </div>
             </div>
             <button type="submit" className="btn-primary w-full justify-center">Agregar unidad</button>

@@ -1,6 +1,7 @@
-import { getEmpleados, getNovedadesPeriodo } from "../actions";
+import { getEmpleados, getNovedadesPeriodo, getAdicionalRemuneratorio, getFondoEducacion, getConceptosAdicionalesPeriodo } from "../actions";
 import { PeriodNav } from "@/components/ui/PeriodNav";
 import NovedadesForm from "./NovedadesForm";
+import { AdicionalRemuneratorioCard } from "./AdicionalRemuneratorioCard";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { pool } from "@/lib/db";
@@ -38,9 +39,12 @@ export default async function NovedadesPage({ searchParams }: Props) {
 
   const consorcioFiltro = activeCuit;
 
-  const [empleados, novedades] = await Promise.all([
+  const [empleados, novedades, adicionalRem, fondoEdu, conceptosAdicionales] = await Promise.all([
     getEmpleados(),
     getNovedadesPeriodo(periodo),
+    getAdicionalRemuneratorio(periodo),
+    getFondoEducacion(periodo),
+    getConceptosAdicionalesPeriodo(periodo, activeCuit),
   ]);
 
   const novedadesMap = Object.fromEntries(
@@ -98,6 +102,14 @@ export default async function NovedadesPage({ searchParams }: Props) {
           {cargados} de {filtered.length} empleados con novedades cargadas
         </span>
       </div>
+
+      <AdicionalRemuneratorioCard
+        periodo={periodo}
+        consorcioCuit={activeCuit}
+        valorInicial={adicionalRem}
+        fondoEducacionInicial={fondoEdu}
+        conceptosIniciales={conceptosAdicionales}
+      />
 
       {filtered.length === 0 ? (
         <p className="text-gray-500 text-center py-12">No hay empleados activos.</p>

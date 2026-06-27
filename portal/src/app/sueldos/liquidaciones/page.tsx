@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { getLiquidacionesPeriodo } from "../actions";
-import { recalcularPeriodoAction, confirmarLiquidacionAction } from "./actions";
+import { confirmarLiquidacionAction } from "./actions";
+import { RecalcularButton } from "./RecalcularButton";
 import { formatMoney0, cleanPeriodo } from "@/lib/format";
 import { EstadoBadge } from "@/components/ui/EstadoBadge";
 import Link from "next/link";
@@ -174,11 +175,7 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
                     <a href={`?periodo=${periodo}&tipo=mensual`} className="btn-secondary py-1.5 text-xs">← Mensual</a>
                   </>
                 )}
-                <form action={recalcularPeriodoAction}>
-                  <input type="hidden" name="periodo" value={periodo} />
-                  <input type="hidden" name="tipo" value={tipo} />
-                  <button type="submit" className="btn-primary py-1.5 text-xs">Recalcular todo</button>
-                </form>
+                <RecalcularButton periodo={periodo} tipo={tipo} />
               </div>
             </div>
 

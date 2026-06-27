@@ -103,7 +103,7 @@ export default async function ReciboPage({
   const neto = Number(liq.neto_a_pagar);
 
   // ── Non-remunerative concepts ──────────────────────────────────────────────
-  const NO_REMUNERATIVOS = new Set(["Adicional Viáticos", "Descuento Vivienda"]);
+  const NO_REMUNERATIVOS = new Set(["Descuento Vivienda"]);
 
   // ── Unidad / Valor Unitario inference ─────────────────────────────────────
   function inferUnidadValor(
