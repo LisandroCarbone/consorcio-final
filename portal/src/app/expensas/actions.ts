@@ -16,7 +16,7 @@ export async function createPeriodo(formData: FormData) {
     [consorcio_cuit, anio, mes, fecha_vencimiento]
   );
   revalidatePath("/expensas");
-  if (row?.id) redirect(`/expensas?periodo=${row.id}`);
+  if (row?.id) redirect(`/expensas?periodoId=${row.id}`);
 }
 
 export async function addGasto(formData: FormData) {
@@ -271,7 +271,7 @@ export async function regenerarGastosFijos(periodoId: number) {
   }
 
   revalidatePath("/expensas");
-  redirect(`/expensas?periodo=${periodoId}`);
+  redirect(`/expensas?periodoId=${periodoId}`);
 }
 
 export async function distribuirExpensasMasivo(periodoId: number) {

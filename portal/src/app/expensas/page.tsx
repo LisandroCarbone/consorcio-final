@@ -127,10 +127,10 @@ async function getPeriodoChecklist(periodoId: number, consorcioCuit: string, ani
 export default async function ExpensasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periodo?: string }>;
+  searchParams: Promise<{ periodoId?: string }>;
 }) {
   const sp = await searchParams;
-  const selectedPeriodo = sp.periodo ? Number(sp.periodo) : null;
+  const selectedPeriodo = sp.periodoId ? Number(sp.periodoId) : null;
 
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
@@ -237,7 +237,7 @@ export default async function ExpensasPage({
                 return (
                   <li key={p.id}>
                     <a
-                      href={`/expensas?periodo=${p.id}`}
+                      href={`/expensas?periodoId=${p.id}`}
                       className={`flex items-center justify-between px-5 py-3.5 hover:bg-gray-50/50 transition-colors border-l-4 ${
                         isActive
                           ? "border-brand-600 bg-brand-50/20"

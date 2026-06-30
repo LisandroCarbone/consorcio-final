@@ -94,12 +94,15 @@ export async function updateConsorcio(formData: FormData) {
 
 export async function createUnidad(formData: FormData) {
   const consorcio_cuit = formData.get("consorcio_cuit") as string;
+  const uf_numero_raw = formData.get("uf_numero");
+  const uf_numero = uf_numero_raw ? Number(uf_numero_raw) : null;
   await queryOne(
-    `INSERT INTO app.unidades (consorcio_cuit, uf, piso, depto, coef_a, coef_b, tipo)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    `INSERT INTO app.unidades (consorcio_cuit, uf, uf_numero, piso, depto, coef_a, coef_b, tipo)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [
       consorcio_cuit,
       (formData.get("uf") as string).trim(),
+      uf_numero,
       formData.get("piso") || null,
       formData.get("depto") || null,
       Number(formData.get("coef_a")),

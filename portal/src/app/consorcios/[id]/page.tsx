@@ -15,11 +15,11 @@ async function getData(cuit: string) {
       [cuit]
     ),
     query<{
-      id: number; uf: number; coef_a: string; coef_b: string; tipo: string;
+      id: number; uf: string; uf_numero: number | null; coef_a: string; coef_b: string; tipo: string;
       propietario_nombre: string | null; propietario_email: string | null; propietario_whatsapp: string | null;
       inquilino_nombre: string | null; inquilino_email: string | null; inquilino_whatsapp: string | null;
     }>(
-      `SELECT u.id, u.uf, u.coef_a, u.coef_b, u.tipo,
+      `SELECT u.id, u.uf, u.uf_numero, u.coef_a, u.coef_b, u.tipo,
               prop.nombre || ' ' || prop.apellido AS propietario_nombre,
               prop.email AS propietario_email,
               prop.whatsapp AS propietario_whatsapp,
@@ -31,7 +31,8 @@ async function getData(cuit: string) {
        LEFT JOIN app.personas prop ON prop.id=o_prop.persona_id
        LEFT JOIN app.ocupantes o_inq ON o_inq.unidad_id=u.id AND o_inq.activo=true AND o_inq.rol='inquilino'
        LEFT JOIN app.personas inq ON inq.id=o_inq.persona_id
-       WHERE u.consorcio_cuit=$1 ORDER BY u.uf`,
+       WHERE u.consorcio_cuit=$1
+       ORDER BY u.uf_numero NULLS LAST, u.uf`,
       [cuit]
     ),
   ]);
@@ -70,6 +71,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
+                <th className="th">UF</th>
                 <th className="th">Unidad</th>
                 <th className="th">Tipo</th>
                 <th className="th text-right">Coef. A</th>
@@ -85,6 +87,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
             <tbody>
               {unidades.map((u) => (
                 <tr key={u.id} className="table-row hover:bg-gray-50">
+                  <td className="td font-mono text-gray-500 text-sm text-center w-12">{u.uf_numero ?? "—"}</td>
                   <td className="td font-medium">{u.uf}</td>
                   <td className="td text-gray-500 capitalize">{u.tipo}</td>
                   <td className="td text-right font-mono text-sm">{parseFloat(u.coef_a).toFixed(4)}</td>
@@ -110,11 +113,17 @@ export default async function ConsorcioDetailPage({ params }: Props) {
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Nueva unidad</h3>
           <form action={createUnidad} className="space-y-3">
             <input type="hidden" name="consorcio_cuit" value={id} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="label">Unidad *</label>
-                <input name="uf" required className="input" placeholder="Ej: 1-03, LOC 1, 5" />
+                <label className="label">N° UF</label>
+                <input name="uf_numero" type="number" min="1" className="input" placeholder="3" />
               </div>
+              <div className="col-span-2">
+                <label className="label">Unidad *</label>
+                <input name="uf" required className="input" placeholder="Ej: 1-03, LOC 1" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Tipo</label>
                 <select name="tipo" className="input">
