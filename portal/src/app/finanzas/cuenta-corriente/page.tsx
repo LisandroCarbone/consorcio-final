@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { query } from "@/lib/db";
 import { formatMoney, formatDate } from "@/lib/format";
 import { cookies } from "next/headers";
@@ -185,7 +185,9 @@ export default async function CuentaCorrientePage({
           {/* Grilla principal */}
           {rows.length > 0 ? (
             <div className="card overflow-hidden">
-              <CuentaCorrienteTableClient consorcioCuit={selectedCuit} data={rows} />
+              <Suspense fallback={null}>
+                <CuentaCorrienteTableClient consorcioCuit={selectedCuit} data={rows} />
+              </Suspense>
             </div>
           ) : (
             selectedCuit && (

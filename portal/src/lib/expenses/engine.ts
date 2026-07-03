@@ -20,9 +20,12 @@ export function calculateEmployerObligations(
   funcion: string,
   jornada: string,
   diasTrabajadosSuplente: number,
-  artPctVariable: number, // e.g. 0.0639
-  svCostoFijo: number, // e.g. 424.62
-  diffOsVal: number // from concept '5150'
+  artPctVariable: number,
+  svCostoFijo: number,
+  diffOsVal: number,
+  suterhPct = 0.045,
+  faterhPct = 0.065,
+  seracarhPct = 0.005
 ): EmployeeObligations {
   const R = totalRemunerativo;
   
@@ -58,10 +61,9 @@ export function calculateEmployerObligations(
   const art = round2(R * artPctVariable);
   const scvo = svCostoFijo;
   
-  // Union obligations (SUTERH 4.5%, FATERYH 6.5%, SERACARH 0.5%)
-  const suterh = round2(R * 0.045);
-  const fateryh = round2(R * 0.065);
-  const seracarh = round2(R * 0.005);
+  const suterh = round2(R * suterhPct);
+  const fateryh = round2(R * faterhPct);
+  const seracarh = round2(R * seracarhPct);
 
   return { f931, art, scvo, suterh, fateryh, seracarh };
 }

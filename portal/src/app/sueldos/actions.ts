@@ -338,7 +338,8 @@ async function regenerateCategory1Expenses(
 
   // Fetch consorcio details (needed for ART variable rate, SCVO fixed rate)
   const consRes = await client.query(`
-    SELECT art_pct_variable::numeric AS art_pct_variable, sv_costo_fijo::numeric AS sv_costo_fijo
+    SELECT art_pct_variable::numeric, sv_costo_fijo::numeric,
+           pct_cct_suterh::numeric, pct_cct_fateryh::numeric, pct_cct_seracarh::numeric
     FROM app.consorcios
     WHERE cuit = $1
   `, [consorcioCuit]);
@@ -346,6 +347,9 @@ async function regenerateCategory1Expenses(
   const currentCons = consRes.rows[0] || {};
   const artPct = Number(currentCons.art_pct_variable || 0.0639);
   const svFijo = Number(currentCons.sv_costo_fijo || 424.62);
+  const suterhPct = Number(currentCons.pct_cct_suterh || 0.045);
+  const faterhPct = Number(currentCons.pct_cct_fateryh || 0.065);
+  const seracarhPct = Number(currentCons.pct_cct_seracarh || 0.005);
 
   // Accumulate obligations
   let f931Total = 0;
@@ -384,7 +388,10 @@ async function regenerateCategory1Expenses(
       diasSuplente,
       artPct,
       svFijo,
-      diffOsVal
+      diffOsVal,
+      suterhPct,
+      faterhPct,
+      seracarhPct
     );
 
     f931Total += ob.f931;

@@ -4,7 +4,6 @@ import { query, queryOne, pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { runCalculateExpenses, calculateEmployerObligations, round2 } from "@/lib/expenses/engine";
-import { calcularLiquidacionesPeriodo } from "@/app/sueldos/actions";
 
 export async function createPeriodo(formData: FormData) {
   const consorcio_cuit = formData.get("consorcio_id") as string;
@@ -102,6 +101,30 @@ export async function addGasto(formData: FormData) {
   }
 
   revalidatePath("/expensas");
+  redirect(`/expensas?periodoId=${periodo_id}`);
+}
+
+export async function deleteGasto(gastoId: number, periodoId: number) {
+  await query("DELETE FROM app.gastos_periodo WHERE id = $1", [gastoId]);
+  revalidatePath("/expensas");
+  redirect(`/expensas?periodoId=${periodoId}`);
+}
+
+export async function updateGasto(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const periodoId = Number(formData.get("periodo_id"));
+  await query(
+    `UPDATE app.gastos_periodo SET descripcion=$1, monto=$2, categoria=$3, tipo=$4 WHERE id=$5`,
+    [
+      formData.get("concepto") as string,
+      Number(formData.get("monto")),
+      Number(formData.get("categoria")),
+      formData.get("tipo") as string,
+      id,
+    ]
+  );
+  revalidatePath("/expensas");
+  redirect(`/expensas?periodoId=${periodoId}`);
 }
 
 export async function calcularExpensas(periodo_id: number) {
@@ -132,14 +155,6 @@ export async function regenerarGastosFijos(periodoId: number) {
   if (!period) throw new Error(`Período ${periodoId} no encontrado`);
 
   const { consorcio_cuit, anio, mes } = period;
-  const periodDate = `${anio}-${String(mes).padStart(2, "0")}-01`;
-
-  // First trigger sueldos calculations for the period (Task 8)
-  try {
-    await calcularLiquidacionesPeriodo(periodDate);
-  } catch (err) {
-    console.error("Error running calcularLiquidacionesPeriodo during Category 1 regeneration:", err);
-  }
 
   const client = await pool.connect();
 
@@ -205,11 +220,14 @@ export async function regenerarGastosFijos(periodoId: number) {
 
     // Consorcio ART/SCVO rates
     const consRes = await client.query(
-      "SELECT art_pct_variable::numeric, sv_costo_fijo::numeric FROM app.consorcios WHERE cuit = $1",
+      "SELECT art_pct_variable::numeric, sv_costo_fijo::numeric, pct_cct_suterh::numeric, pct_cct_fateryh::numeric, pct_cct_seracarh::numeric FROM app.consorcios WHERE cuit = $1",
       [consorcio_cuit]
     );
     const artPct = Number(consRes.rows[0]?.art_pct_variable || 0.0639);
     const svFijo = Number(consRes.rows[0]?.sv_costo_fijo || 424.62);
+    const suterhPct = Number(consRes.rows[0]?.pct_cct_suterh || 0.045);
+    const faterhPct = Number(consRes.rows[0]?.pct_cct_fateryh || 0.065);
+    const seracarhPct = Number(consRes.rows[0]?.pct_cct_seracarh || 0.005);
 
     // Accumulate obligations
     let f931 = 0, art = 0, scvo = 0, suterh = 0, fateryh = 0, seracarh = 0;
@@ -227,7 +245,7 @@ export async function regenerarGastosFijos(periodoId: number) {
       );
       const diffOsVal = diffOsRes.rows.length > 0 ? Number(diffOsRes.rows[0].importe) : 0;
 
-      const ob = calculateEmployerObligations(bruto, liq.funcion, liq.jornada, diasSuplente, artPct, svFijo, diffOsVal);
+      const ob = calculateEmployerObligations(bruto, liq.funcion, liq.jornada, diasSuplente, artPct, svFijo, diffOsVal, suterhPct, faterhPct, seracarhPct);
       f931 += ob.f931; art += ob.art; scvo += ob.scvo;
       suterh += ob.suterh; fateryh += ob.fateryh; seracarh += ob.seracarh;
     }
@@ -271,7 +289,6 @@ export async function regenerarGastosFijos(periodoId: number) {
   }
 
   revalidatePath("/expensas");
-  redirect(`/expensas?periodoId=${periodoId}`);
 }
 
 export async function distribuirExpensasMasivo(periodoId: number) {

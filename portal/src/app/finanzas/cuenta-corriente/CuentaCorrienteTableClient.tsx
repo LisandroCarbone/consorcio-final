@@ -1,8 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
 import { formatMoney, formatDate } from "@/lib/format";
@@ -31,10 +30,8 @@ export function CuentaCorrienteTableClient({
   consorcioCuit,
   data,
 }: CuentaCorrienteTableClientProps) {
-  const searchParams = useSearchParams();
-  const pagoParam = searchParams.get("pago");
-  const pagoUnidadId = pagoParam ? Number(pagoParam) : null;
-  const pagoUnidad = data.find((r) => r.unidad_id === pagoUnidadId);
+  const [pagoUnidad, setPagoUnidad] = useState<CuentaCorrienteRow | null>(null);
+  const [montoInput, setMontoInput] = useState("");
 
   const columns: ColumnDef<CuentaCorrienteRow>[] = [
     {
@@ -111,12 +108,13 @@ export function CuentaCorrienteTableClient({
         const r = row.original;
         return (
           <div className="flex items-center justify-end gap-2 pr-2">
-            <Link
-              href={`?consorcio=${consorcioCuit}&pago=${r.unidad_id}`}
+            <button
+              type="button"
+              onClick={() => { setPagoUnidad(r); setMontoInput(r.expensa_pendiente_monto || r.saldo || ""); }}
               className="btn-primary text-xs py-1.5 px-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white flex items-center justify-center gap-1 transition-all whitespace-nowrap font-medium shadow-sm"
             >
               💸 Pagar
-            </Link>
+            </button>
             <Link
               href={`?consorcio=${consorcioCuit}&ver_historial=${r.unidad_id}`}
               className="btn-secondary text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 flex items-center justify-center gap-1 transition-all whitespace-nowrap font-medium"
@@ -145,8 +143,9 @@ export function CuentaCorrienteTableClient({
       {pagoUnidad && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
-          <Link
-            href={`?consorcio=${consorcioCuit}`}
+          <button
+            type="button"
+            onClick={() => setPagoUnidad(null)}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
           />
 
@@ -159,14 +158,15 @@ export function CuentaCorrienteTableClient({
                   Unidad {pagoUnidad.unidad_numero} · Propietario: {pagoUnidad.propietario || "—"}
                 </p>
               </div>
-              <Link
-                href={`?consorcio=${consorcioCuit}`}
+              <button
+                type="button"
+                onClick={() => setPagoUnidad(null)}
                 className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </Link>
+              </button>
             </div>
             <div className="p-6">
               <form action={registrarPago} className="grid grid-cols-2 gap-4">
@@ -187,15 +187,28 @@ export function CuentaCorrienteTableClient({
                 </div>
                 <div>
                   <label className="label text-xs">Monto *</label>
-                  <input
-                    name="monto"
-                    type="number"
-                    step="0.01"
-                    defaultValue={pagoUnidad.expensa_pendiente_monto || ""}
-                    required
-                    placeholder="0.00"
-                    className="input text-sm"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      name="monto"
+                      type="number"
+                      step="0.01"
+                      value={montoInput}
+                      onChange={(e) => setMontoInput(e.target.value)}
+                      required
+                      placeholder="0.00"
+                      className="input text-sm flex-1"
+                    />
+                    {Number(pagoUnidad.saldo) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setMontoInput(pagoUnidad.saldo)}
+                        className="px-2.5 py-1.5 text-xs font-semibold bg-green-50 border border-green-300 text-green-700 rounded-lg hover:bg-green-100 whitespace-nowrap transition-colors"
+                        title="Pagar saldo total"
+                      >
+                        Pago total
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="col-span-2 grid grid-cols-2 gap-4">
                   <div>
@@ -223,9 +236,9 @@ export function CuentaCorrienteTableClient({
                   <textarea name="notas" rows={2} className="input text-sm resize-none" placeholder="Opcional..." />
                 </div>
                 <div className="col-span-2 pt-2 flex gap-2 justify-end">
-                  <Link href={`?consorcio=${consorcioCuit}`} className="btn-secondary text-sm">
+                  <button type="button" onClick={() => setPagoUnidad(null)} className="btn-secondary text-sm">
                     Cancelar
-                  </Link>
+                  </button>
                   <button type="submit" className="btn-primary text-sm">
                     Registrar Pago
                   </button>

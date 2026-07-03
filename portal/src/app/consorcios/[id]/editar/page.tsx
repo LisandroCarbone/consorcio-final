@@ -24,13 +24,17 @@ export default async function EditarConsorcioPage({ params }: Props) {
     tiene_compactador: boolean; tiene_montacargas: boolean;
     tiene_otros_servicios_centrales: boolean;
     interest_rate: string | null;
+    art_pct_variable: string | null; sv_costo_fijo: string | null;
+    pct_cct_suterh: string | null; pct_cct_fateryh: string | null; pct_cct_seracarh: string | null;
   }>("SELECT * FROM app.consorcios WHERE cuit = $1", [id]);
 
   if (!c) notFound();
 
-  const interesesPct = c.interest_rate
-    ? (Number(c.interest_rate) * 100).toFixed(2)
-    : "";
+  const interesesPct = c.interest_rate ? (Number(c.interest_rate) * 100).toFixed(2) : "";
+  const artPct = c.art_pct_variable ? (Number(c.art_pct_variable) * 100).toFixed(4) : "";
+  const suterhPct = c.pct_cct_suterh ? (Number(c.pct_cct_suterh) * 100).toFixed(4) : "";
+  const faterhPct = c.pct_cct_fateryh ? (Number(c.pct_cct_fateryh) * 100).toFixed(4) : "";
+  const seracarhPct = c.pct_cct_seracarh ? (Number(c.pct_cct_seracarh) * 100).toFixed(4) : "";
 
   const SERVICIOS_CENTRALES = [
     { name: "tiene_ascensor", label: "Ascensor", checked: c.tiene_ascensor },
@@ -138,6 +142,53 @@ export default async function EditarConsorcioPage({ params }: Props) {
                 {f.label}
               </label>
             ))}
+          </div>
+        </div>
+
+        <div className="border-t pt-4 space-y-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cargas sociales patronales</p>
+          <p className="text-xs text-gray-400 -mt-2">Porcentajes sobre remuneración bruta. Dejar vacío para usar el valor legal vigente por defecto.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">ART % variable</label>
+              <div className="relative">
+                <input name="art_pct_variable" type="number" step="0.0001" min="0" max="100"
+                  defaultValue={artPct} className="input pr-8" placeholder="Ej: 6.39" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+              </div>
+            </div>
+            <div>
+              <label className="label">SCVO costo fijo (por empleado)</label>
+              <div className="relative">
+                <input name="sv_costo_fijo" type="number" step="0.01" min="0"
+                  defaultValue={c.sv_costo_fijo ?? ""} className="input pl-6" placeholder="424.62" />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+              </div>
+            </div>
+            <div>
+              <label className="label">SUTERH %</label>
+              <div className="relative">
+                <input name="pct_cct_suterh" type="number" step="0.0001" min="0" max="100"
+                  defaultValue={suterhPct} className="input pr-8" placeholder="4.5 (default)" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+              </div>
+            </div>
+            <div>
+              <label className="label">FATERYH %</label>
+              <div className="relative">
+                <input name="pct_cct_fateryh" type="number" step="0.0001" min="0" max="100"
+                  defaultValue={faterhPct} className="input pr-8" placeholder="6.5 (default)" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+              </div>
+            </div>
+            <div>
+              <label className="label">FATERYH SERACARH %</label>
+              <div className="relative">
+                <input name="pct_cct_seracarh" type="number" step="0.0001" min="0" max="100"
+                  defaultValue={seracarhPct} className="input pr-8" placeholder="0.5 (default)" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+              </div>
+            </div>
           </div>
         </div>
 

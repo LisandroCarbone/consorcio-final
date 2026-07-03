@@ -1,6 +1,7 @@
 import { query } from "@/lib/db";
 import { formatMoney, formatMonth, formatDate, cleanPeriodo } from "@/lib/format";
-import { createPeriodo, calcularExpensas, regenerarGastosFijos } from "./actions";
+import { createPeriodo, calcularExpensas } from "./actions";
+import { RegenerarCat1Button } from "./RegenerarCat1Button";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { AddGastoForm } from "./AddGastoForm";
@@ -456,11 +457,7 @@ export default async function ExpensasPage({
                     </p>
                   </div>
                   <div className="flex gap-2 flex-wrap">
-                    <form action={regenerarGastosFijos.bind(null, selected.id)}>
-                      <button type="submit" className="btn-secondary text-amber-700 border-amber-300 hover:bg-amber-50">
-                        ⚡ Regenerar Cat. 1
-                      </button>
-                    </form>
+                    <RegenerarCat1Button periodoId={selected.id} />
                     {isUltimoPeriodo && (
                       <form action={calcularExpensas.bind(null, selected.id)}>
                         <button type="submit" className={`btn-primary transition-all duration-300 ${
@@ -496,7 +493,7 @@ export default async function ExpensasPage({
                   <h3 className="font-semibold text-gray-800 text-base">Gastos del período</h3>
                   <p className="text-lg font-bold text-gray-900">{formatMoney(selected.total_gastos)}</p>
                 </div>
-                <ExpensasTableClient gastos={detail?.gastos ?? []} />
+                <ExpensasTableClient gastos={detail?.gastos ?? []} periodoId={selected.id} />
                 <AddGastoForm
                   periodoId={selected.id}
                   unidades={detail?.unidades ?? []}

@@ -976,7 +976,7 @@ export async function calcularSACPreview(
     seguroVital,
     totalDescuentos,
     totalPatronal,
-    netoAPagar: totalBruto - totalDescuentos,
+    netoAPagar: Math.ceil(totalBruto - totalDescuentos),
     periodo: periodoSAC,
     tipo: semestre === 1 ? "sac_1" : "sac_2",
   };
