@@ -339,17 +339,32 @@ async function regenerateCategory1Expenses(
   // Fetch consorcio details (needed for ART variable rate, SCVO fixed rate)
   const consRes = await client.query(`
     SELECT art_pct_variable::numeric, sv_costo_fijo::numeric,
-           pct_cct_suterh::numeric, pct_cct_fateryh::numeric, pct_cct_seracarh::numeric
+           pct_cct_suterh::numeric, pct_cct_fateryh::numeric, pct_cct_seracarh::numeric,
+           art_costo_fijo::numeric, fateryh_art19bis_mensual::numeric
     FROM app.consorcios
     WHERE cuit = $1
   `, [consorcioCuit]);
 
   const currentCons = consRes.rows[0] || {};
   const artPct = Number(currentCons.art_pct_variable || 0.0639);
-  const svFijo = Number(currentCons.sv_costo_fijo || 424.62);
+  const svFijo = Number(currentCons.sv_costo_fijo || 430.62);
   const suterhPct = Number(currentCons.pct_cct_suterh || 0.045);
   const faterhPct = Number(currentCons.pct_cct_fateryh || 0.065);
   const seracarhPct = Number(currentCons.pct_cct_seracarh || 0.005);
+  const artCostoFijo = Number(currentCons.art_costo_fijo || 0);
+  const art19bis = Number(currentCons.fateryh_art19bis_mensual || 0);
+
+  // CCT parameters (detracción F.931 vigente al período usado)
+  const cctRes = await client.query(
+    `SELECT detraccion_fija_mensual::numeric FROM app.parametros_cct
+     WHERE fecha_desde <= $1 ORDER BY fecha_desde DESC LIMIT 1`,
+    [usedPeriodStr]
+  );
+  const detraccionBase = Number(cctRes.rows[0]?.detraccion_fija_mensual || 12003.68);
+
+  // SAC months (June=6, December=12): F931 detracción × 1.5
+  const usedMes = usedPeriodStr === prevPeriodStr ? prevMes : mes;
+  const isSacPeriod = usedMes === 6 || usedMes === 12;
 
   // Accumulate obligations
   let f931Total = 0;
@@ -391,7 +406,10 @@ async function regenerateCategory1Expenses(
       diffOsVal,
       suterhPct,
       faterhPct,
-      seracarhPct
+      seracarhPct,
+      isSacPeriod,
+      artCostoFijo,
+      detraccionBase
     );
 
     f931Total += ob.f931;
@@ -407,7 +425,7 @@ async function regenerateCategory1Expenses(
   artTotal = Math.round(artTotal * 100) / 100;
   scvoTotal = Math.round(scvoTotal * 100) / 100;
   suterhTotal = Math.round(suterhTotal * 100) / 100;
-  fateryhTotal = Math.round(fateryhTotal * 100) / 100;
+  fateryhTotal = Math.round((fateryhTotal + art19bis) * 100) / 100;
   seracarhTotal = Math.round(seracarhTotal * 100) / 100;
 
   // Insert consolidated obligations (if any)

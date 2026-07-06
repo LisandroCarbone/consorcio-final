@@ -101,7 +101,6 @@ export async function addGasto(formData: FormData) {
   }
 
   revalidatePath("/expensas");
-  redirect(`/expensas?periodoId=${periodo_id}`);
 }
 
 export async function deleteGasto(gastoId: number, periodoId: number) {
@@ -126,6 +125,91 @@ export async function updateGasto(formData: FormData) {
   revalidatePath("/expensas");
   redirect(`/expensas?periodoId=${periodoId}`);
 }
+
+export async function updatePeriodoVencimiento(periodoId: number, fechaVencimiento: string | null) {
+  await query(
+    "UPDATE app.periodos_expensas SET fecha_vencimiento = $1 WHERE id = $2",
+    [fechaVencimiento || null, periodoId]
+  );
+  revalidatePath("/expensas");
+}
+
+export async function deletePeriodo(periodoId: number) {
+  await query("DELETE FROM app.periodos_expensas WHERE id = $1 AND estado = 'abierto'", [periodoId]);
+  revalidatePath("/expensas");
+  redirect("/expensas");
+}
+
+// ── Recurring expenses helpers ─────────────────────────────────────────────
+
+export async function getGastosAnteriores(periodoId: number): Promise<{
+  gastos: { id: number; descripcion: string; monto: string; categoria: number; tipo: string }[];
+  sourcePeriodo: { id: number; anio: number; mes: number } | null;
+}> {
+  const period = await queryOne<{ consorcio_cuit: string }>(
+    "SELECT consorcio_cuit FROM app.periodos_expensas WHERE id = $1",
+    [periodoId]
+  );
+  if (!period) return { gastos: [], sourcePeriodo: null };
+
+  const sourcePeriodo = await queryOne<{ id: number; anio: number; mes: number }>(
+    `SELECT id, anio, mes FROM app.periodos_expensas
+     WHERE consorcio_cuit = $1 AND id != $2
+     ORDER BY anio DESC, mes DESC LIMIT 1`,
+    [period.consorcio_cuit, periodoId]
+  );
+  if (!sourcePeriodo) return { gastos: [], sourcePeriodo: null };
+
+  const gastos = await query<{ id: number; descripcion: string; monto: string; categoria: number; tipo: string }>(
+    `SELECT id, descripcion, monto::numeric, categoria, tipo
+     FROM app.gastos_periodo
+     WHERE periodo_id = $1 AND categoria > 1
+     ORDER BY categoria, descripcion`,
+    [sourcePeriodo.id]
+  );
+
+  return { gastos, sourcePeriodo };
+}
+
+export async function copiarGastos(periodoId: number, gastoIds: number[]) {
+  for (const gastoId of gastoIds) {
+    const g = await queryOne<{ descripcion: string; monto: string; categoria: number; tipo: string }>(
+      "SELECT descripcion, monto::numeric, categoria, tipo FROM app.gastos_periodo WHERE id = $1",
+      [gastoId]
+    );
+    if (!g) continue;
+    await query(
+      "INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo) VALUES ($1, $2, $3, $4, $5)",
+      [periodoId, g.categoria, g.descripcion, g.monto, g.tipo]
+    );
+  }
+  revalidatePath("/expensas");
+}
+
+export async function buscarGastosSimilares(
+  periodoId: number,
+  texto: string
+): Promise<{ descripcion: string; monto: string; categoria: number; tipo: string }[]> {
+  if (texto.length < 3) return [];
+  const period = await queryOne<{ consorcio_cuit: string }>(
+    "SELECT consorcio_cuit FROM app.periodos_expensas WHERE id = $1",
+    [periodoId]
+  );
+  if (!period) return [];
+
+  return query<{ descripcion: string; monto: string; categoria: number; tipo: string }>(
+    `SELECT DISTINCT ON (g.descripcion) g.descripcion, g.monto::numeric, g.categoria, g.tipo
+     FROM app.gastos_periodo g
+     JOIN app.periodos_expensas p ON p.id = g.periodo_id
+     WHERE p.consorcio_cuit = $1 AND p.id != $2 AND g.categoria > 1
+       AND g.descripcion ILIKE $3
+     ORDER BY g.descripcion, p.anio DESC, p.mes DESC
+     LIMIT 8`,
+    [period.consorcio_cuit, periodoId, `%${texto}%`]
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 
 export async function calcularExpensas(periodo_id: number) {
   try {
@@ -218,16 +302,30 @@ export async function regenerarGastosFijos(periodoId: number) {
       );
     }
 
+    // CCT parameters (detracción F.931 vigente al período usado)
+    const cctRes = await client.query(
+      `SELECT detraccion_fija_mensual::numeric FROM app.parametros_cct
+       WHERE fecha_desde <= $1 ORDER BY fecha_desde DESC LIMIT 1`,
+      [usedPeriodStr]
+    );
+    const detraccionBase = Number(cctRes.rows[0]?.detraccion_fija_mensual || 12003.68);
+
     // Consorcio ART/SCVO rates
     const consRes = await client.query(
-      "SELECT art_pct_variable::numeric, sv_costo_fijo::numeric, pct_cct_suterh::numeric, pct_cct_fateryh::numeric, pct_cct_seracarh::numeric FROM app.consorcios WHERE cuit = $1",
+      "SELECT art_pct_variable::numeric, sv_costo_fijo::numeric, pct_cct_suterh::numeric, pct_cct_fateryh::numeric, pct_cct_seracarh::numeric, art_costo_fijo::numeric, fateryh_art19bis_mensual::numeric FROM app.consorcios WHERE cuit = $1",
       [consorcio_cuit]
     );
     const artPct = Number(consRes.rows[0]?.art_pct_variable || 0.0639);
-    const svFijo = Number(consRes.rows[0]?.sv_costo_fijo || 424.62);
+    const svFijo = Number(consRes.rows[0]?.sv_costo_fijo || 430.62);
     const suterhPct = Number(consRes.rows[0]?.pct_cct_suterh || 0.045);
     const faterhPct = Number(consRes.rows[0]?.pct_cct_fateryh || 0.065);
     const seracarhPct = Number(consRes.rows[0]?.pct_cct_seracarh || 0.005);
+    const artCostoFijo = Number(consRes.rows[0]?.art_costo_fijo || 0);
+    const art19bis = Number(consRes.rows[0]?.fateryh_art19bis_mensual || 0);
+
+    // SAC months (June=6, December=12): F931 detracción × 1.5
+    const usedMes = usedPeriodStr === prevPeriodStr ? prevMes : mes;
+    const isSacPeriod = usedMes === 6 || usedMes === 12;
 
     // Accumulate obligations
     let f931 = 0, art = 0, scvo = 0, suterh = 0, fateryh = 0, seracarh = 0;
@@ -245,7 +343,7 @@ export async function regenerarGastosFijos(periodoId: number) {
       );
       const diffOsVal = diffOsRes.rows.length > 0 ? Number(diffOsRes.rows[0].importe) : 0;
 
-      const ob = calculateEmployerObligations(bruto, liq.funcion, liq.jornada, diasSuplente, artPct, svFijo, diffOsVal, suterhPct, faterhPct, seracarhPct);
+      const ob = calculateEmployerObligations(bruto, liq.funcion, liq.jornada, diasSuplente, artPct, svFijo, diffOsVal, suterhPct, faterhPct, seracarhPct, isSacPeriod, artCostoFijo, detraccionBase);
       f931 += ob.f931; art += ob.art; scvo += ob.scvo;
       suterh += ob.suterh; fateryh += ob.fateryh; seracarh += ob.seracarh;
     }
@@ -254,7 +352,7 @@ export async function regenerarGastosFijos(periodoId: number) {
     art    = Math.round(art    * 100) / 100;
     scvo   = Math.round(scvo   * 100) / 100;
     suterh = Math.round(suterh * 100) / 100;
-    fateryh   = Math.round(fateryh   * 100) / 100;
+    fateryh   = Math.round((fateryh + art19bis) * 100) / 100;
     seracarh  = Math.round(seracarh  * 100) / 100;
 
     const pText = `${String(prevMes).padStart(2, "0")}/${String(prevAnio).slice(-2)}`;

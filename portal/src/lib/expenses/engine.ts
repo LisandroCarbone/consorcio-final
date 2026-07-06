@@ -25,26 +25,32 @@ export function calculateEmployerObligations(
   diffOsVal: number,
   suterhPct = 0.045,
   faterhPct = 0.065,
-  seracarhPct = 0.005
+  seracarhPct = 0.005,
+  isSacPeriod = false,
+  artCostoFijo = 0,
+  detraccionBase = 12003.68
 ): EmployeeObligations {
   const R = totalRemunerativo;
-  
+
   // Determine detracción
   let detraccion = 0;
   const isSuplente = String(funcion || '').toLowerCase().includes('suplente');
-  
+
   let diasTrabajados = 30;
   if (isSuplente && typeof diasTrabajadosSuplente === 'number') {
     diasTrabajados = diasTrabajadosSuplente;
   }
 
-  if (String(funcion || '').toLowerCase().includes('media') || 
+  // In SAC months (June=6, December=12) the F931 detracción is multiplied by 1.5
+  const sacMultiplier = isSacPeriod ? 1.5 : 1;
+
+  if (String(funcion || '').toLowerCase().includes('media') ||
       String(jornada || '').toLowerCase().includes('media')) {
-    detraccion = 3501.84;
+    detraccion = round2(detraccionBase / 2 * sacMultiplier);
   } else if (isSuplente) {
-    detraccion = round2(7003.68 * diasTrabajados / 30);
+    detraccion = round2(detraccionBase * diasTrabajados / 30 * sacMultiplier);
   } else {
-    detraccion = 7003.68;
+    detraccion = round2(detraccionBase * sacMultiplier);
   }
 
   const base1 = R;
@@ -58,7 +64,7 @@ export function calculateEmployerObligations(
   const contribucionesSS = round2(base10 * 0.18 + base4 * 0.009); // SS 18% + ANSSAL 0.9%
 
   const f931 = round2(aportesSS + contribucionesSS + aportesOS + contribucionesOS);
-  const art = round2(R * artPctVariable);
+  const art = round2(R * artPctVariable + artCostoFijo);
   const scvo = svCostoFijo;
   
   const suterh = round2(R * suterhPct);

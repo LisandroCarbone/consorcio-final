@@ -18,8 +18,12 @@ const sueldosSublinks = [
   { href: "/sueldos/sac", label: "SAC" },
 ];
 
+const expensasSublinks = [
+  { href: "/expensas", label: "Expensas" },
+  { href: "/configuracion/parametros-cct", label: "Parámetros CCT" },
+];
+
 const operationalLinks = [
-  { href: "/expensas", label: "Expensas", icon: "💰" },
   { href: "/finanzas/cuenta-corriente", label: "Cuenta Cte.", icon: "📊" },
   { href: "/proveedores", label: "Proveedores", icon: "🔨" },
   { href: "/tickets", label: "Tickets", icon: "🔧" },
@@ -31,10 +35,16 @@ export function Nav() {
   const [theme, setTheme] = useState<string>("default");
   const inSueldos = pathname.startsWith("/sueldos");
   const [sueldosOpen, setSueldosOpen] = useState(inSueldos);
+  const inExpensas = pathname.startsWith("/expensas") || pathname.startsWith("/configuracion/parametros-cct");
+  const [expensasOpen, setExpensasOpen] = useState(inExpensas);
 
   useEffect(() => {
     if (inSueldos) setSueldosOpen(true);
   }, [inSueldos]);
+
+  useEffect(() => {
+    if (inExpensas) setExpensasOpen(true);
+  }, [inExpensas]);
 
   useEffect(() => {
     // Leer el tema inicial del atributo del html
@@ -107,6 +117,41 @@ export function Nav() {
             {sueldosOpen && (
               <div className="ml-9 space-y-0.5">
                 {sueldosSublinks.map(({ href, label }) => {
+                  const active = pathname === href || pathname.startsWith(href + "/");
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={clsx(
+                        "block rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-white/20 text-white"
+                          : "text-brand-200 hover:bg-white/10 hover:text-white"
+                      )}
+                    >
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+            {/* Expensas — expandible */}
+            <button
+              onClick={() => setExpensasOpen((o) => !o)}
+              className={clsx(
+                "w-full flex items-center gap-4 rounded-xl px-4 py-3 text-base font-semibold transition-colors",
+                inExpensas
+                  ? "bg-white/20 text-white shadow-sm"
+                  : "text-brand-100 hover:bg-white/10 hover:text-white"
+              )}
+            >
+              <span className="text-xl select-none">💰</span>
+              <span className="flex-1 text-left">Expensas</span>
+              <span className="text-xs opacity-60">{expensasOpen ? "▲" : "▼"}</span>
+            </button>
+            {expensasOpen && (
+              <div className="ml-9 space-y-0.5">
+                {expensasSublinks.map(({ href, label }) => {
                   const active = pathname === href || pathname.startsWith(href + "/");
                   return (
                     <Link

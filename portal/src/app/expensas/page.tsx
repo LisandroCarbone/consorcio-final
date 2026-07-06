@@ -2,6 +2,7 @@ import { query } from "@/lib/db";
 import { formatMoney, formatMonth, formatDate, cleanPeriodo } from "@/lib/format";
 import { createPeriodo, calcularExpensas } from "./actions";
 import { RegenerarCat1Button } from "./RegenerarCat1Button";
+import { CopiarGastosButton } from "./CopiarGastosButton";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { AddGastoForm } from "./AddGastoForm";
@@ -9,6 +10,7 @@ import { ExpensasTableClient } from "./ExpensasTableClient";
 import { CalendarDays, HelpCircle } from "lucide-react";
 import { BulkSendButton } from "./SendExpensasButtons";
 import { UfLiquidacionesTableClient } from "./UfLiquidacionesTableClient";
+import { PeriodoActionsMenu } from "./PeriodoActionsMenu";
 
 async function getData(activeCuit?: string) {
   const params: unknown[] = [];
@@ -25,7 +27,7 @@ async function getData(activeCuit?: string) {
       total_gastos: string; total_expensas: string; pagadas: string;
     }>(
       `SELECT p.id, p.consorcio_cuit AS consorcio_id, c.nombre AS consorcio_nombre,
-              p.anio, p.mes, p.estado, p.fecha_vencimiento,
+              p.anio, p.mes, p.estado, p.fecha_vencimiento::text,
               COALESCE((SELECT SUM(monto) FROM app.gastos_periodo WHERE periodo_id=p.id), 0) AS total_gastos,
               (SELECT COUNT(*) FROM app.res_cuenta_periodo WHERE periodo_id=p.id) AS total_expensas,
               (SELECT COUNT(*) FROM app.res_cuenta_periodo WHERE periodo_id=p.id AND estado='pagada') AS pagadas
@@ -43,8 +45,31 @@ async function getData(activeCuit?: string) {
 
 async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
   const [gastos, unidades] = await Promise.all([
-    query<{ id: number; concepto: string; monto: string; tipo: string; categoria: number }>(
-      "SELECT id, descripcion AS concepto, monto::numeric, tipo, categoria FROM app.gastos_periodo WHERE periodo_id=$1 ORDER BY categoria, tipo, descripcion",
+    query<{
+      id: number; concepto: string; monto: string; tipo: string; categoria: number;
+      liquidacion_id: number | null;
+      liq_bruto: string | null; liq_descuentos: string | null; liq_neto: string | null; liq_tipo: string | null;
+      conceptos: string | null;
+    }>(
+      `SELECT g.id, g.descripcion AS concepto, g.monto::numeric, g.tipo, g.categoria,
+              g.liquidacion_id,
+              l.remuneracion_bruta::numeric AS liq_bruto,
+              l.total_descuentos_empleado::numeric AS liq_descuentos,
+              l.neto_a_pagar::numeric AS liq_neto,
+              l.tipo AS liq_tipo,
+              (SELECT json_agg(json_build_object('concepto', c.concepto, 'importe', c.importe::numeric, 'tipo', c.tipo) ORDER BY c.orden)
+               FROM app.conceptos_liquidacion c WHERE c.liquidacion_id = l.id) AS conceptos
+       FROM app.gastos_periodo g
+       LEFT JOIN app.liquidaciones_sueldo l ON l.id = g.liquidacion_id
+       WHERE g.periodo_id = $1
+       ORDER BY g.categoria,
+         CASE
+           WHEN g.liquidacion_id IS NOT NULL AND l.tipo = 'mensual' THEN 1
+           WHEN g.liquidacion_id IS NOT NULL AND l.tipo IN ('sac_1','sac_2') THEN 2
+           WHEN g.liquidacion_id IS NOT NULL THEN 3
+           ELSE 4
+         END,
+         g.descripcion`,
       [periodoId]
     ),
     query<{ id: number; uf: number }>(
@@ -236,37 +261,38 @@ export default async function ExpensasPage({
               {periodos.map((p) => {
                 const isActive = selected?.id === p.id;
                 return (
-                  <li key={p.id}>
+                  <li key={p.id} className={`group flex items-center border-l-4 transition-colors ${
+                    isActive ? "border-brand-600 bg-brand-50/20" : "border-transparent hover:bg-gray-50/50"
+                  }`}>
                     <a
                       href={`/expensas?periodoId=${p.id}`}
-                      className={`flex items-center justify-between px-5 py-3.5 hover:bg-gray-50/50 transition-colors border-l-4 ${
-                        isActive
-                          ? "border-brand-600 bg-brand-50/20"
-                          : "border-transparent"
-                      }`}
+                      className="flex-1 flex items-center justify-between px-5 py-3.5 min-w-0"
                     >
-                      <div className="flex items-center gap-3">
-                        <CalendarDays className={`w-4 h-4 ${isActive ? "text-brand-600" : "text-gray-400"}`} />
-                        <div>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <CalendarDays className={`w-4 h-4 shrink-0 ${isActive ? "text-brand-600" : "text-gray-400"}`} />
+                        <div className="min-w-0">
                           <p className={`text-sm font-semibold ${isActive ? "text-brand-700" : "text-gray-700"}`}>
                             {formatMonth(p.anio, p.mes)}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">{p.consorcio_nombre}</p>
+                          <p className="text-xs text-gray-400 mt-0.5 truncate">{p.consorcio_nombre}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span
-                          className={`badge text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                            p.estado === "liquidado"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
+                      <div className="text-right shrink-0 ml-2">
+                        <span className={`badge text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          p.estado === "liquidado" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                        }`}>
                           {p.estado}
                         </span>
                         <p className="text-xs font-semibold text-gray-600 mt-1 font-mono">{formatMoney(p.total_gastos)}</p>
                       </div>
                     </a>
+                    <div className="pr-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <PeriodoActionsMenu
+                        periodoId={p.id}
+                        fechaVencimiento={p.fecha_vencimiento}
+                        estado={p.estado}
+                      />
+                    </div>
                   </li>
                 );
               })}
@@ -458,6 +484,7 @@ export default async function ExpensasPage({
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     <RegenerarCat1Button periodoId={selected.id} />
+                    <CopiarGastosButton periodoId={selected.id} />
                     {isUltimoPeriodo && (
                       <form action={calcularExpensas.bind(null, selected.id)}>
                         <button type="submit" className={`btn-primary transition-all duration-300 ${

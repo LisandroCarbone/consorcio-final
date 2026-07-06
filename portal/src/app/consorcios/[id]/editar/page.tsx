@@ -26,6 +26,7 @@ export default async function EditarConsorcioPage({ params }: Props) {
     interest_rate: string | null;
     art_pct_variable: string | null; sv_costo_fijo: string | null;
     pct_cct_suterh: string | null; pct_cct_fateryh: string | null; pct_cct_seracarh: string | null;
+    art_costo_fijo: string | null; fateryh_art19bis_mensual: string | null;
   }>("SELECT * FROM app.consorcios WHERE cuit = $1", [id]);
 
   if (!c) notFound();
@@ -188,6 +189,24 @@ export default async function EditarConsorcioPage({ params }: Props) {
                   defaultValue={seracarhPct} className="input pr-8" placeholder="0.5 (default)" />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
               </div>
+            </div>
+            <div>
+              <label className="label">ART costo fijo (por empleado)</label>
+              <div className="relative">
+                <input name="art_costo_fijo" type="number" step="0.01" min="0"
+                  defaultValue={c.art_costo_fijo ?? "0"} className="input pl-6" placeholder="0" />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">Cuota fija mensual por trabajador (ej: Berkley $1,765)</p>
+            </div>
+            <div className="col-span-2">
+              <label className="label">FATERYH Art. 19 bis mensual (monto fijo total)</label>
+              <div className="relative">
+                <input name="fateryh_art19bis_mensual" type="number" step="0.01" min="0"
+                  defaultValue={c.fateryh_art19bis_mensual ?? "0"} className="input pl-6" placeholder="0" />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">Aporte fijo mensual por encargados permanentes. Se suma al FATERYH % variable.</p>
             </div>
           </div>
         </div>

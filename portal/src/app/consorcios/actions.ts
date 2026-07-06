@@ -48,6 +48,12 @@ function formToConsorcio(formData: FormData) {
     pct_cct_seracarh: formData.get("pct_cct_seracarh")
       ? Number(formData.get("pct_cct_seracarh")) / 100
       : null,
+    art_costo_fijo: formData.get("art_costo_fijo")
+      ? Number(formData.get("art_costo_fijo"))
+      : 0,
+    fateryh_art19bis_mensual: formData.get("fateryh_art19bis_mensual")
+      ? Number(formData.get("fateryh_art19bis_mensual"))
+      : 0,
   };
 }
 
@@ -91,8 +97,9 @@ export async function updateConsorcio(formData: FormData) {
        tiene_compactador = $20, tiene_montacargas = $21,
        tiene_otros_servicios_centrales = $22, interest_rate = $23,
        art_pct_variable = $24, sv_costo_fijo = $25,
-       pct_cct_suterh = $26, pct_cct_fateryh = $27, pct_cct_seracarh = $28
-     WHERE cuit = $29`,
+       pct_cct_suterh = $26, pct_cct_fateryh = $27, pct_cct_seracarh = $28,
+       art_costo_fijo = $29, fateryh_art19bis_mensual = $30
+     WHERE cuit = $31`,
     [d.nombre, d.direccion, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.categoria_edificio, d.banco,
      d.tiene_cochera, d.tiene_movimiento_coches, d.tiene_jardin,
@@ -104,6 +111,7 @@ export async function updateConsorcio(formData: FormData) {
      d.tiene_otros_servicios_centrales, d.intereses_mora_pct,
      d.art_pct_variable, d.sv_costo_fijo,
      d.pct_cct_suterh, d.pct_cct_fateryh, d.pct_cct_seracarh,
+     d.art_costo_fijo, d.fateryh_art19bis_mensual,
      cuit]
   );
   revalidatePath("/consorcios");
