@@ -287,7 +287,7 @@ export default async function ExpensasPage({
                         <p className="text-xs font-semibold text-gray-600 mt-1 font-mono">{formatMoney(p.total_gastos)}</p>
                       </div>
                     </a>
-                    <div className="pr-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <div className="pr-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
                       <PeriodoActionsMenu
                         periodoId={p.id}
                         fechaVencimiento={p.fecha_vencimiento}
