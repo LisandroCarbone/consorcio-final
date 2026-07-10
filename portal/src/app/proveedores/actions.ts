@@ -116,3 +116,24 @@ export async function completarOrdenTrabajo(formData: FormData) {
   revalidatePath("/tickets");
   revalidatePath("/expensas");
 }
+
+export async function updateProveedorAction(
+  id: number,
+  nombre: string,
+  rubro: string | null,
+  telefono: string | null,
+  whatsapp: string | null
+) {
+  await query(
+    `UPDATE app.proveedores 
+     SET nombre = $1, rubro = $2, telefono = $3, whatsapp = $4, updated_at = NOW() 
+     WHERE id = $5`,
+    [nombre, rubro, telefono, whatsapp, id]
+  );
+  revalidatePath("/proveedores");
+}
+
+export async function deleteProveedorAction(id: number) {
+  await query("UPDATE app.proveedores SET activo = false WHERE id = $1", [id]);
+  revalidatePath("/proveedores");
+}
