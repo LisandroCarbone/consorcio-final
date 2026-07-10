@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { getLiquidacionesPeriodo } from "../actions";
 import { confirmarLiquidacionAction } from "./actions";
 import { RecalcularButton } from "./RecalcularButton";
+import { LsdExportButton } from "./LsdExportButton";
 import { formatMoney0, cleanPeriodo } from "@/lib/format";
 import { EstadoBadge } from "@/components/ui/EstadoBadge";
 import Link from "next/link";
@@ -70,6 +71,7 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
   }
 
   const liquidaciones: LiquidacionRow[] = await getLiquidacionesPeriodo(periodo, tipo, activeCuit);
+  const hasConfirmedLiqs = liquidaciones.some((l) => l.estado === "confirmada");
 
   const periodoDate = new Date(periodo + "T00:00:00Z");
   const year = periodoDate.getUTCFullYear();
@@ -272,6 +274,11 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
                   <p className="text-xs text-gray-500">Liquidación final e indemnización</p>
                 </div>
               </Link>
+              <LsdExportButton
+                periodo={periodo}
+                tipo={tipo}
+                hasConfirmedLiqs={hasConfirmedLiqs}
+              />
             </div>
           </div>
 

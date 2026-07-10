@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { AddGastoForm } from "./AddGastoForm";
 import { ExpensasTableClient } from "./ExpensasTableClient";
-import { CalendarDays, HelpCircle } from "lucide-react";
+import { CalendarDays, HelpCircle, FileText } from "lucide-react";
 import { BulkSendButton } from "./SendExpensasButtons";
 import { UfLiquidacionesTableClient } from "./UfLiquidacionesTableClient";
 import { PeriodoActionsMenu } from "./PeriodoActionsMenu";
@@ -327,6 +327,49 @@ export default async function ExpensasPage({
               </div>
               <button type="submit" className="btn-primary w-full justify-center">Crear período</button>
             </form>
+          </div>
+
+          {/* Informes y Rendiciones */}
+          <div className="card p-5 mt-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+              <FileText className="w-4 h-4 text-brand-600" /> Informes y Rendiciones
+            </h3>
+            <div className="space-y-3">
+              {selected ? (
+                <div>
+                  <label className="label mb-1">Rendición Mensual del Período</label>
+                  <a
+                    href={`/api/expensas/reporte-mensual?periodoId=${selected.id}`}
+                    target="_blank"
+                    className="btn-secondary text-xs w-full text-center justify-center py-2 flex items-center gap-1 hover:bg-gray-100/80 transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> Descargar Rendición Mensual
+                  </a>
+                </div>
+              ) : (
+                <div className="text-xs text-gray-400 italic">
+                  Seleccione un período para descargar su rendición de cuentas mensual.
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-gray-100">
+                <label className="label mb-1">Informe Anual para Asamblea</label>
+                <form action="/api/expensas/reporte-anual" method="GET" target="_blank" className="flex gap-2">
+                  <input type="hidden" name="consorcioCuit" value={activeCuit} />
+                  <input
+                    name="anio"
+                    type="number"
+                    defaultValue={selected ? selected.anio : new Date().getFullYear()}
+                    className="input text-xs w-24 py-1.5"
+                    placeholder="Año"
+                    required
+                  />
+                  <button type="submit" className="btn-primary text-xs flex-1 justify-center py-1.5">
+                    Generar Anual
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
 

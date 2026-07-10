@@ -5,6 +5,7 @@ import { createProveedor, createOrdenTrabajo, completarOrdenTrabajo } from "./ac
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { ProveedoresTableClient } from "./ProveedoresTableClient";
+import { NuevoProveedorForm } from "./NuevoProveedorForm";
 import {
   ClipboardList,
   AlertTriangle,
@@ -338,25 +339,7 @@ export default async function ProveedoresPage({
               <PlusCircle className="w-4.5 h-4.5 text-gray-400" />
               <h3 className="text-sm font-semibold text-gray-700">Nuevo proveedor</h3>
             </div>
-            <form action={createProveedor} className="space-y-3">
-              <div>
-                <label className="label">Nombre *</label>
-                <input name="nombre" required className="input" />
-              </div>
-              <div>
-                <label className="label">Rubro</label>
-                <input name="rubro" className="input" placeholder="plomería, electricidad..." />
-              </div>
-              <div>
-                <label className="label">WhatsApp</label>
-                <input name="whatsapp" className="input" placeholder="+5491112345678" />
-              </div>
-              <div>
-                <label className="label">Email</label>
-                <input name="email" type="email" className="input" />
-              </div>
-              <button type="submit" className="btn-primary w-full justify-center">Registrar</button>
-            </form>
+            <NuevoProveedorForm activeCuitConsorcio={activeCuit} />
           </div>
         </div>
       </div>

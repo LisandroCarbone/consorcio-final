@@ -400,12 +400,6 @@ export async function distribuirExpensasMasivo(periodoId: number) {
   );
   if (!period) throw new Error("Período no encontrado");
 
-  const consorcio = await queryOne<{ id: number }>(
-    "SELECT id FROM app.consorcios WHERE cuit = $1",
-    [period.consorcio_cuit]
-  );
-  if (!consorcio) throw new Error("Consorcio no encontrado");
-
   const agentUrl = process.env.EXPENSAS_AGENT_URL ?? "http://localhost:3001";
   const apiKey = process.env.AGENT_API_KEY ?? "changeme";
 
@@ -416,7 +410,7 @@ export async function distribuirExpensasMasivo(periodoId: number) {
       "x-api-key": apiKey
     },
     body: JSON.stringify({
-      consorcio_id: consorcio.id,
+      consorcio_id: period.consorcio_cuit,
       anio: period.anio,
       mes: period.mes
     })

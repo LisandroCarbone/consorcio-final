@@ -6,9 +6,10 @@
 
 import http from "http";
 import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
 import { pool, query, queryOne } from "./db.js";
-import { generatePdf, generateSueldoPdf, SueldoReceipt } from "./pdf.js";
+import { generatePdf, generateSueldoPdf, SueldoReceipt, generateMonthlyReportPdf, generateAnnualReportPdf } from "./pdf.js";
 import { sendExpensaEmail, sendSueldoEmail } from "./mailer.js";
 
 const PORT = Number(process.env.AGENT_PORT ?? 3001);
@@ -32,9 +33,9 @@ interface RunPayload {
 async function runDistribution(payload: RunPayload): Promise<object> {
   const { consorcio_id, anio, mes, dry_run = false } = payload;
 
-  const consorcio = await queryOne<{ id: number; nombre: string; direccion: string; cuit: string }>(
-    "SELECT id, nombre, direccion, cuit FROM consorcios WHERE id=$1",
-    [consorcio_id]
+  const consorcio = await queryOne<{ nombre: string; direccion: string; cuit: string }>(
+    "SELECT nombre, direccion, cuit FROM consorcios WHERE cuit=$1",
+    [String(consorcio_id)]
   );
   if (!consorcio) throw new Error(`Consorcio ${consorcio_id} not found`);
 
@@ -397,7 +398,7 @@ const server = http.createServer(async (req, res) => {
 
         // 3. Fetch consorcio details
         const consorcio = await queryOne<any>(
-          "SELECT id, nombre, direccion, cuit FROM consorcios WHERE cuit=$1",
+          "SELECT nombre, direccion, cuit FROM consorcios WHERE cuit=$1",
           [periodo.consorcio_cuit]
         );
         if (!consorcio) throw new Error("Consorcio not found");
@@ -488,6 +489,241 @@ const server = http.createServer(async (req, res) => {
       }
     });
     return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/reporte-mensual") {
+    try {
+      const periodo_id = Number(url.searchParams.get("periodo_id"));
+      if (!periodo_id) throw new Error("periodo_id is required");
+
+      const period = await queryOne<any>(
+        "SELECT * FROM periodos_expensas WHERE id=$1",
+        [periodo_id]
+      );
+      if (!period) throw new Error(`Period ${periodo_id} not found`);
+
+      const consorcio = await queryOne<any>(
+        "SELECT nombre, direccion, cuit FROM consorcios WHERE cuit=$1",
+        [period.consorcio_cuit]
+      );
+      if (!consorcio) throw new Error("Consorcio not found");
+
+      const gastos = await query<any>(
+        "SELECT categoria, descripcion, monto::numeric AS monto, tipo FROM gastos_periodo WHERE periodo_id=$1 ORDER BY categoria, tipo, descripcion",
+        [periodo_id]
+      );
+
+      const resCuentas = await query<any>(
+        `SELECT u.uf,
+                NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '') AS propietario,
+                rcp.coef_a::numeric AS coef_a, rcp.coef_b::numeric AS coef_b,
+                rcp.saldo_anterior::numeric AS saldo_anterior, rcp.su_pago::numeric AS su_pago,
+                rcp.expensas_a::numeric AS expensas_a, rcp.expensas_b::numeric AS expensas_b,
+                rcp.s_asamblea::numeric AS s_asamblea, rcp.otros::numeric AS otros,
+                rcp.gast_part::numeric AS gast_part, rcp.deuda::numeric AS deuda,
+                rcp.intereses::numeric AS intereses, rcp.total_pagar::numeric AS total_pagar
+         FROM res_cuenta_periodo rcp
+         JOIN unidades u ON u.id = rcp.unidad_id
+         LEFT JOIN ocupantes o ON o.unidad_id = u.id AND o.activo = true AND o.rol = 'propietario'
+         LEFT JOIN personas p ON p.id = o.persona_id
+         WHERE rcp.periodo_id = $1
+         ORDER BY u.uf`,
+        [periodo_id]
+      );
+
+      const totalGastos = gastos.reduce((sum: number, g: any) => sum + parseFloat(g.monto), 0);
+      const totalPagos = resCuentas.reduce((sum: number, r: any) => sum + parseFloat(r.su_pago), 0);
+      const totalProrrateado = resCuentas.reduce((sum: number, r: any) => sum + (parseFloat(r.expensas_a) + parseFloat(r.expensas_b) + parseFloat(r.s_asamblea) + parseFloat(r.otros) + parseFloat(r.gast_part)), 0);
+
+      const pdfDir = `${process.env.PDF_OUTPUT_DIR ?? "./pdfs"}/reportes`;
+      const pdfPath = await generateMonthlyReportPdf({
+        consorcio_nombre: consorcio.nombre,
+        consorcio_direccion: consorcio.direccion,
+        consorcio_cuit: consorcio.cuit,
+        anio: period.anio,
+        mes: period.mes,
+        total_gastos: totalGastos,
+        total_pagos: totalPagos,
+        total_prorrateado: totalProrrateado,
+        gastos: gastos.map((g: any) => ({
+          categoria: g.categoria,
+          descripcion: g.descripcion,
+          monto: parseFloat(g.monto),
+          tipo: g.tipo
+        })),
+        resCuentas: resCuentas.map((r: any) => ({
+          uf: r.uf,
+          propietario: r.propietario,
+          coef_a: parseFloat(r.coef_a),
+          coef_b: parseFloat(r.coef_b),
+          saldo_anterior: parseFloat(r.saldo_anterior),
+          su_pago: parseFloat(r.su_pago),
+          expensas_a: parseFloat(r.expensas_a),
+          expensas_b: parseFloat(r.expensas_b),
+          s_asamblea: parseFloat(r.s_asamblea),
+          otros: parseFloat(r.otros),
+          gast_part: parseFloat(r.gast_part),
+          deuda: parseFloat(r.deuda),
+          intereses: parseFloat(r.intereses),
+          total_pagar: parseFloat(r.total_pagar)
+        }))
+      }, pdfDir);
+
+      res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${path.basename(pdfPath)}"`
+      });
+      const stream = fsSync.createReadStream(pdfPath);
+      stream.pipe(res);
+      return;
+    } catch (err: any) {
+      console.error(err);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message || "Error generating monthly report." }));
+      return;
+    }
+  }
+
+  if (req.method === "GET" && url.pathname === "/reporte-anual") {
+    try {
+      const consorcio_cuit = url.searchParams.get("consorcio_cuit");
+      const anio = Number(url.searchParams.get("anio"));
+      if (!consorcio_cuit || !anio) throw new Error("consorcio_cuit and anio are required");
+
+      const consorcio = await queryOne<any>(
+        "SELECT nombre, direccion, cuit FROM consorcios WHERE cuit=$1",
+        [consorcio_cuit]
+      );
+      if (!consorcio) throw new Error("Consorcio not found");
+
+      const gastosRaw = await query<any>(
+        `SELECT gp.categoria, gp.monto::numeric, pe.mes
+         FROM gastos_periodo gp
+         JOIN periodos_expensas pe ON pe.id = gp.periodo_id
+         WHERE pe.consorcio_cuit = $1 AND pe.anio = $2`,
+        [consorcio.cuit, anio]
+      );
+
+      const categoriesMap: Record<number, number[]> = {};
+      gastosRaw.forEach((g: any) => {
+        const cat = Number(g.categoria || 10);
+        const m = Number(g.mes);
+        const val = parseFloat(g.monto);
+        if (!categoriesMap[cat]) {
+          categoriesMap[cat] = Array(12).fill(0);
+        }
+        if (m >= 1 && m <= 12) {
+          categoriesMap[cat][m - 1] += val;
+        }
+      });
+
+      const CATEGORIA_LABELS_LOCAL: Record<number, string> = {
+        1: "Sueldos y Cargas",
+        2: "Servicios Públicos",
+        3: "Abonos de Servicios",
+        4: "Mantenimiento Común",
+        5: "Reparaciones en Unidades",
+        6: "Gastos Bancarios",
+        7: "Gastos de Limpieza",
+        8: "Gastos Administración",
+        9: "Seguros",
+        10: "Otros Gastos",
+      };
+
+      const gastosPorCategoria = Object.keys(categoriesMap)
+        .map(Number)
+        .sort((a, b) => a - b)
+        .map((cat) => {
+          const arr = categoriesMap[cat];
+          const total = arr.reduce((sum, v) => sum + v, 0);
+          return {
+            categoria: cat,
+            nombre: CATEGORIA_LABELS_LOCAL[cat] ?? `Categoría ${cat}`,
+            mensual: arr,
+            total
+          };
+        });
+
+      const totalGastosMensual = Array(12).fill(0);
+      for (let m = 0; m < 12; m++) {
+        gastosPorCategoria.forEach((cat) => {
+          totalGastosMensual[m] += cat.mensual[m];
+        });
+      }
+      const totalGastosAnual = totalGastosMensual.reduce((sum, v) => sum + v, 0);
+
+      const lastPeriod = await queryOne<any>(
+        `SELECT id FROM periodos_expensas 
+         WHERE consorcio_cuit = $1 AND anio = $2 AND estado = 'liquidado'
+         ORDER BY mes DESC LIMIT 1`,
+        [consorcio.cuit, anio]
+      );
+
+      let deudores: any[] = [];
+      if (lastPeriod) {
+        const deudoresRaw = await query<any>(
+          `SELECT u.uf, 
+                  NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '') AS propietario,
+                  rcp.total_pagar::numeric AS saldo_pendiente
+           FROM res_cuenta_periodo rcp
+           JOIN unidades u ON u.id = rcp.unidad_id
+           LEFT JOIN ocupantes o ON o.unidad_id = u.id AND o.activo = true AND o.rol = 'propietario'
+           LEFT JOIN personas p ON p.id = o.persona_id
+           WHERE rcp.periodo_id = $1 AND rcp.total_pagar > 0
+           ORDER BY u.uf`,
+          [lastPeriod.id]
+        );
+        deudores = deudoresRaw.map((d: any) => ({
+          uf: d.uf,
+          propietario: d.propietario,
+          saldo_pendiente: parseFloat(d.saldo_pendiente)
+        }));
+      }
+
+      const reserveRaw = await query<any>(
+        `SELECT pe.mes, SUM(rcp.s_asamblea + rcp.otros)::numeric AS fondo
+         FROM res_cuenta_periodo rcp
+         JOIN periodos_expensas pe ON pe.id = rcp.periodo_id
+         WHERE pe.consorcio_cuit = $1 AND pe.anio = $2
+         GROUP BY pe.mes`,
+        [consorcio.cuit, anio]
+      );
+      const fondoReservaMensual = Array(12).fill(0);
+      reserveRaw.forEach((r: any) => {
+        const m = Number(r.mes);
+        if (m >= 1 && m <= 12) {
+          fondoReservaMensual[m - 1] = parseFloat(r.fondo || "0");
+        }
+      });
+      const totalFondoReservaAnual = fondoReservaMensual.reduce((sum, v) => sum + v, 0);
+
+      const pdfDir = `${process.env.PDF_OUTPUT_DIR ?? "./pdfs"}/reportes`;
+      const pdfPath = await generateAnnualReportPdf({
+        consorcio_nombre: consorcio.nombre,
+        consorcio_direccion: consorcio.direccion,
+        consorcio_cuit: consorcio.cuit,
+        anio,
+        gastosPorCategoria,
+        totalGastosMensual,
+        totalGastosAnual,
+        deudores,
+        fondoReservaMensual,
+        totalFondoReservaAnual
+      }, pdfDir);
+
+      res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${path.basename(pdfPath)}"`
+      });
+      const stream = fsSync.createReadStream(pdfPath);
+      stream.pipe(res);
+      return;
+    } catch (err: any) {
+      console.error(err);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message || "Error generating annual report." }));
+      return;
+    }
   }
 
   if (req.method === "GET" && url.pathname === "/health") {
