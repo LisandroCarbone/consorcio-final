@@ -72,7 +72,7 @@ function SalaryBreakdown({ row }: { row: GastoRow }) {
   return (
     <div className="mt-1">
       {/* Collapsed summary — always visible */}
-      <div className="flex items-center gap-3 text-xs text-gray-400">
+      <div className="flex items-center gap-3 text-xs sm:text-[13px] text-gray-400">
         <span>Bruto <span className="font-mono text-gray-600">{formatMoney(bruto)}</span></span>
         <span>·</span>
         <span>Desc. <span className="font-mono text-red-500">-{formatMoney(descuentos)}</span></span>
@@ -87,7 +87,7 @@ function SalaryBreakdown({ row }: { row: GastoRow }) {
 
       {/* Expanded detail */}
       {open && (
-        <div className="mt-2 ml-0 text-xs border border-gray-100 rounded-lg overflow-hidden bg-white shadow-sm w-80">
+        <div className="mt-2 ml-0 text-xs sm:text-[13px] border border-gray-100 rounded-lg overflow-hidden bg-white shadow-sm w-80">
           {haberes.length > 0 && (
             <div className="px-3 pt-2.5 pb-1.5">
               {haberes.map((c, i) => (
@@ -161,15 +161,15 @@ export function ExpensasTableClient({ gastos, periodoId }: Props) {
         return (
           <div key={cat} className="border-b border-gray-100 last:border-b-0">
             {/* Category header */}
-            <div className={`flex items-center justify-between px-5 py-2 border-b ${colorClass}`}>
-              <span className="text-xs font-bold uppercase tracking-wider">
+            <div className={`flex items-center justify-between px-5 py-2.5 border-b ${colorClass}`}>
+              <span className="text-sm sm:text-[15px] font-bold uppercase tracking-wider">
                 {cat}. {CATEGORIA_LABELS[cat] ?? `Categoría ${cat}`}
               </span>
-              <span className="text-xs font-mono font-bold">{formatMoney(subtotal)}</span>
+              <span className="text-sm sm:text-[15px] font-mono font-bold">{formatMoney(subtotal)}</span>
             </div>
 
             {/* Rows in this category */}
-            <table className="w-full text-sm">
+            <table className="w-full text-sm sm:text-base">
               <tbody>
                 {rows.map((g) =>
                   editingId === g.id ? (
@@ -212,7 +212,7 @@ export function ExpensasTableClient({ gastos, periodoId }: Props) {
                   ) : (
                     <tr key={g.id} className="group border-b border-gray-100 last:border-b-0 hover:bg-gray-50/60 transition-colors">
                       <td className="px-5 py-2.5">
-                        <p className="font-medium text-gray-900 text-sm leading-snug">{g.concepto}</p>
+                        <p className="font-medium text-gray-900 text-sm sm:text-base leading-snug">{g.concepto}</p>
                         {g.liquidacion_id && (
                           <SalaryBreakdown row={g} />
                         )}
