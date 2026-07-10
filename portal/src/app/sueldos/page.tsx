@@ -80,6 +80,60 @@ async function getEmpleadosActivos(activeCuit: string) {
   return empleados as EmpleadoRow[];
 }
 
+async function getSueldosChecklist(activeCuit: string, activePeriodo: string) {
+  const db = pool;
+  
+  const dateObj = new Date(activePeriodo);
+  const anio = dateObj.getUTCFullYear();
+  const mes = dateObj.getUTCMonth() + 1;
+
+  const [statsRes, novedadesRes, periodExpRes] = await Promise.all([
+    db.query(`
+      SELECT
+        (SELECT COUNT(*) FROM app.empleados WHERE estado = 'activo' AND consorcio_cuit = $2) AS total_empleados,
+        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.cuil = l.empleado_cuil WHERE l.periodo = $1 AND e.consorcio_cuit = $2 AND l.estado != 'anulada') AS liquidaciones_mes,
+        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.cuil = l.empleado_cuil WHERE l.periodo = $1 AND l.estado = 'confirmada' AND e.consorcio_cuit = $2) AS confirmadas
+    `, [activePeriodo, activeCuit]),
+    db.query(`
+      SELECT COUNT(*) FROM app.novedades_sueldo n
+      JOIN app.empleados e ON e.cuil = n.empleado_cuil
+      WHERE e.consorcio_cuit = $1 AND n.periodo = $2
+    `, [activeCuit, activePeriodo]),
+    db.query(`
+      SELECT estado FROM app.periodos_expensas
+      WHERE consorcio_cuit = $1 AND anio = $2 AND mes = $3
+      LIMIT 1
+    `, [activeCuit, anio, mes])
+  ]);
+
+  const total_empleados = Number(statsRes.rows[0]?.total_empleados || 0);
+  const liquidacionesCount = Number(statsRes.rows[0]?.liquidaciones_mes || 0);
+  const confirmadasCount = Number(statsRes.rows[0]?.confirmadas || 0);
+  const novedadesCount = Number(novedadesRes.rows[0]?.count || 0);
+  const periodoExpensaEstado = periodExpRes.rows[0]?.estado || null; 
+
+  const isPeriodClosed = periodoExpensaEstado === "liquidado" || periodoExpensaEstado === "cerrado";
+
+  const step1Done = total_empleados === 0 || novedadesCount > 0 || liquidacionesCount >= total_empleados || confirmadasCount >= total_empleados || isPeriodClosed;
+  const step2Done = total_empleados === 0 || (liquidacionesCount >= total_empleados) || confirmadasCount >= total_empleados || isPeriodClosed;
+  const step3Done = total_empleados === 0 || (confirmadasCount >= total_empleados) || isPeriodClosed;
+  const step4Done = total_empleados === 0 || (confirmadasCount >= total_empleados);
+  const step5Done = isPeriodClosed;
+
+  return {
+    total_empleados,
+    novedadesCount,
+    liquidacionesCount,
+    confirmadasCount,
+    periodoExpensaEstado,
+    step1Done,
+    step2Done,
+    step3Done,
+    step4Done,
+    step5Done
+  };
+}
+
 
 export default async function SueldosPage() {
   const cookieStore = await cookies();
@@ -103,6 +157,8 @@ export default async function SueldosPage() {
     getSueldosStats(activeCuit, activePeriodo),
     getEmpleadosActivos(activeCuit)
   ]);
+
+  const checklist = await getSueldosChecklist(activeCuit, stats.periodo);
 
   const mes = new Date(stats.periodo).toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" });
   const escalaLabel = stats.ultima_escala
@@ -136,6 +192,93 @@ export default async function SueldosPage() {
         
         {/* Lado Izquierdo (2/3 de ancho) - Nómina de Empleados */}
         <div className="lg:col-span-2 order-1 lg:order-first space-y-6">
+          
+          {/* Smart Checklist */}
+          {checklist && (
+            <div className="card p-5">
+              <div className="flex items-center gap-1.5 mb-3">
+                <h3 className="font-semibold text-gray-800 text-sm">Pasos del período de sueldos</h3>
+                <div className="group relative inline-block">
+                  <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-help hover:text-gray-600 transition-colors" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-56 bg-gray-900 text-white text-[10px] p-2 rounded shadow-lg text-center normal-case font-normal z-50">
+                    Checklist inteligente: monitorea y detecta automáticamente si falta algún paso para cerrar el mes.
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                {/* Step 1 */}
+                <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
+                    checklist.step1Done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                  }`}>
+                    {checklist.step1Done ? "✓" : "1"}
+                  </span>
+                  <p className="text-xs font-semibold text-gray-800">1. Cargar Novedades</p>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    {checklist.novedadesCount > 0 ? `${checklist.novedadesCount} novedades` : "Sin cambios"}
+                  </p>
+                </div>
+
+                {/* Step 2 */}
+                <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
+                    checklist.step2Done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                  }`}>
+                    {checklist.step2Done ? "✓" : "2"}
+                  </span>
+                  <p className="text-xs font-semibold text-gray-800">2. Liquidar Recibos</p>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    {checklist.total_empleados === 0 
+                      ? "Sin empleados" 
+                      : `${checklist.liquidacionesCount} de ${checklist.total_empleados} gen.`}
+                  </p>
+                </div>
+
+                {/* Step 3 */}
+                <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
+                    checklist.step3Done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                  }`}>
+                    {checklist.step3Done ? "✓" : "3"}
+                  </span>
+                  <p className="text-xs font-semibold text-gray-800">3. Confirmar Recibos</p>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    {checklist.total_empleados === 0 
+                      ? "Sin empleados" 
+                      : `${checklist.confirmadasCount} de ${checklist.total_empleados} conf.`}
+                  </p>
+                </div>
+
+                {/* Step 4 */}
+                <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
+                    checklist.step4Done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                  }`}>
+                    {checklist.step4Done ? "✓" : "4"}
+                  </span>
+                  <p className="text-xs font-semibold text-gray-800">4. Exportar LSD</p>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    {checklist.confirmadasCount > 0 ? "Listo para exportar" : "Pendiente"}
+                  </p>
+                </div>
+
+                {/* Step 5 */}
+                <div className="flex flex-col items-center text-center p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 ${
+                    checklist.step5Done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                  }`}>
+                    {checklist.step5Done ? "✓" : "5"}
+                  </span>
+                  <p className="text-xs font-semibold text-gray-800">5. Cerrar Período</p>
+                  <p className="text-[10px] text-gray-500 mt-1 capitalize">
+                    {checklist.periodoExpensaEstado || "abierto"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="card">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
