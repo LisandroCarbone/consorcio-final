@@ -91,12 +91,19 @@ const columns: ColumnDef<ConsorcioRow>[] = [
   {
     id: "actions",
     cell: ({ row }) => (
-      <div className="flex gap-3 pr-4 justify-end">
-        <Link href={`/consorcios/${row.original.cuit}`} className="text-brand-600 text-xs hover:underline font-semibold">
-          Ver →
+      <div className="flex gap-1 justify-end">
+        <Link
+          href={`/consorcios/${row.original.cuit}`}
+          className="btn-secondary text-xs px-3 py-1.5"
+        >
+          Ver
         </Link>
-        <Link href={`/consorcios/${row.original.cuit}/editar`} className="text-gray-400 text-xs hover:underline">
-          Editar
+        <Link
+          href={`/consorcios/${row.original.cuit}/editar`}
+          className="p-1.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors"
+          title="Editar"
+        >
+          ✏️
         </Link>
       </div>
     )

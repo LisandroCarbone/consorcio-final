@@ -1,0 +1,687 @@
+{
+  "agents/comms-agent/package.json": {
+    "mtime": 1782423531.0872495,
+    "ast_hash": "b485e240f7199163ee4c48e5564bfd2a",
+    "semantic_hash": ""
+  },
+  "agents/comms-agent/src/classifier.ts": {
+    "mtime": 1782423531.0882497,
+    "ast_hash": "e0ce1c819b12bedc1379abb03ce9da23",
+    "semantic_hash": ""
+  },
+  "agents/comms-agent/src/db.ts": {
+    "mtime": 1782423531.0882497,
+    "ast_hash": "1774b167f73b61d6ba4da738de0ea723",
+    "semantic_hash": ""
+  },
+  "agents/comms-agent/src/server.ts": {
+    "mtime": 1782773381.4019084,
+    "ast_hash": "13b37c55a65ccec65cabc5ecfadb2e94",
+    "semantic_hash": ""
+  },
+  "agents/comms-agent/src/whatsapp.ts": {
+    "mtime": 1782773381.4019084,
+    "ast_hash": "f9babc4b175082a218aaf5e74066be9c",
+    "semantic_hash": ""
+  },
+  "agents/expensas-agent/package.json": {
+    "mtime": 1782423531.0902483,
+    "ast_hash": "b004f9502cded93e4d53349407596975",
+    "semantic_hash": ""
+  },
+  "agents/expensas-agent/src/db.ts": {
+    "mtime": 1782423531.0902483,
+    "ast_hash": "1774b167f73b61d6ba4da738de0ea723",
+    "semantic_hash": ""
+  },
+  "agents/expensas-agent/src/index.ts": {
+    "mtime": 1782773381.4019084,
+    "ast_hash": "0999a2bc84a961c07cef2403213b3349",
+    "semantic_hash": ""
+  },
+  "agents/expensas-agent/src/mailer.ts": {
+    "mtime": 1782773381.4019084,
+    "ast_hash": "39f4475eb7825882ab8feb43b06230ff",
+    "semantic_hash": ""
+  },
+  "agents/expensas-agent/src/pdf.ts": {
+    "mtime": 1782773381.4019084,
+    "ast_hash": "76c4e0237254f76cc9cd2a82e218d513",
+    "semantic_hash": ""
+  },
+  "agents/expensas-agent/src/server.ts": {
+    "mtime": 1782773381.4019084,
+    "ast_hash": "e238261688b6aa5232678f9e0318dc88",
+    "semantic_hash": ""
+  },
+  "db/migrations/001_init.sql": {
+    "mtime": 1782423531.092719,
+    "ast_hash": "26f123a71cf75a760991c2aa3afe30af",
+    "semantic_hash": ""
+  },
+  "db/migrations/002_seed.sql": {
+    "mtime": 1782540679.7998643,
+    "ast_hash": "3eb88814b8569fa8c92b2029efc9875f",
+    "semantic_hash": ""
+  },
+  "db/migrations/003_migration.sql": {
+    "mtime": 1782539571.2214587,
+    "ast_hash": "ffd5639732e47fd071c24c6a267277a7",
+    "semantic_hash": ""
+  },
+  "db/migrations/004_empleado_contact.sql": {
+    "mtime": 1782773381.4019084,
+    "ast_hash": "f92ea6964564c19422545d33548223f5",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-consorcio/package.json": {
+    "mtime": 1782423531.094965,
+    "ast_hash": "1831ad27056847acc27b7d3db5a4f367",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-consorcio/src/db.ts": {
+    "mtime": 1782423531.095964,
+    "ast_hash": "594297186d742b1fa635eacc23fbd117",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-consorcio/src/index.ts": {
+    "mtime": 1782423531.095964,
+    "ast_hash": "8119b356f83a517fa6ebe8ddbb58f1dd",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-consorcio/src/tools/consorcios.ts": {
+    "mtime": 1782423531.0969634,
+    "ast_hash": "1a94873350278adb610e6ae5523d598f",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-consorcio/src/tools/expensas.ts": {
+    "mtime": 1782423531.0969634,
+    "ast_hash": "1b34e99f252c64f76b6f657fcc00e7d4",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-consorcio/src/tools/personas.ts": {
+    "mtime": 1782423531.0969634,
+    "ast_hash": "84e9e8a231d46076a271363995d5695a",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-consorcio/src/tools/proveedores.ts": {
+    "mtime": 1782423531.097963,
+    "ast_hash": "ace3e2a2fbc379d331a3292a057c647a",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-consorcio/src/tools/tickets.ts": {
+    "mtime": 1782423531.0989637,
+    "ast_hash": "1858f347eee719bddfe754ce0e6de799",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-consorcio/src/tools/unidades.ts": {
+    "mtime": 1782423531.0989637,
+    "ast_hash": "095036477083e04d67a3b7c21eb1785b",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-consorcio/tsconfig.json": {
+    "mtime": 1782423531.0989637,
+    "ast_hash": "94c2812cf86dfaeae854e95cf6e2fdc9",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-pdf/package.json": {
+    "mtime": 1782423531.1000378,
+    "ast_hash": "a9a7bac5ceaff268349d4e7ee38b9d21",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-pdf/src/index.ts": {
+    "mtime": 1782423531.1000378,
+    "ast_hash": "f1786a48bc5c0e1ff05f7722c7fb7c51",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-pdf/src/template.ts": {
+    "mtime": 1782423531.1010382,
+    "ast_hash": "eec5e1819bbeb2de265a5a4d4c98131b",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-pdf/tsconfig.json": {
+    "mtime": 1782423531.1010382,
+    "ast_hash": "94c2812cf86dfaeae854e95cf6e2fdc9",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-whatsapp/package.json": {
+    "mtime": 1782423531.1020384,
+    "ast_hash": "f590758606e516c9e67eaad05930fec4",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-whatsapp/src/index.ts": {
+    "mtime": 1782423531.1020384,
+    "ast_hash": "cbf71cc2a9a00ec8443d50d45cf0113e",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-whatsapp/src/providers/meta.ts": {
+    "mtime": 1782423531.1030388,
+    "ast_hash": "5af87301a311f7bcb76eb9466ce2bff1",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-whatsapp/src/providers/twilio.ts": {
+    "mtime": 1782423531.1030388,
+    "ast_hash": "0e7e779bdf595590e37f988253a0780d",
+    "semantic_hash": ""
+  },
+  "mcp-servers/mcp-whatsapp/tsconfig.json": {
+    "mtime": 1782423531.1030388,
+    "ast_hash": "94c2812cf86dfaeae854e95cf6e2fdc9",
+    "semantic_hash": ""
+  },
+  "n8n/fix-extraer.js": {
+    "mtime": 1782431179.0736861,
+    "ast_hash": "9b788326d8ce636430498e700653ba1a",
+    "semantic_hash": ""
+  },
+  "n8n/fix-guardar.js": {
+    "mtime": 1782428990.8518133,
+    "ast_hash": "dfbe6ba8eaeb945465db25846a38260b",
+    "semantic_hash": ""
+  },
+  "n8n/patch-parsear.js": {
+    "mtime": 1782428625.826328,
+    "ast_hash": "809cafe1f54daa3b14028e3c818176f5",
+    "semantic_hash": ""
+  },
+  "n8n/patch-workflow.js": {
+    "mtime": 1782427198.2823353,
+    "ast_hash": "debdd3198aa182f151f714cfce10d854",
+    "semantic_hash": ""
+  },
+  "n8n/push-workflow.js": {
+    "mtime": 1782428713.398299,
+    "ast_hash": "71a4c4130bcdbc6d80faf6a7526fdb20",
+    "semantic_hash": ""
+  },
+  "n8n/restore-webhook.js": {
+    "mtime": 1782428869.368015,
+    "ast_hash": "97330c9e3f41ed8410ab68f2b0408441",
+    "semantic_hash": ""
+  },
+  "n8n/workflows/circular-whatsapp.json": {
+    "mtime": 1782423531.105039,
+    "ast_hash": "0695dac890cc12788357c51e5ce04850",
+    "semantic_hash": ""
+  },
+  "n8n/workflows/distribucion-expensas.json": {
+    "mtime": 1782423531.105039,
+    "ast_hash": "6f6680607136c23a5bb763addcffe9d5",
+    "semantic_hash": ""
+  },
+  "n8n/workflows/import.json": {
+    "mtime": 1782425487.3281577,
+    "ast_hash": "9e42e92a3dd3866ee6f4e09821d9cb42",
+    "semantic_hash": ""
+  },
+  "n8n/workflows/live.json": {
+    "mtime": 1782428776.169403,
+    "ast_hash": "f37f3da52ca1a2e3d430c5b8f53aea09",
+    "semantic_hash": ""
+  },
+  "n8n/workflows/update.json": {
+    "mtime": 1782427216.6266549,
+    "ast_hash": "d206d9f698838848061841fe5df38ec3",
+    "semantic_hash": ""
+  },
+  "portal/next-env.d.ts": {
+    "mtime": 1782423531.1060388,
+    "ast_hash": "90426577ad8f38459f3e566411c85589",
+    "semantic_hash": ""
+  },
+  "portal/next.config.ts": {
+    "mtime": 1782423531.1070397,
+    "ast_hash": "78ff609f6e8f8a77544d7ac2dfa403b2",
+    "semantic_hash": ""
+  },
+  "portal/package.json": {
+    "mtime": 1782423531.1080387,
+    "ast_hash": "3ec4baa00d08dfe2b576bbc27197e9c9",
+    "semantic_hash": ""
+  },
+  "portal/postcss.config.js": {
+    "mtime": 1782423531.1085985,
+    "ast_hash": "42f6755017778f6d654d56e270c2b865",
+    "semantic_hash": ""
+  },
+  "portal/src/app/api/sueldos/escalas/route.ts": {
+    "mtime": 1782423531.1105492,
+    "ast_hash": "d4445eeb073db41f7e789b5274245da5",
+    "semantic_hash": ""
+  },
+  "portal/src/app/api/sueldos/liquidar/route.ts": {
+    "mtime": 1782423531.1115491,
+    "ast_hash": "5bb618d7d8f76a7930073461318d35fe",
+    "semantic_hash": ""
+  },
+  "portal/src/app/api/sueldos/trigger-escalas/route.ts": {
+    "mtime": 1782511732.2858727,
+    "ast_hash": "efc78fb6e0f3179938ead15468d472eb",
+    "semantic_hash": ""
+  },
+  "portal/src/app/circulares/CircularesTableClient.tsx": {
+    "mtime": 1782423531.1125495,
+    "ast_hash": "09d3fbd418a334e07164a7c85c74b049",
+    "semantic_hash": ""
+  },
+  "portal/src/app/circulares/actions.ts": {
+    "mtime": 1782423531.1125495,
+    "ast_hash": "63b6fe0edba3098c7fcffc27daa44b41",
+    "semantic_hash": ""
+  },
+  "portal/src/app/circulares/page.tsx": {
+    "mtime": 1782423531.1135485,
+    "ast_hash": "0360f35d8028795f8fc744920f322a17",
+    "semantic_hash": ""
+  },
+  "portal/src/app/configuracion/parametros-cct/actions.ts": {
+    "mtime": 1783306764.267734,
+    "ast_hash": "dcef060b36856a057019ea76d61eeda6",
+    "semantic_hash": ""
+  },
+  "portal/src/app/configuracion/parametros-cct/page.tsx": {
+    "mtime": 1783307099.0024087,
+    "ast_hash": "37d690aca04137f09b97388d8c44b2c8",
+    "semantic_hash": ""
+  },
+  "portal/src/app/consorcios/ConsorciosTableClient.tsx": {
+    "mtime": 1782539571.222459,
+    "ast_hash": "dedde6a5c836b64297f5bffa0bf17a58",
+    "semantic_hash": ""
+  },
+  "portal/src/app/consorcios/[id]/editar/page.tsx": {
+    "mtime": 1783307703.7541473,
+    "ast_hash": "4cb4f7e6f7392fb8954994b0782ffac1",
+    "semantic_hash": ""
+  },
+  "portal/src/app/consorcios/[id]/page.tsx": {
+    "mtime": 1782788815.5403187,
+    "ast_hash": "86432c789114890951510cfa2fbffb2f",
+    "semantic_hash": ""
+  },
+  "portal/src/app/consorcios/actions.ts": {
+    "mtime": 1783307683.5227978,
+    "ast_hash": "7945504c9a1e48fc391c22ac0ce7dab5",
+    "semantic_hash": ""
+  },
+  "portal/src/app/consorcios/loading.tsx": {
+    "mtime": 1782423531.1155486,
+    "ast_hash": "e50fc218d267d62696bc16ed3eb3f143",
+    "semantic_hash": ""
+  },
+  "portal/src/app/consorcios/page.tsx": {
+    "mtime": 1782539571.224459,
+    "ast_hash": "d76956bd1a95624f0a7e709119286c14",
+    "semantic_hash": ""
+  },
+  "portal/src/app/expensas/AddGastoForm.tsx": {
+    "mtime": 1783308684.181986,
+    "ast_hash": "70fb357c14cc4bc4c62200f9cff68950",
+    "semantic_hash": ""
+  },
+  "portal/src/app/expensas/CopiarGastosButton.tsx": {
+    "mtime": 1783308639.8620987,
+    "ast_hash": "0dea515619350e86e30165d2fc90f756",
+    "semantic_hash": ""
+  },
+  "portal/src/app/expensas/ExpensasTableClient.tsx": {
+    "mtime": 1783308875.7225335,
+    "ast_hash": "6245f531907ff974e7c939ad4175e732",
+    "semantic_hash": ""
+  },
+  "portal/src/app/expensas/PeriodoActionsMenu.tsx": {
+    "mtime": 1783309052.7098007,
+    "ast_hash": "fb38935f2957d1c63f0f7d30d2c4f2f4",
+    "semantic_hash": ""
+  },
+  "portal/src/app/expensas/RegenerarCat1Button.tsx": {
+    "mtime": 1783034455.1169405,
+    "ast_hash": "53726c606c6bcd68ff3eeaa7424cb4df",
+    "semantic_hash": ""
+  },
+  "portal/src/app/expensas/SendExpensasButtons.tsx": {
+    "mtime": 1782773381.4177287,
+    "ast_hash": "d307fb96428207ddc7ccf044175017bb",
+    "semantic_hash": ""
+  },
+  "portal/src/app/expensas/UfLiquidacionesTableClient.tsx": {
+    "mtime": 1782773381.4177287,
+    "ast_hash": "3495d00a73eed1ec4e840800c38d3ecb",
+    "semantic_hash": ""
+  },
+  "portal/src/app/expensas/actions.ts": {
+    "mtime": 1783309034.4173467,
+    "ast_hash": "20ed7340e24ee59781d5c073a305e003",
+    "semantic_hash": ""
+  },
+  "portal/src/app/expensas/loading.tsx": {
+    "mtime": 1782423531.118549,
+    "ast_hash": "8d5947cdf227bf30ca060e0737bce7a5",
+    "semantic_hash": ""
+  },
+  "portal/src/app/expensas/page.tsx": {
+    "mtime": 1783309389.0613346,
+    "ast_hash": "7180d0bcd1dd0ab2959ec45cc4fca8c2",
+    "semantic_hash": ""
+  },
+  "portal/src/app/finanzas/actions.ts": {
+    "mtime": 1782423531.1195488,
+    "ast_hash": "17487a4941ad09d50e99b30e143d0ff9",
+    "semantic_hash": ""
+  },
+  "portal/src/app/finanzas/cuenta-corriente/CobrosChartClient.tsx": {
+    "mtime": 1782423531.1195488,
+    "ast_hash": "0a8d17b760e582971ccc3bbb331781d4",
+    "semantic_hash": ""
+  },
+  "portal/src/app/finanzas/cuenta-corriente/CuentaCorrienteTableClient.tsx": {
+    "mtime": 1783036103.2789974,
+    "ast_hash": "ed3d50e16568de166ec626b33923a06b",
+    "semantic_hash": ""
+  },
+  "portal/src/app/finanzas/cuenta-corriente/ManagePaymentsModal.tsx": {
+    "mtime": 1782423531.1205485,
+    "ast_hash": "269ebeeefbc61188d594ea24ac9a1b6c",
+    "semantic_hash": ""
+  },
+  "portal/src/app/finanzas/cuenta-corriente/page.tsx": {
+    "mtime": 1783035155.6523716,
+    "ast_hash": "ed2af4537b191bdab39ef4bbb1c39c27",
+    "semantic_hash": ""
+  },
+  "portal/src/app/finanzas/loading.tsx": {
+    "mtime": 1782423531.121549,
+    "ast_hash": "398a47b126164a98d80f1bcb11ebdc3e",
+    "semantic_hash": ""
+  },
+  "portal/src/app/layout.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "8c4b420d47071270d4f2baba33a7718b",
+    "semantic_hash": ""
+  },
+  "portal/src/app/loading.tsx": {
+    "mtime": 1782423531.1225493,
+    "ast_hash": "cd88f188af6e572d7f0c1ae63e23ee3d",
+    "semantic_hash": ""
+  },
+  "portal/src/app/page.tsx": {
+    "mtime": 1782423531.123548,
+    "ast_hash": "258378ffd4ef6a9807c36f73cdfa5a41",
+    "semantic_hash": ""
+  },
+  "portal/src/app/proveedores/ProveedoresTableClient.tsx": {
+    "mtime": 1782423531.123548,
+    "ast_hash": "ec6d531bbfe5c90fd4cc5820711e9aa4",
+    "semantic_hash": ""
+  },
+  "portal/src/app/proveedores/actions.ts": {
+    "mtime": 1782423531.1245496,
+    "ast_hash": "603f3fd858dda815e4f1fb44a57f8a1f",
+    "semantic_hash": ""
+  },
+  "portal/src/app/proveedores/loading.tsx": {
+    "mtime": 1782423531.1245496,
+    "ast_hash": "47ec1333c087a561405d82d72b9ca9b6",
+    "semantic_hash": ""
+  },
+  "portal/src/app/proveedores/page.tsx": {
+    "mtime": 1782423531.1255503,
+    "ast_hash": "40490bf58e2fe74c68e041d147397754",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/SueldosTableClient.tsx": {
+    "mtime": 1782423531.1261337,
+    "ast_hash": "c60af9daaef9b7fe4db33504db695c43",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/actions.ts": {
+    "mtime": 1783306507.2525232,
+    "ast_hash": "a19d477e237db84f3fbfce2875736687",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/despido/actions.ts": {
+    "mtime": 1782423531.1282635,
+    "ast_hash": "8869817b68b8b92a7bfce5390ef3833d",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/despido/page.tsx": {
+    "mtime": 1782423531.1282635,
+    "ast_hash": "6938be68bfde91e5f3758bed48d04fa7",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/empleados/[id]/editar/page.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "ca933d2d7da87b09a1fd40e0a9d84742",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/empleados/constants.ts": {
+    "mtime": 1782423531.130263,
+    "ast_hash": "9cb57bcc9a058c347d5c1f88805f72a5",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/empleados/nuevo/page.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "d4a2a4ca65fc42f57fc730ec6b476725",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/empleados/page.tsx": {
+    "mtime": 1782423531.1312635,
+    "ast_hash": "228577d2f6bef6f71d1e38fe31a28612",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/escalas/PeriodoSelect.tsx": {
+    "mtime": 1782423531.1322634,
+    "ast_hash": "57e6722b66f5217ebe4cb05134ecd8ba",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/escalas/TriggerN8nButton.tsx": {
+    "mtime": 1782539600.700063,
+    "ast_hash": "8087574a3cf87b432b7f28e524439ede",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/escalas/page.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "2163e0a0d789f5697ddaedd4d92bf9ad",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/liquidaciones/RecalcularButton.tsx": {
+    "mtime": 1782539571.2269678,
+    "ast_hash": "07f33f75158653b6f78c83326bd32dde",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/liquidaciones/[id]/PrintButton.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "a8b853eb64c8db7626b0a90d5d4b2084",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/liquidaciones/[id]/page.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "7592cdea2cc61a6a57a0577fbb7f8584",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/liquidaciones/actions.ts": {
+    "mtime": 1782511732.2883868,
+    "ast_hash": "c9f91caf429b8b7fcfedf91af997ac59",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/liquidaciones/historia/EmpleadoSelect.tsx": {
+    "mtime": 1782430452.8264434,
+    "ast_hash": "b60d773d3fd18fb54130ebabc3ae4c1d",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/liquidaciones/historia/page.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "b281c73d26cdff2cba200255091ed069",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/liquidaciones/page.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "828b7e8791ee9e928ca019c0de34a879",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/liquidaciones/queries.ts": {
+    "mtime": 1782436729.4625857,
+    "ast_hash": "da3d42afb47da4df5ee3bef085ad8a60",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/loading.tsx": {
+    "mtime": 1782423531.1362631,
+    "ast_hash": "766a7fd218eeb3dd070296980d281603",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/novedades/AdicionalRemuneratorioCard.tsx": {
+    "mtime": 1782539571.2289734,
+    "ast_hash": "dcf6cf56bcd660f6a6f022b02c7d641b",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/novedades/NovedadesForm.tsx": {
+    "mtime": 1782513589.3682857,
+    "ast_hash": "3a7a0dbfa83ea76f040ebc2d2d0e7c03",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/novedades/page.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "5cdd0b28ef05486605323d2e634ab64f",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/page.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "6762f8c0e216c0f2ecc6a9686c8d559a",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/sac/actions.ts": {
+    "mtime": 1782511732.2906003,
+    "ast_hash": "b63a0d2853ccce5c3e6564fedfd535d3",
+    "semantic_hash": ""
+  },
+  "portal/src/app/sueldos/sac/page.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "f96fd5e666e511abe60f2011e708355b",
+    "semantic_hash": ""
+  },
+  "portal/src/app/tickets/TicketsTableClient.tsx": {
+    "mtime": 1782423531.1392634,
+    "ast_hash": "05eab0e0bbf793acf857293fcc28f0b5",
+    "semantic_hash": ""
+  },
+  "portal/src/app/tickets/actions.ts": {
+    "mtime": 1782423531.1402636,
+    "ast_hash": "856b522384f6e5b65aad2b6f000356ab",
+    "semantic_hash": ""
+  },
+  "portal/src/app/tickets/loading.tsx": {
+    "mtime": 1782423531.1402636,
+    "ast_hash": "3dc5a725fff690695672a556fa2cf36d",
+    "semantic_hash": ""
+  },
+  "portal/src/app/tickets/page.tsx": {
+    "mtime": 1782423531.1402636,
+    "ast_hash": "2ac7c7cab47abd206698f617cc1765ec",
+    "semantic_hash": ""
+  },
+  "portal/src/components/dashboard/DashboardClient.tsx": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "19737bfd322eda32cde0c1f0dff92176",
+    "semantic_hash": ""
+  },
+  "portal/src/components/ui/ActionFeedback.tsx": {
+    "mtime": 1782511732.292547,
+    "ast_hash": "9bd900c59760c2fc7b6c17a60cee7a22",
+    "semantic_hash": ""
+  },
+  "portal/src/components/ui/ConsorcioRequerido.tsx": {
+    "mtime": 1782423531.142264,
+    "ast_hash": "2bf597bccd37f17e513a48c211f7451b",
+    "semantic_hash": ""
+  },
+  "portal/src/components/ui/DataTable.tsx": {
+    "mtime": 1782423531.143265,
+    "ast_hash": "6b92b5113acc103670596d02b553fb35",
+    "semantic_hash": ""
+  },
+  "portal/src/components/ui/EstadoBadge.tsx": {
+    "mtime": 1782423531.143265,
+    "ast_hash": "a9ba6dce086dc3903d2ed730c607362f",
+    "semantic_hash": ""
+  },
+  "portal/src/components/ui/Nav.tsx": {
+    "mtime": 1783307348.4303937,
+    "ast_hash": "9fa7d2cdb60869b66d1872708aedac54",
+    "semantic_hash": ""
+  },
+  "portal/src/components/ui/PeriodNav.tsx": {
+    "mtime": 1782423531.1442654,
+    "ast_hash": "f70377255f41aaf16b598e2bd6bb4ced",
+    "semantic_hash": ""
+  },
+  "portal/src/components/ui/TopBar.tsx": {
+    "mtime": 1782423531.1442654,
+    "ast_hash": "6323341015bf8d0cbb5203818cb513d8",
+    "semantic_hash": ""
+  },
+  "portal/src/lib/db.ts": {
+    "mtime": 1782423531.145264,
+    "ast_hash": "6c116df3d1874c0a75af3dc7921e4d5c",
+    "semantic_hash": ""
+  },
+  "portal/src/lib/expenses/engine.ts": {
+    "mtime": 1783306481.0623543,
+    "ast_hash": "08868b55c45a82e496c644fbdc0a84f5",
+    "semantic_hash": ""
+  },
+  "portal/src/lib/expenses/receipt_parser.ts": {
+    "mtime": 1782423531.1462624,
+    "ast_hash": "8abaf966cf1cf2d6b090c670afe89566",
+    "semantic_hash": ""
+  },
+  "portal/src/lib/format.ts": {
+    "mtime": 1782773381.4187963,
+    "ast_hash": "017f14c936078135a015eac1e4f9687f",
+    "semantic_hash": ""
+  },
+  "portal/src/lib/liquidacion/engine.ts": {
+    "mtime": 1783030328.8576443,
+    "ast_hash": "33b9bfb0fc8431094c1b05ad1c7d5585",
+    "semantic_hash": ""
+  },
+  "portal/tailwind.config.ts": {
+    "mtime": 1782423531.1472628,
+    "ast_hash": "1bc793ca2d2a87760c4e27ef1cee40fa",
+    "semantic_hash": ""
+  },
+  "portal/tsconfig.json": {
+    "mtime": 1782423531.1482632,
+    "ast_hash": "04a2d343e93f65857c1d664694b5232e",
+    "semantic_hash": ""
+  },
+  "seed.sql": {
+    "mtime": 1782424469.475069,
+    "ast_hash": "21fad8c72b7b5ac93635eb1d83bc328f",
+    "semantic_hash": ""
+  },
+  ".agents/AGENTS.md": {
+    "mtime": 1782423531.0852492,
+    "ast_hash": "65e3578faf0bc104d84e6a7773f4c584",
+    "semantic_hash": ""
+  },
+  "INSTRUCCIONES.txt": {
+    "mtime": 1782423531.086249,
+    "ast_hash": "aae1f76983e04d34f046722f9ea20cf5",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1782423531.086249,
+    "ast_hash": "9d21f5602b3f9b4b8814d18ce8960010",
+    "semantic_hash": ""
+  },
+  "docker-compose.yml": {
+    "mtime": 1782773381.4019084,
+    "ast_hash": "ebb8fbfca34bc1fbea0a8c23fd227dea",
+    "semantic_hash": ""
+  },
+  "portal/public/firma-empleador.png": {
+    "mtime": 1782423531.1085985,
+    "ast_hash": "be3df52dd34d848766aaedff2ecde496",
+    "semantic_hash": ""
+  }
+}

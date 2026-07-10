@@ -245,9 +245,13 @@ export async function regenerarGastosFijos(periodoId: number) {
   try {
     await client.query("BEGIN");
 
-    // 1. Delete existing Category 1 expenses
+    // 1. Delete auto-generated Category 1 expenses (keep manually added ones)
     await client.query(
-      "DELETE FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = 1",
+      `DELETE FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = 1
+       AND (liquidacion_id IS NOT NULL
+            OR descripcion LIKE 'ARCA AFIP F. 931:%'
+            OR descripcion LIKE 'SUTERH %'
+            OR descripcion LIKE 'FATERYH %')`,
       [periodoId]
     );
 

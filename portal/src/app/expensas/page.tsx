@@ -211,6 +211,7 @@ export default async function ExpensasPage({
         id: number;
         unidad_id: number;
         uf: string;
+        uf_numero: number | null;
         propietario: string | null;
         monto_ordinario: string;
         monto_extraordinario: string;
@@ -219,7 +220,7 @@ export default async function ExpensasPage({
         enviada: boolean;
         pdf_url: string | null;
       }>(
-        `SELECT rcp.id, rcp.unidad_id, u.uf::text,
+        `SELECT rcp.id, rcp.unidad_id, u.uf::text, u.uf_numero,
                 NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '') AS propietario,
                 rcp.expensas_a::text AS monto_ordinario,
                 rcp.expensas_b::text AS monto_extraordinario,
@@ -232,7 +233,7 @@ export default async function ExpensasPage({
          LEFT JOIN app.ocupantes o ON o.unidad_id = u.id AND o.activo = true AND o.rol = 'propietario'
          LEFT JOIN app.personas p ON p.id = o.persona_id
          WHERE rcp.periodo_id = $1
-         ORDER BY u.uf`,
+         ORDER BY u.uf_numero NULLS LAST, u.uf`,
         [selected.id]
       )
     : [];
@@ -532,7 +533,17 @@ export default async function ExpensasPage({
                 <div className="card overflow-hidden">
                   <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="font-semibold text-gray-800 text-base">Liquidación por Unidad (UF)</h3>
-                    <BulkSendButton periodoId={selected.id} />
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`/api/expensas/liquidacion/${selected.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-secondary flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm border border-gray-300 hover:bg-gray-50 transition-all"
+                      >
+                        📋 Ver Liquidación Completa
+                      </a>
+                      <BulkSendButton periodoId={selected.id} />
+                    </div>
                   </div>
                   <UfLiquidacionesTableClient data={resCuentaRows} />
                 </div>

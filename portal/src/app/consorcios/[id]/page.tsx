@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+import Link from "next/link";
 import { query, queryOne } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { createUnidad, createPersonaAndOcupante } from "../actions";
@@ -55,7 +56,12 @@ export default async function ConsorcioDetailPage({ params }: Props) {
           {" / "}
           <span>Detalle</span>
         </p>
-        <h2 className="text-2xl font-bold text-gray-900">{consorcio.nombre}</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-bold text-gray-900">{consorcio.nombre}</h2>
+          <Link href={`/consorcios/${id}/editar`} className="btn-secondary text-sm px-3 py-1">
+            Editar
+          </Link>
+        </div>
         <p className="text-gray-500 text-sm">{consorcio.direccion}{consorcio.cuit ? ` · CUIT: ${consorcio.cuit}` : ""}</p>
       </div>
 

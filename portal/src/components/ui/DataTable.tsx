@@ -73,7 +73,7 @@ export function DataTable<TData, TValue>({
         <tbody>
           {table.getRowModel().rows.length > 0 ? (
             table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="table-row hover:bg-gray-50/50 transition-colors">
+              <tr key={row.id} className="group table-row hover:bg-gray-50/50 transition-colors">
                 {row.getVisibleCells().map((cell) => (
                   <td key={cell.id} className="td text-gray-700">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { useEffect, useState } from "react";
 
 const generalLinks = [
+  { href: "/administracion", label: "Administración", icon: "⚙️" },
   { href: "/", label: "Dashboard", icon: "🏠" },
   { href: "/consorcios", label: "Consorcios", icon: "🏢" },
 ];

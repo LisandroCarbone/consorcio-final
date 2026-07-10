@@ -128,6 +128,7 @@ export function AddGastoForm({
           onChange={(e) => setCategoria(e.target.value)}
           disabled={isPending}
         >
+          <option value="1">1 - Sueldos y Cargas Sociales</option>
           <option value="2">2 - Servicios Públicos</option>
           <option value="3">3 - Abonos de Servicios</option>
           <option value="4">4 - Mantenimiento Común</option>

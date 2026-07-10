@@ -8,6 +8,7 @@ export interface UfLiquidacionRow {
   id: number;
   unidad_id: number;
   uf: string;
+  uf_numero: number | null;
   propietario: string | null;
   monto_ordinario: string;
   monto_extraordinario: string;
@@ -55,6 +56,7 @@ export function UfLiquidacionesTableClient({ data }: UfLiquidacionesTableClientP
       <table className="w-full text-sm text-left text-gray-500">
         <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-100">
           <tr>
+            <th className="px-5 py-3.5 text-center">UF</th>
             <th className="px-5 py-3.5">Unidad</th>
             <th className="px-5 py-3.5">Propietario</th>
             <th className="px-5 py-3.5 text-right">Ordinario (A)</th>
@@ -72,6 +74,7 @@ export function UfLiquidacionesTableClient({ data }: UfLiquidacionesTableClientP
 
             return (
               <tr key={row.id} className="hover:bg-gray-50/50 transition-colors">
+                <td className="px-5 py-3.5 font-mono text-gray-500 text-sm text-center w-12">{row.uf_numero ?? "—"}</td>
                 <td className="px-5 py-3.5 font-semibold text-gray-900">{row.uf}</td>
                 <td className="px-5 py-3.5 text-gray-700">{row.propietario ?? "—"}</td>
                 <td className="px-5 py-3.5 text-right font-mono text-gray-600">{formatMoney(row.monto_ordinario)}</td>
@@ -96,16 +99,14 @@ export function UfLiquidacionesTableClient({ data }: UfLiquidacionesTableClientP
                 </td>
                 <td className="px-5 py-3.5 text-right pr-6">
                   <div className="flex items-center justify-end gap-2">
-                    {row.pdf_url && (
-                      <a
-                        href={row.pdf_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn-secondary text-xs py-1 px-2.5 rounded-lg border border-gray-300 flex items-center gap-1 hover:bg-gray-50 transition-all"
-                      >
-                        📄 PDF
-                      </a>
-                    )}
+                    <a
+                      href={`/api/expensas/pdf/${row.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-secondary text-xs py-1 px-2.5 rounded-lg border border-gray-300 flex items-center gap-1 hover:bg-gray-50 transition-all"
+                    >
+                      📄 Ver PDF
+                    </a>
                     <button
                       onClick={() => handleSendIndividual(row.id)}
                       disabled={isSending}
