@@ -306,36 +306,71 @@ export async function regenerarGastosFijos(periodoId: number) {
       );
     }
 
-    // CCT parameters (detracción F.931 vigente al período usado)
+    // CCT parameters (SUTERH/FATERYH/SERACARH, SCVO and AFIP F.931 rates vigentes al período usado)
     const cctRes = await client.query(
-      `SELECT detraccion_fija_mensual::numeric FROM app.parametros_cct
+      `SELECT detraccion_fija_mensual::numeric, detraccion_fija_empleador::numeric,
+              pct_suterh::numeric, pct_fateryh::numeric, pct_seracarh::numeric,
+              sv_costo_fijo::numeric,
+              pct_aportes_ss::numeric, pct_aportes_os::numeric,
+              pct_contrib_os::numeric, pct_contrib_ss::numeric, pct_contrib_anssal::numeric,
+              fateryh_art19bis::numeric
+       FROM app.parametros_cct
        WHERE fecha_desde <= $1 ORDER BY fecha_desde DESC LIMIT 1`,
       [usedPeriodStr]
     );
-    const detraccionBase = Number(cctRes.rows[0]?.detraccion_fija_mensual || 12003.68);
+    const cct = cctRes.rows[0];
+    const detraccionBase = Number(cct?.detraccion_fija_mensual || 12003.68);
+    const detraccionEmpleador = Number(cct?.detraccion_fija_empleador || 0);
+    const suterhPct = Number(cct?.pct_suterh || 0.045);
+    const faterhPct = Number(cct?.pct_fateryh || 0.065);
+    const seracarhPct = Number(cct?.pct_seracarh || 0.005);
+    const svFijo = Number(cct?.sv_costo_fijo || 430.62);
+    const pctAportesSS = Number(cct?.pct_aportes_ss || 0.1445);
+    const pctAportesOS = Number(cct?.pct_aportes_os || 0.0255);
+    const pctContribOS = Number(cct?.pct_contrib_os || 0.051);
+    const pctContribSS = Number(cct?.pct_contrib_ss || 0.18);
+    const pctContribANSSAL = Number(cct?.pct_contrib_anssal || 0.009);
 
-    // Consorcio ART/SCVO rates
-    const consRes = await client.query(
-      "SELECT art_pct_variable::numeric, sv_costo_fijo::numeric, pct_cct_suterh::numeric, pct_cct_fateryh::numeric, pct_cct_seracarh::numeric, art_costo_fijo::numeric, fateryh_art19bis_mensual::numeric FROM app.consorcios WHERE cuit = $1",
-      [consorcio_cuit]
+    const art19bis = Number(cct?.fateryh_art19bis || 0);
+
+    // ART rates per consorcio with vigency
+    const artRes = await client.query(
+      `SELECT art_pct_variable::numeric, art_costo_fijo::numeric
+       FROM app.parametros_art_consorcio
+       WHERE consorcio_cuit = $1 AND fecha_desde <= $2
+       ORDER BY fecha_desde DESC LIMIT 1`,
+      [consorcio_cuit, usedPeriodStr]
     );
-    const artPct = Number(consRes.rows[0]?.art_pct_variable || 0.0639);
-    const svFijo = Number(consRes.rows[0]?.sv_costo_fijo || 430.62);
-    const suterhPct = Number(consRes.rows[0]?.pct_cct_suterh || 0.045);
-    const faterhPct = Number(consRes.rows[0]?.pct_cct_fateryh || 0.065);
-    const seracarhPct = Number(consRes.rows[0]?.pct_cct_seracarh || 0.005);
-    const artCostoFijo = Number(consRes.rows[0]?.art_costo_fijo || 0);
-    const art19bis = Number(consRes.rows[0]?.fateryh_art19bis_mensual || 0);
+    const artPct = Number(artRes.rows[0]?.art_pct_variable || 0.0639);
+    const artCostoFijo = Number(artRes.rows[0]?.art_costo_fijo || 0);
 
     // SAC months (June=6, December=12): F931 detracción × 1.5
     const usedMes = usedPeriodStr === prevPeriodStr ? prevMes : mes;
     const isSacPeriod = usedMes === 6 || usedMes === 12;
 
+    // In SAC months, fetch SAC liquidaciones and build a map of SAC bruto per employee
+    const sacBrutoMap = new Map<string, number>();
+    if (isSacPeriod) {
+      const sacTipo = usedMes === 6 ? "sac_1" : "sac_2";
+      const sacLiqs = await client.query(
+        `SELECT l.empleado_cuil, l.remuneracion_bruta::numeric AS remuneracion_bruta
+         FROM app.liquidaciones_sueldo l
+         JOIN app.empleados e ON e.cuil = l.empleado_cuil
+         WHERE e.consorcio_cuit = $1 AND l.periodo = $2 AND l.estado = 'confirmada' AND l.tipo = $3`,
+        [consorcio_cuit, usedPeriodStr, sacTipo]
+      );
+      for (const s of sacLiqs.rows) {
+        sacBrutoMap.set(s.empleado_cuil, Number(s.remuneracion_bruta || 0));
+      }
+    }
+
     // Accumulate obligations
     let f931 = 0, art = 0, scvo = 0, suterh = 0, fateryh = 0, seracarh = 0;
 
     for (const liq of obligLiqs.rows) {
-      const bruto = Number(liq.remuneracion_bruta || 0);
+      const brutoMensual = Number(liq.remuneracion_bruta || 0);
+      const brutoSac = sacBrutoMap.get(liq.empleado_cuil) || 0;
+      const bruto = brutoMensual + brutoSac;
       const novRes = await client.query(
         "SELECT dias_trabajados_suplente::numeric FROM app.novedades_sueldo WHERE empleado_cuil = $1 AND periodo = $2 LIMIT 1",
         [liq.empleado_cuil, usedPeriodStr]
@@ -347,12 +382,16 @@ export async function regenerarGastosFijos(periodoId: number) {
       );
       const diffOsVal = diffOsRes.rows.length > 0 ? Number(diffOsRes.rows[0].importe) : 0;
 
-      const ob = calculateEmployerObligations(bruto, liq.funcion, liq.jornada, diasSuplente, artPct, svFijo, diffOsVal, suterhPct, faterhPct, seracarhPct, isSacPeriod, artCostoFijo, detraccionBase);
+      const ob = calculateEmployerObligations(
+        bruto, liq.funcion, liq.jornada, diasSuplente, artPct, svFijo, diffOsVal,
+        suterhPct, faterhPct, seracarhPct, isSacPeriod, artCostoFijo, detraccionBase,
+        pctAportesSS, pctAportesOS, pctContribOS, pctContribSS, pctContribANSSAL
+      );
       f931 += ob.f931; art += ob.art; scvo += ob.scvo;
       suterh += ob.suterh; fateryh += ob.fateryh; seracarh += ob.seracarh;
     }
 
-    f931   = Math.round(f931   * 100) / 100;
+    f931   = Math.round((f931 - detraccionEmpleador) * 100) / 100;
     art    = Math.round(art    * 100) / 100;
     scvo   = Math.round(scvo   * 100) / 100;
     suterh = Math.round(suterh * 100) / 100;

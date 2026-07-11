@@ -36,23 +36,8 @@ function formToConsorcio(formData: FormData) {
     art_pct_variable: formData.get("art_pct_variable")
       ? Number(formData.get("art_pct_variable")) / 100
       : null,
-    sv_costo_fijo: formData.get("sv_costo_fijo")
-      ? Number(formData.get("sv_costo_fijo"))
-      : null,
-    pct_cct_suterh: formData.get("pct_cct_suterh")
-      ? Number(formData.get("pct_cct_suterh")) / 100
-      : null,
-    pct_cct_fateryh: formData.get("pct_cct_fateryh")
-      ? Number(formData.get("pct_cct_fateryh")) / 100
-      : null,
-    pct_cct_seracarh: formData.get("pct_cct_seracarh")
-      ? Number(formData.get("pct_cct_seracarh")) / 100
-      : null,
     art_costo_fijo: formData.get("art_costo_fijo")
       ? Number(formData.get("art_costo_fijo"))
-      : 0,
-    fateryh_art19bis_mensual: formData.get("fateryh_art19bis_mensual")
-      ? Number(formData.get("fateryh_art19bis_mensual"))
       : 0,
   };
 }
@@ -96,10 +81,8 @@ export async function updateConsorcio(formData: FormData) {
        tiene_grupo_electrogeno = $18, tiene_seguridad_centralizada = $19,
        tiene_compactador = $20, tiene_montacargas = $21,
        tiene_otros_servicios_centrales = $22, interest_rate = $23,
-       art_pct_variable = $24, sv_costo_fijo = $25,
-       pct_cct_suterh = $26, pct_cct_fateryh = $27, pct_cct_seracarh = $28,
-       art_costo_fijo = $29, fateryh_art19bis_mensual = $30
-     WHERE cuit = $31`,
+       art_pct_variable = $24, art_costo_fijo = $25
+     WHERE cuit = $26`,
     [d.nombre, d.direccion, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.categoria_edificio, d.banco,
      d.tiene_cochera, d.tiene_movimiento_coches, d.tiene_jardin,
@@ -109,11 +92,20 @@ export async function updateConsorcio(formData: FormData) {
      d.tiene_grupo_electrogeno, d.tiene_seguridad_centralizada,
      d.tiene_compactador, d.tiene_montacargas,
      d.tiene_otros_servicios_centrales, d.intereses_mora_pct,
-     d.art_pct_variable, d.sv_costo_fijo,
-     d.pct_cct_suterh, d.pct_cct_fateryh, d.pct_cct_seracarh,
-     d.art_costo_fijo, d.fateryh_art19bis_mensual,
+     d.art_pct_variable, d.art_costo_fijo,
      cuit]
   );
+
+  if (d.art_pct_variable != null) {
+    await query(
+      `INSERT INTO app.parametros_art_consorcio (consorcio_cuit, fecha_desde, art_pct_variable, art_costo_fijo)
+       VALUES ($1, CURRENT_DATE, $2, $3)
+       ON CONFLICT (consorcio_cuit, fecha_desde) DO UPDATE SET
+         art_pct_variable = EXCLUDED.art_pct_variable,
+         art_costo_fijo = EXCLUDED.art_costo_fijo`,
+      [cuit, d.art_pct_variable, d.art_costo_fijo]
+    );
+  }
   revalidatePath("/consorcios");
   revalidatePath(`/consorcios/${cuit}`);
   redirect(`/consorcios/${cuit}/editar?ok=guardado`);

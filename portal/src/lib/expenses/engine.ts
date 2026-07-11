@@ -28,7 +28,12 @@ export function calculateEmployerObligations(
   seracarhPct = 0.005,
   isSacPeriod = false,
   artCostoFijo = 0,
-  detraccionBase = 12003.68
+  detraccionBase = 12003.68,
+  pctAportesSS = 0.1445,   // Jubilación 11% + Ley 19032 3% + ANSSAL 0.45%
+  pctAportesOS = 0.0255,   // OS aportes
+  pctContribOS = 0.051,    // OS contribución patronal
+  pctContribSS = 0.18,     // SS contribución patronal sobre base con detracción
+  pctContribANSSAL = 0.009 // ANSSAL contribución patronal
 ): EmployeeObligations {
   const R = totalRemunerativo;
 
@@ -58,10 +63,10 @@ export function calculateEmployerObligations(
   const base10 = Math.max(0, R - detraccion);
 
   // AFIP F.931 Split
-  const aportesSS = round2(base1 * 0.1445); // Jubilación 11% + Ley 19032 3% + ANSSAL 0.45%
-  const aportesOS = round2(base4 * 0.0255); // OS 2.55%
-  const contribucionesOS = round2(base4 * 0.051); // OS 5.10%
-  const contribucionesSS = round2(base10 * 0.18 + base4 * 0.009); // SS 18% + ANSSAL 0.9%
+  const aportesSS = round2(base1 * pctAportesSS); // Jubilación + Ley 19032 + ANSSAL
+  const aportesOS = round2(base4 * pctAportesOS); // OS aportes
+  const contribucionesOS = round2(base4 * pctContribOS); // OS contribución patronal
+  const contribucionesSS = round2(base10 * pctContribSS + base4 * pctContribANSSAL); // SS + ANSSAL contribución patronal
 
   const f931 = round2(aportesSS + contribucionesSS + aportesOS + contribucionesOS);
   const art = round2(R * artPctVariable + artCostoFijo);
