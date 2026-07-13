@@ -77,11 +77,23 @@ type PeriodoRow = {
   admin_categoria_afip: string | null;
 }
 
+type ConceptoLiq = {
+  concepto: string;
+  importe: number;
+  tipo: string;
+};
+
 type GastoRow = {
   descripcion: string;
   monto: string;
   tipo: string;
   categoria: number;
+  liquidacion_id: number | null;
+  liq_bruto: string | null;
+  liq_descuentos: string | null;
+  liq_neto: string | null;
+  liq_tipo: string | null;
+  conceptos: ConceptoLiq[] | string | null;
 }
 
 type UfRow = {
@@ -138,10 +150,25 @@ export async function GET(
 
   const [gastos, ufRows] = await Promise.all([
     query<GastoRow>(
-      `SELECT descripcion, monto::numeric, tipo, categoria
-       FROM app.gastos_periodo
-       WHERE periodo_id = $1
-       ORDER BY categoria, descripcion`,
+      `SELECT g.descripcion, g.monto::numeric, g.tipo, g.categoria,
+              g.liquidacion_id,
+              l.remuneracion_bruta::numeric AS liq_bruto,
+              l.total_descuentos_empleado::numeric AS liq_descuentos,
+              l.neto_a_pagar::numeric AS liq_neto,
+              l.tipo AS liq_tipo,
+              (SELECT json_agg(json_build_object('concepto', c.concepto, 'importe', c.importe::numeric, 'tipo', c.tipo) ORDER BY c.orden)
+               FROM app.conceptos_liquidacion c WHERE c.liquidacion_id = l.id) AS conceptos
+       FROM app.gastos_periodo g
+       LEFT JOIN app.liquidaciones_sueldo l ON l.id = g.liquidacion_id
+       WHERE g.periodo_id = $1
+       ORDER BY g.categoria,
+         CASE
+           WHEN g.liquidacion_id IS NOT NULL AND l.tipo = 'mensual' THEN 1
+           WHEN g.liquidacion_id IS NOT NULL AND l.tipo IN ('sac_1','sac_2') THEN 2
+           WHEN g.liquidacion_id IS NOT NULL THEN 3
+           ELSE 4
+         END,
+         g.descripcion`,
       [id]
     ),
     query<UfRow>(
@@ -190,13 +217,59 @@ export async function GET(
     .map(({ categoria, items, subtotal }) => {
       const pctInc = totalGastos > 0 ? ((subtotal / totalGastos) * 100).toFixed(1) : "0.0";
 
-      const itemRows = items.map(g => `
+      const itemRows = items.map(g => {
+        let conceptRows = "";
+        if (g.liquidacion_id && g.liq_bruto) {
+          let conceptos: ConceptoLiq[] = [];
+          if (g.conceptos) {
+            try {
+              conceptos = typeof g.conceptos === "string"
+                ? JSON.parse(g.conceptos)
+                : g.conceptos as ConceptoLiq[];
+            } catch { /* ignore */ }
+          }
+          const haberes = conceptos.filter(c => c.tipo === "haber" || c.tipo === "no_remunerativo");
+          const descuentos = conceptos.filter(c => c.tipo === "descuento");
+          const bruto = Number(g.liq_bruto);
+          const totalDesc = Number(g.liq_descuentos || 0);
+          const neto = Number(g.liq_neto || 0);
+
+          const haberRows = haberes.map(c => `
+            <tr class="desglose-row">
+              <td class="desglose-desc">${esc(c.concepto)}</td>
+              <td class="r mono desglose-val">${moneyCompact(c.importe)}</td>
+              <td></td><td></td>
+            </tr>`).join("");
+
+          const descRows = "";
+
+          conceptRows = `
+            ${haberRows}
+            <tr class="desglose-row desglose-subtotal">
+              <td class="desglose-desc"><strong>Total bruto</strong></td>
+              <td class="r mono desglose-val"><strong>${moneyCompact(bruto)}</strong></td>
+              <td></td><td></td>
+            </tr>
+            ${totalDesc > 0 ? `
+            <tr class="desglose-row">
+              <td class="desglose-desc desc-item">Descuentos</td>
+              <td class="r mono desglose-val desc-val">-${moneyCompact(totalDesc)}</td>
+              <td></td><td></td>
+            </tr>` : ""}
+            <tr class="desglose-row desglose-neto">
+              <td class="desglose-desc"><strong>Neto a pagar</strong></td>
+              <td class="r mono desglose-val"><strong>${moneyCompact(neto)}</strong></td>
+              <td></td><td></td>
+            </tr>`;
+        }
+        return `
         <tr>
           <td class="gasto-desc">${esc(g.descripcion)}</td>
           <td class="r mono">${g.tipo === "A" ? moneyCompact(g.monto) : ""}</td>
           <td class="r mono">${g.tipo === "B" ? moneyCompact(g.monto) : ""}</td>
           <td></td>
-        </tr>`).join("");
+        </tr>${conceptRows}`;
+      }).join("");
 
       return `
         <tr class="cat-row">
@@ -415,6 +488,15 @@ export async function GET(
     font-size: 10px;
   }
   .gasto-desc { padding-left: 14px; color: #333; }
+  .desglose-row td { border-bottom: none; padding: 1px 5px; }
+  .desglose-desc { padding-left: 28px !important; font-size: 9px; color: #666; }
+  .desglose-val { font-size: 9px; color: #666; }
+  .desc-item { color: #b44; }
+  .desc-val { color: #b44; }
+  .desglose-subtotal td { border-top: 1px dotted #ccc; }
+  .desglose-neto td { border-top: 1px solid #999; border-bottom: 1px solid #ddd; }
+  .desglose-neto .desglose-desc { color: #222; }
+  .desglose-neto .desglose-val { color: #222; }
   .totales-row td {
     font-weight: 700;
     border-top: 2px solid #222;

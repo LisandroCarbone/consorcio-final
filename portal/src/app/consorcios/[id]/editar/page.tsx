@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { updateConsorcio } from "../../actions";
 import { Suspense } from "react";
 import { ActionFeedback } from "@/components/ui/ActionFeedback";
+import MaskedInput from "@/components/ui/MaskedInput";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -14,7 +15,7 @@ export default async function EditarConsorcioPage({ params }: Props) {
   const { id } = await params;
   const c = await queryOne<{
     cuit: string; nombre: string; direccion: string;
-    codigo_postal: string | null; suterh_key: string | null;
+    codigo_postal: string | null; suterh_key: string | null; clave_suterh: string | null;
     cant_uf: number | null; categoria_edificio: string | null; banco: string | null;
     tiene_cochera: boolean; tiene_movimiento_coches: boolean; tiene_jardin: boolean;
     zona_desfavorable: boolean; tiene_pileta: boolean; tiene_caldera: boolean;
@@ -24,14 +25,11 @@ export default async function EditarConsorcioPage({ params }: Props) {
     tiene_compactador: boolean; tiene_montacargas: boolean;
     tiene_otros_servicios_centrales: boolean;
     interest_rate: string | null;
-    art_pct_variable: string | null;
-    art_costo_fijo: string | null;
   }>("SELECT * FROM app.consorcios WHERE cuit = $1", [id]);
 
   if (!c) notFound();
 
   const interesesPct = c.interest_rate ? (Number(c.interest_rate) * 100).toFixed(2) : "";
-  const artPct = c.art_pct_variable ? (Number(c.art_pct_variable) * 100).toFixed(4) : "";
 
   const SERVICIOS_CENTRALES = [
     { name: "tiene_ascensor", label: "Ascensor", checked: c.tiene_ascensor },
@@ -88,6 +86,10 @@ export default async function EditarConsorcioPage({ params }: Props) {
             <input name="nro_cta_suterh" defaultValue={c.suterh_key ?? ""} className="input" />
           </div>
           <div>
+            <label className="label">Clave SUTERH</label>
+            <input name="clave_suterh" defaultValue={c.clave_suterh ?? ""} className="input" />
+          </div>
+          <div>
             <label className="label">UF p/ Retiro de Residuos</label>
             <input name="cant_uf" type="number" defaultValue={c.cant_uf ?? ""} className="input" />
             <p className="text-xs text-gray-400 mt-0.5">Solo las UF alcanzadas por el servicio de retiro</p>
@@ -109,12 +111,9 @@ export default async function EditarConsorcioPage({ params }: Props) {
           </div>
           <div className="col-span-2">
             <label className="label">Intereses por mora (%)</label>
-            <input
+            <MaskedInput
+              preset="percentage"
               name="intereses_mora_pct"
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
               defaultValue={interesesPct}
               className="input w-40"
               placeholder="Ej: 3.5"
@@ -142,32 +141,10 @@ export default async function EditarConsorcioPage({ params }: Props) {
           </div>
         </div>
 
-        <div className="border-t pt-4 space-y-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ART (por consorcio)</p>
-          <p className="text-xs text-gray-400 -mt-2">
-            Valores de la póliza ART de este consorcio. Los demás parámetros (SUTERH, FATERYH, SERACARH, SCVO, alícuotas AFIP)
-            se configuran en <a href="/configuracion/parametros-cct" className="text-brand-600 hover:underline">Parámetros CCT</a>.
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">ART % variable</label>
-              <div className="relative">
-                <input name="art_pct_variable" type="number" step="0.0001" min="0" max="100"
-                  defaultValue={artPct} className="input pr-8" placeholder="Ej: 6.39" />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
-              </div>
-            </div>
-            <div>
-              <label className="label">ART costo fijo (por empleado)</label>
-              <div className="relative">
-                <input name="art_costo_fijo" type="number" step="0.01" min="0"
-                  defaultValue={c.art_costo_fijo ?? "0"} className="input pl-6" placeholder="0" />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-              </div>
-              <p className="text-xs text-gray-400 mt-0.5">Cuota fija mensual por trabajador (ej: Berkley $1,765)</p>
-            </div>
-          </div>
-        </div>
+        <p className="text-xs text-gray-400 border-t pt-4">
+          ART, SUTERH, FATERYH, SERACARH, SCVO y alícuotas AFIP se configuran en{" "}
+          <a href="/configuracion/parametros" className="text-brand-600 hover:underline">Parámetros</a>.
+        </p>
 
         <div className="flex justify-between items-center border-t pt-4">
           <a href={`/consorcios/${id}`} className="btn-secondary">Cancelar</a>

@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import { emitirFacturaAction } from "./actions";
+import { formatCuit } from "@/lib/format";
 
 interface Comprobante {
   id: number;
@@ -226,7 +227,7 @@ export function FacturacionClient({
                         </td>
                         <td className="td">
                           <p className="font-medium text-gray-800 truncate max-w-[150px]">{c.descripcion}</p>
-                          <p className="text-[10px] text-gray-400 font-mono">Receptor: {c.cuit_receptor}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">Receptor: {formatCuit(c.cuit_receptor)}</p>
                         </td>
                         <td className="td text-gray-500">
                           {new Date(c.fecha).toLocaleDateString()}

@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
+import { formatCuit } from "@/lib/format";
 
 export interface EmpleadoRow {
   cuil: string;
@@ -60,7 +61,7 @@ const columns: ColumnDef<EmpleadoRow>[] = [
   {
     accessorKey: "cuil",
     header: "CUIL",
-    cell: ({ row }) => <span className="text-gray-400 font-mono text-xs">{row.original.cuil}</span>,
+    cell: ({ row }) => <span className="text-gray-400 font-mono text-xs">{formatCuit(row.original.cuil)}</span>,
   },
   {
     accessorKey: "funcion",

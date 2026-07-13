@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { cookies } from "next/headers";
 import { pool } from "@/lib/db";
 import { getEmpleados } from "../../actions";
 import { formatMoney0, formatEmpleadoOption } from "@/lib/format";
@@ -25,7 +26,9 @@ const ESTADO_CLS: Record<string, string> = {
 
 export default async function HistoriaPage({ searchParams }: Props) {
   const { empleado_cuil, desde, hasta } = await searchParams;
-  const empleados = await getEmpleados();
+  const cookieStore = await cookies();
+  const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+  const empleados = await getEmpleados(activeCuit || undefined);
 
   const now = new Date();
   const desdeDefault = `${now.getFullYear() - 1}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
@@ -153,9 +156,9 @@ export default async function HistoriaPage({ searchParams }: Props) {
                         </span>
                       </td>
                       <td className="px-3 py-3">
-                        <Link href={`/sueldos/liquidaciones/${l.id}`} className="text-blue-600 hover:underline text-xs">
+                        <a href={`/sueldos/liquidaciones/${l.id}`} className="text-blue-600 hover:underline text-xs">
                           Ver recibo
-                        </Link>
+                        </a>
                       </td>
                     </tr>
                   );

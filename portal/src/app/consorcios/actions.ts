@@ -12,6 +12,7 @@ function formToConsorcio(formData: FormData) {
     cuit: (formData.get("cuit") as string) || null,
     codigo_postal: (formData.get("codigo_postal") as string) || null,
     nro_cta_suterh: (formData.get("nro_cta_suterh") as string) || null,
+    clave_suterh: (formData.get("clave_suterh") as string) || null,
     cant_uf: formData.get("cant_uf") ? Number(formData.get("cant_uf")) : null,
     categoria_edificio: (formData.get("categoria_edificio") as string) || null,
     banco: (formData.get("banco") as string) || null,
@@ -33,12 +34,6 @@ function formToConsorcio(formData: FormData) {
     intereses_mora_pct: formData.get("intereses_mora_pct")
       ? Number(formData.get("intereses_mora_pct")) / 100
       : null,
-    art_pct_variable: formData.get("art_pct_variable")
-      ? Number(formData.get("art_pct_variable")) / 100
-      : null,
-    art_costo_fijo: formData.get("art_costo_fijo")
-      ? Number(formData.get("art_costo_fijo"))
-      : 0,
   };
 }
 
@@ -81,8 +76,8 @@ export async function updateConsorcio(formData: FormData) {
        tiene_grupo_electrogeno = $18, tiene_seguridad_centralizada = $19,
        tiene_compactador = $20, tiene_montacargas = $21,
        tiene_otros_servicios_centrales = $22, interest_rate = $23,
-       art_pct_variable = $24, art_costo_fijo = $25
-     WHERE cuit = $26`,
+       clave_suterh = $24
+     WHERE cuit = $25`,
     [d.nombre, d.direccion, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.categoria_edificio, d.banco,
      d.tiene_cochera, d.tiene_movimiento_coches, d.tiene_jardin,
@@ -92,20 +87,8 @@ export async function updateConsorcio(formData: FormData) {
      d.tiene_grupo_electrogeno, d.tiene_seguridad_centralizada,
      d.tiene_compactador, d.tiene_montacargas,
      d.tiene_otros_servicios_centrales, d.intereses_mora_pct,
-     d.art_pct_variable, d.art_costo_fijo,
-     cuit]
+     d.clave_suterh, cuit]
   );
-
-  if (d.art_pct_variable != null) {
-    await query(
-      `INSERT INTO app.parametros_art_consorcio (consorcio_cuit, fecha_desde, art_pct_variable, art_costo_fijo)
-       VALUES ($1, CURRENT_DATE, $2, $3)
-       ON CONFLICT (consorcio_cuit, fecha_desde) DO UPDATE SET
-         art_pct_variable = EXCLUDED.art_pct_variable,
-         art_costo_fijo = EXCLUDED.art_costo_fijo`,
-      [cuit, d.art_pct_variable, d.art_costo_fijo]
-    );
-  }
   revalidatePath("/consorcios");
   revalidatePath(`/consorcios/${cuit}`);
   redirect(`/consorcios/${cuit}/editar?ok=guardado`);

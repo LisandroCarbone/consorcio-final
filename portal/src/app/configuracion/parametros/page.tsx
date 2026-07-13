@@ -70,9 +70,9 @@ export default async function ParametrosCCTPage() {
   const vigente = params[0];
 
   return (
-    <div className="w-full max-w-5xl">
+    <div className="w-full">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Parámetros CCT</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Parámetros</h2>
         <p className="text-sm text-gray-500 mt-1">
           Valores del Convenio Colectivo 589/10 y alícuotas AFIP que aplican a todos los consorcios.
           Actualizá cuando AFIP emita una nueva resolución.

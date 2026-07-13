@@ -64,13 +64,13 @@ export async function agregarParametroCCT(formData: FormData) {
     ]
   );
 
-  revalidatePath("/configuracion/parametros-cct");
-  redirect("/configuracion/parametros-cct");
+  revalidatePath("/configuracion/parametros");
+  redirect("/configuracion/parametros");
 }
 
 export async function eliminarParametroCCT(id: number) {
   await query("DELETE FROM app.parametros_cct WHERE id = $1", [id]);
-  revalidatePath("/configuracion/parametros-cct");
+  revalidatePath("/configuracion/parametros");
 }
 
 export async function agregarParametroART(formData: FormData) {
@@ -92,11 +92,11 @@ export async function agregarParametroART(formData: FormData) {
     [consorcio_cuit, fecha_desde, art_pct_variable, art_costo_fijo]
   );
 
-  revalidatePath("/configuracion/parametros-cct");
-  redirect("/configuracion/parametros-cct");
+  revalidatePath("/configuracion/parametros");
+  redirect("/configuracion/parametros");
 }
 
 export async function eliminarParametroART(id: number) {
   await query("DELETE FROM app.parametros_art_consorcio WHERE id = $1", [id]);
-  revalidatePath("/configuracion/parametros-cct");
+  revalidatePath("/configuracion/parametros");
 }

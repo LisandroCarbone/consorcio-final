@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { pool } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { FUNCIONES } from "../constants";
+import MaskedInput from "@/components/ui/MaskedInput";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
@@ -93,7 +94,7 @@ export default async function NuevoEmpleadoPage({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">CUIL *</label>
-              <input name="cuil" required className="input" placeholder="20123456789" />
+              <MaskedInput preset="cuit" name="cuil" required className="input" placeholder="20-12345678-9" />
             </div>
             <div>
               <label className="label">Legajo</label>
@@ -117,7 +118,7 @@ export default async function NuevoEmpleadoPage({
             </div>
             <div>
               <label className="label">WhatsApp (Celular)</label>
-              <input name="whatsapp" className="input" placeholder="+54911..." />
+              <MaskedInput preset="phone" name="whatsapp" className="input" placeholder="11-1234-5678" />
             </div>
           </div>
         </div>
@@ -197,7 +198,7 @@ export default async function NuevoEmpleadoPage({
             </div>
             <div>
               <label className="label">CBU</label>
-              <input name="cbu" className="input" placeholder="22 dígitos" />
+              <MaskedInput preset="cbu" name="cbu" className="input" placeholder="22 dígitos" />
             </div>
           </div>
         </div>
@@ -224,7 +225,7 @@ export default async function NuevoEmpleadoPage({
           </div>
           <div className="mt-4">
             <label className="label">Adicional voluntario ($)</label>
-            <input name="adicional_voluntario" type="number" step="0.01" className="input w-48" defaultValue="0" />
+            <MaskedInput preset="money" name="adicional_voluntario" className="input w-48" defaultValue="0" />
           </div>
         </div>
 

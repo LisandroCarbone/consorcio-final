@@ -1,3 +1,25 @@
+export function formatCuit(v: string | null | undefined): string {
+  if (!v) return "—";
+  const d = v.replace(/\D/g, "");
+  if (d.length !== 11) return v;
+  return `${d.slice(0, 2)}-${d.slice(2, 10)}-${d.slice(10)}`;
+}
+
+export function formatPhone(v: string | null | undefined): string {
+  if (!v) return "—";
+  const d = v.replace(/\D/g, "");
+  if (d.length === 10) return `${d.slice(0, 2)}-${d.slice(2, 6)}-${d.slice(6)}`;
+  if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+  return v;
+}
+
+export function formatCbu(v: string | null | undefined): string {
+  if (!v) return "—";
+  const d = v.replace(/\D/g, "");
+  if (d.length !== 22) return v;
+  return `${d.slice(0, 4)} ${d.slice(4, 8)} ${d.slice(8, 12)} ${d.slice(12, 16)} ${d.slice(16, 20)} ${d.slice(20)}`;
+}
+
 export function formatMoney(n: number | string): string {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(Number(n));
 }

@@ -4,6 +4,7 @@ import React, { useState, useTransition } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
 import { updateProveedorAction, deleteProveedorAction } from "./actions";
+import { formatPhone } from "@/lib/format";
 
 export interface ProveedorRow {
   id: number;
@@ -102,7 +103,7 @@ export function ProveedoresTableClient({ proveedores }: ProveedoresTableClientPr
             />
           );
         }
-        return <span className="text-gray-500 text-xs">{row.original.telefono ?? "—"}</span>;
+        return <span className="text-gray-500 text-xs">{formatPhone(row.original.telefono)}</span>;
       },
     },
     {
@@ -128,7 +129,7 @@ export function ProveedoresTableClient({ proveedores }: ProveedoresTableClientPr
             rel="noopener noreferrer"
             className="text-green-600 hover:underline text-xs flex items-center gap-1 font-medium"
           >
-            💬 {wa}
+            💬 {formatPhone(wa)}
           </a>
         );
       },

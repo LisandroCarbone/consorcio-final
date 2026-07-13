@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatMoney } from "@/lib/format";
+import MaskedInput from "@/components/ui/MaskedInput";
 import { agregarParametroCCT, eliminarParametroCCT, agregarParametroART, eliminarParametroART } from "./actions";
 
 export type ParametroCCTRow = {
@@ -49,37 +50,39 @@ export function ParametrosCCTClient({ params, artParams, consorcioCuit, consorci
   const [editing, setEditing] = useState<ParametroCCTRow | null>(null);
   const [editingART, setEditingART] = useState<ARTRow | null>(null);
 
-  const formDefaults = editing
+  const source = editing ?? params[0] ?? null;
+  const formDefaults = source
     ? {
-        fecha_desde: editing.fecha_desde,
-        detraccion_fija_mensual: Number(editing.detraccion_fija_mensual).toString(),
-        detraccion_fija_empleador: Number(editing.detraccion_fija_empleador).toString(),
-        pct_suterh: decToHuman(editing.pct_suterh),
-        pct_fateryh: decToHuman(editing.pct_fateryh),
-        pct_seracarh: decToHuman(editing.pct_seracarh),
-        sv_costo_fijo: Number(editing.sv_costo_fijo).toString(),
-        pct_aportes_ss: decToHuman(editing.pct_aportes_ss),
-        pct_aportes_os: decToHuman(editing.pct_aportes_os),
-        pct_contrib_os: decToHuman(editing.pct_contrib_os),
-        pct_contrib_ss: decToHuman(editing.pct_contrib_ss),
-        pct_contrib_anssal: decToHuman(editing.pct_contrib_anssal),
-        fateryh_art19bis: Number(editing.fateryh_art19bis).toString(),
+        fecha_desde: editing ? editing.fecha_desde : new Date().toISOString().slice(0, 10),
+        detraccion_fija_mensual: Number(source.detraccion_fija_mensual).toString(),
+        detraccion_fija_empleador: Number(source.detraccion_fija_empleador).toString(),
+        pct_suterh: decToHuman(source.pct_suterh),
+        pct_fateryh: decToHuman(source.pct_fateryh),
+        pct_seracarh: decToHuman(source.pct_seracarh),
+        sv_costo_fijo: Number(source.sv_costo_fijo).toString(),
+        pct_aportes_ss: decToHuman(source.pct_aportes_ss),
+        pct_aportes_os: decToHuman(source.pct_aportes_os),
+        pct_contrib_os: decToHuman(source.pct_contrib_os),
+        pct_contrib_ss: decToHuman(source.pct_contrib_ss),
+        pct_contrib_anssal: decToHuman(source.pct_contrib_anssal),
+        fateryh_art19bis: Number(source.fateryh_art19bis).toString(),
       }
     : null;
 
-  const artDefaults = editingART
+  const artSource = editingART ?? artParams[0] ?? null;
+  const artDefaults = artSource
     ? {
-        fecha_desde: editingART.fecha_desde,
-        art_pct_variable: decToHuman(editingART.art_pct_variable),
-        art_costo_fijo: Number(editingART.art_costo_fijo).toString(),
+        fecha_desde: editingART ? editingART.fecha_desde : new Date().toISOString().slice(0, 10),
+        art_pct_variable: decToHuman(artSource.art_pct_variable),
+        art_costo_fijo: Number(artSource.art_costo_fijo).toString(),
       }
     : null;
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="flex gap-6 items-start">
         {/* Historial CCT */}
-        <div className="card">
+        <div className="card flex-1 min-w-0">
           <div className="px-5 py-4 border-b border-gray-100">
             <h3 className="font-semibold text-gray-800">Historial de parámetros CCT</h3>
           </div>
@@ -101,6 +104,8 @@ export function ParametrosCCTClient({ params, artParams, consorcioCuit, consorci
                     <th className="th text-right">Con. OS</th>
                     <th className="th text-right">Con. SS</th>
                     <th className="th text-right">Con. ANSSAL</th>
+                    <th className="th text-right">Detr. Empl.</th>
+                    <th className="th text-right">Art.19bis</th>
                     <th className="th" />
                   </tr>
                 </thead>
@@ -126,6 +131,8 @@ export function ParametrosCCTClient({ params, artParams, consorcioCuit, consorci
                       <td className="td text-right font-mono text-xs">{formatPct(p.pct_contrib_os)}</td>
                       <td className="td text-right font-mono text-xs">{formatPct(p.pct_contrib_ss)}</td>
                       <td className="td text-right font-mono text-xs">{formatPct(p.pct_contrib_anssal)}</td>
+                      <td className="td text-right font-mono text-xs">{formatMoney(p.detraccion_fija_empleador)}</td>
+                      <td className="td text-right font-mono text-xs">{formatMoney(p.fateryh_art19bis)}</td>
                       <td className="td text-right whitespace-nowrap">
                         <div className="flex gap-1 justify-end">
                           <button
@@ -158,143 +165,103 @@ export function ParametrosCCTClient({ params, artParams, consorcioCuit, consorci
         </div>
 
         {/* Formulario CCT */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
+        <div className="card p-4 w-72 shrink-0">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-700">
-              {editing ? `Editando registro ${editing.fecha_desde}` : "Nuevo registro"}
+              {editing ? `Editando ${editing.fecha_desde}` : "Nuevo registro"}
             </h3>
             {editing && (
-              <button
-                type="button"
-                onClick={() => setEditing(null)}
-                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                ✕ Cancelar edición
-              </button>
+              <button type="button" onClick={() => setEditing(null)}
+                className="text-xs text-gray-400 hover:text-gray-600">✕</button>
             )}
           </div>
-          <form key={editing?.id ?? "new"} action={agregarParametroCCT} className="space-y-5">
+          <form key={editing?.id ?? "new"} action={agregarParametroCCT} className="space-y-3">
             <div>
               <label className="label">Vigente desde *</label>
-              <input
-                name="fecha_desde"
-                type="date"
-                required
-                className="input"
-                defaultValue={formDefaults?.fecha_desde ?? new Date().toISOString().slice(0, 10)}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Los períodos anteriores a esta fecha siguen usando el valor anterior.
-              </p>
+              <input name="fecha_desde" type="date" required className="input text-sm"
+                defaultValue={formDefaults?.fecha_desde ?? new Date().toISOString().slice(0, 10)} />
             </div>
 
-            <fieldset className="space-y-3">
-              <legend className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Detracción F.931</legend>
+            <fieldset className="space-y-2">
+              <legend className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Detracción F.931</legend>
               <div>
-                <label className="label">Detracción mensual (encargado jornada completa) *</label>
-                <input
-                  name="detraccion_fija_mensual"
-                  type="number"
-                  step="0.01"
-                  required
-                  placeholder="12003.68"
-                  className="input"
-                  defaultValue={formDefaults?.detraccion_fija_mensual}
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Fuente: Resolución General AFIP. Media jornada y suplentes se calculan automáticamente.
-                </p>
+                <label className="label">Mensual (jornada completa)</label>
+                <MaskedInput preset="money" name="detraccion_fija_mensual" required
+                  placeholder="7003.68" className="input text-sm" defaultValue={formDefaults?.detraccion_fija_mensual} />
               </div>
               <div>
-                <label className="label">Detracción fija empleador (contribuciones) *</label>
-                <input
-                  name="detraccion_fija_empleador"
-                  type="number"
-                  step="0.01"
-                  required
-                  placeholder="1800"
-                  className="input"
-                  defaultValue={formDefaults?.detraccion_fija_empleador}
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Se resta una vez del total F.931 por empleador, no por empleado.
-                </p>
+                <label className="label">Fija empleador</label>
+                <MaskedInput preset="money" name="detraccion_fija_empleador" required
+                  placeholder="1800" className="input text-sm" defaultValue={formDefaults?.detraccion_fija_empleador} />
               </div>
             </fieldset>
 
-            <fieldset className="space-y-3">
-              <legend className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Sindicales</legend>
-              <div className="grid grid-cols-3 gap-2">
+            <fieldset className="space-y-2">
+              <legend className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sindicales</legend>
+              <div className="grid grid-cols-3 gap-1">
                 <div>
-                  <label className="label">SUTERH %</label>
-                  <input name="pct_suterh" type="number" step="0.01" required placeholder="4.50" className="input"
-                    defaultValue={formDefaults?.pct_suterh} />
+                  <label className="label">SUT %</label>
+                  <MaskedInput preset="percentage" name="pct_suterh" required placeholder="4.50"
+                    className="input text-sm" defaultValue={formDefaults?.pct_suterh} />
                 </div>
                 <div>
-                  <label className="label">FATERYH %</label>
-                  <input name="pct_fateryh" type="number" step="0.01" required placeholder="6.50" className="input"
-                    defaultValue={formDefaults?.pct_fateryh} />
+                  <label className="label">FAT %</label>
+                  <MaskedInput preset="percentage" name="pct_fateryh" required placeholder="6.50"
+                    className="input text-sm" defaultValue={formDefaults?.pct_fateryh} />
                 </div>
                 <div>
-                  <label className="label">SERACARH %</label>
-                  <input name="pct_seracarh" type="number" step="0.01" required placeholder="0.50" className="input"
-                    defaultValue={formDefaults?.pct_seracarh} />
+                  <label className="label">SER %</label>
+                  <MaskedInput preset="percentage" name="pct_seracarh" required placeholder="0.50"
+                    className="input text-sm" defaultValue={formDefaults?.pct_seracarh} />
                 </div>
               </div>
               <div>
-                <label className="label">FATERYH Art.19bis (monto fijo mensual)</label>
-                <input name="fateryh_art19bis" type="number" step="0.01" required placeholder="48424" className="input"
-                  defaultValue={formDefaults?.fateryh_art19bis} />
-                <p className="text-xs text-gray-400 mt-1">
-                  Aporte fijo mensual por empleado permanente. Se suma al FATERYH % variable.
-                </p>
+                <label className="label">Art.19bis (fijo mensual)</label>
+                <MaskedInput preset="money" name="fateryh_art19bis" required placeholder="145272"
+                  className="input text-sm" defaultValue={formDefaults?.fateryh_art19bis} />
+                <p className="text-[10px] text-gray-400 mt-0.5">Por empleado permanente. ×1.5 en SAC.</p>
               </div>
             </fieldset>
 
-            <fieldset className="space-y-3">
-              <legend className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Seguro</legend>
-              <div>
-                <label className="label">SCVO costo fijo *</label>
-                <input name="sv_costo_fijo" type="number" step="0.01" required placeholder="430.62" className="input"
-                  defaultValue={formDefaults?.sv_costo_fijo} />
-              </div>
+            <fieldset className="space-y-2">
+              <legend className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">SCVO</legend>
+              <MaskedInput preset="money" name="sv_costo_fijo" required placeholder="424.62"
+                className="input text-sm" defaultValue={formDefaults?.sv_costo_fijo} />
             </fieldset>
 
-            <fieldset className="space-y-3">
-              <legend className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">AFIP F.931 alícuotas</legend>
-              <div className="grid grid-cols-2 gap-2">
+            <fieldset className="space-y-2">
+              <legend className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">AFIP F.931</legend>
+              <div className="grid grid-cols-2 gap-1">
                 <div>
-                  <label className="label">Aportes SS %</label>
-                  <input name="pct_aportes_ss" type="number" step="0.01" required placeholder="14.45" className="input"
-                    defaultValue={formDefaults?.pct_aportes_ss} />
+                  <label className="label">Ap. SS %</label>
+                  <MaskedInput preset="percentage" name="pct_aportes_ss" required placeholder="14.00"
+                    className="input text-sm" defaultValue={formDefaults?.pct_aportes_ss} />
                 </div>
                 <div>
-                  <label className="label">Aportes OS %</label>
-                  <input name="pct_aportes_os" type="number" step="0.01" required placeholder="2.55" className="input"
-                    defaultValue={formDefaults?.pct_aportes_os} />
+                  <label className="label">Ap. OS %</label>
+                  <MaskedInput preset="percentage" name="pct_aportes_os" required placeholder="3.00"
+                    className="input text-sm" defaultValue={formDefaults?.pct_aportes_os} />
                 </div>
                 <div>
-                  <label className="label">Contrib. OS %</label>
-                  <input name="pct_contrib_os" type="number" step="0.01" required placeholder="5.10" className="input"
-                    defaultValue={formDefaults?.pct_contrib_os} />
+                  <label className="label">C. OS %</label>
+                  <MaskedInput preset="percentage" name="pct_contrib_os" required placeholder="5.10"
+                    className="input text-sm" defaultValue={formDefaults?.pct_contrib_os} />
                 </div>
                 <div>
-                  <label className="label">Contrib. SS %</label>
-                  <input name="pct_contrib_ss" type="number" step="0.01" required placeholder="18.00" className="input"
-                    defaultValue={formDefaults?.pct_contrib_ss} />
+                  <label className="label">C. SS %</label>
+                  <MaskedInput preset="percentage" name="pct_contrib_ss" required placeholder="18.00"
+                    className="input text-sm" defaultValue={formDefaults?.pct_contrib_ss} />
                 </div>
                 <div>
-                  <label className="label">Contrib. ANSSAL %</label>
-                  <input name="pct_contrib_anssal" type="number" step="0.01" required placeholder="0.90" className="input"
-                    defaultValue={formDefaults?.pct_contrib_anssal} />
+                  <label className="label">ANSSAL %</label>
+                  <MaskedInput preset="percentage" name="pct_contrib_anssal" required placeholder="0.90"
+                    className="input text-sm" defaultValue={formDefaults?.pct_contrib_anssal} />
                 </div>
               </div>
-              <p className="text-xs text-gray-400 mt-1">
-                Ingresá los porcentajes en formato humano (ej. 4.5 significa 4.50%).
-              </p>
+              <p className="text-[10px] text-gray-400">Formato humano (4.5 = 4.50%)</p>
             </fieldset>
 
-            <button type="submit" className="btn-primary w-full justify-center">
+            <button type="submit" className="btn-primary w-full justify-center text-sm">
               {editing ? "Guardar cambios" : "Guardar"}
             </button>
           </form>
@@ -414,12 +381,9 @@ export function ParametrosCCTClient({ params, artParams, consorcioCuit, consorci
                   <div>
                     <label className="label">ART % variable *</label>
                     <div className="relative">
-                      <input
+                      <MaskedInput
+                        preset="percentage"
                         name="art_pct_variable"
-                        type="number"
-                        step="0.0001"
-                        min="0"
-                        max="100"
                         required
                         className="input pr-8"
                         placeholder="7.40"
@@ -431,11 +395,9 @@ export function ParametrosCCTClient({ params, artParams, consorcioCuit, consorci
                   <div>
                     <label className="label">ART costo fijo (por empleado)</label>
                     <div className="relative">
-                      <input
+                      <MaskedInput
+                        preset="money"
                         name="art_costo_fijo"
-                        type="number"
-                        step="0.01"
-                        min="0"
                         className="input pl-6"
                         placeholder="0"
                         defaultValue={artDefaults?.art_costo_fijo}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { query, queryOne } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { createUnidad, createPersonaAndOcupante } from "../actions";
+import { formatCuit, formatPhone } from "@/lib/format";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -62,7 +63,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
             Editar
           </Link>
         </div>
-        <p className="text-gray-500 text-sm">{consorcio.direccion}{consorcio.cuit ? ` · CUIT: ${consorcio.cuit}` : ""}</p>
+        <p className="text-gray-500 text-sm">{consorcio.direccion}{consorcio.cuit ? ` · CUIT: ${formatCuit(consorcio.cuit)}` : ""}</p>
       </div>
 
       {/* Unidades */}
@@ -100,10 +101,10 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                   <td className="td text-right font-mono text-sm">{parseFloat(u.coef_b).toFixed(4)}</td>
                   <td className="td font-medium text-gray-800">{u.propietario_nombre ?? <span className="text-gray-400 italic text-xs font-normal">Sin asignar</span>}</td>
                   <td className="td text-xs text-gray-600 font-mono">{u.propietario_email ?? "—"}</td>
-                  <td className="td text-xs text-gray-600 font-mono">{u.propietario_whatsapp ?? "—"}</td>
+                  <td className="td text-xs text-gray-600 font-mono">{formatPhone(u.propietario_whatsapp)}</td>
                   <td className="td font-medium text-gray-800">{u.inquilino_nombre ?? <span className="text-gray-400 italic text-xs font-normal">Sin asignar</span>}</td>
                   <td className="td text-xs text-gray-600 font-mono">{u.inquilino_email ?? "—"}</td>
-                  <td className="td text-xs text-gray-600 font-mono">{u.inquilino_whatsapp ?? "—"}</td>
+                  <td className="td text-xs text-gray-600 font-mono">{formatPhone(u.inquilino_whatsapp)}</td>
                 </tr>
               ))}
             </tbody>

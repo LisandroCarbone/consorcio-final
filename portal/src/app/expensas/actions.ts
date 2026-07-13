@@ -395,7 +395,8 @@ export async function regenerarGastosFijos(periodoId: number) {
     art    = Math.round(art    * 100) / 100;
     scvo   = Math.round(scvo   * 100) / 100;
     suterh = Math.round(suterh * 100) / 100;
-    fateryh   = Math.round((fateryh + art19bis) * 100) / 100;
+    const art19bisTotal = art19bis * obligLiqs.rows.length * (isSacPeriod ? 1.5 : 1);
+    fateryh   = Math.round((fateryh + art19bisTotal) * 100) / 100;
     seracarh  = Math.round(seracarh  * 100) / 100;
 
     const pText = `${String(prevMes).padStart(2, "0")}/${String(prevAnio).slice(-2)}`;

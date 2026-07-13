@@ -5,6 +5,7 @@ import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { FUNCIONES } from "../../constants";
+import MaskedInput from "@/components/ui/MaskedInput";
 
 async function getEmpleado(cuil: string) {
   const { rows } = await pool.query(
@@ -106,7 +107,7 @@ export default async function EditarEmpleadoPage({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">CUIL *</label>
-              <input name="cuil" required className="input" defaultValue={emp.cuil ?? ''} />
+              <MaskedInput preset="cuit" name="cuil" required className="input" defaultValue={emp.cuil ?? ''} />
             </div>
             <div>
               <label className="label">Legajo</label>
@@ -130,7 +131,7 @@ export default async function EditarEmpleadoPage({
             </div>
             <div>
               <label className="label">WhatsApp (Celular)</label>
-              <input name="whatsapp" className="input" defaultValue={emp.whatsapp ?? ''} placeholder="+54911..." />
+              <MaskedInput preset="phone" name="whatsapp" className="input" defaultValue={emp.whatsapp ?? ''} placeholder="11-1234-5678" />
             </div>
           </div>
         </div>
@@ -203,7 +204,7 @@ export default async function EditarEmpleadoPage({
             </div>
             <div>
               <label className="label">CBU</label>
-              <input name="cbu" className="input" defaultValue={emp.cbu ?? ''} />
+              <MaskedInput preset="cbu" name="cbu" className="input" defaultValue={emp.cbu ?? ''} />
             </div>
           </div>
         </div>
@@ -236,10 +237,9 @@ export default async function EditarEmpleadoPage({
           </div>
           <div className="mt-4">
             <label className="label">Adicional voluntario ($)</label>
-            <input
+            <MaskedInput
+              preset="money"
               name="adicional_voluntario"
-              type="number"
-              step="0.01"
               className="input w-48"
               defaultValue={emp.adicional_voluntario ?? 0}
             />

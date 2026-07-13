@@ -21,7 +21,7 @@ const sueldosSublinks = [
 
 const expensasSublinks = [
   { href: "/expensas", label: "Expensas" },
-  { href: "/configuracion/parametros-cct", label: "Parámetros CCT" },
+  { href: "/configuracion/parametros", label: "Parámetros" },
   { href: "/configuracion/arca", label: "Credenciales ARCA" },
 ];
 
@@ -38,7 +38,7 @@ export function Nav() {
   const [theme, setTheme] = useState<string>("default");
   const inSueldos = pathname.startsWith("/sueldos");
   const [sueldosOpen, setSueldosOpen] = useState(inSueldos);
-  const inExpensas = pathname.startsWith("/expensas") || pathname.startsWith("/configuracion/parametros-cct") || pathname.startsWith("/configuracion/arca");
+  const inExpensas = pathname.startsWith("/expensas") || pathname.startsWith("/configuracion/parametros") || pathname.startsWith("/configuracion/arca");
   const [expensasOpen, setExpensasOpen] = useState(inExpensas);
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/DataTable";
+import { formatCuit } from "@/lib/format";
 
 export interface ConsorcioRow {
   cuit: string;
@@ -40,7 +41,7 @@ const columns: ColumnDef<ConsorcioRow>[] = [
   {
     accessorKey: "cuit",
     header: "CUIT",
-    cell: ({ row }) => <span className="text-gray-400 font-mono text-xs">{row.original.cuit ?? "—"}</span>,
+    cell: ({ row }) => <span className="text-gray-400 font-mono text-xs">{formatCuit(row.original.cuit)}</span>,
   },
   {
     accessorKey: "categoria_edificio",

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { query } from "@/lib/db";
 import { createConsorcio } from "./actions";
 import { ConsorciosTableClient } from "./ConsorciosTableClient";
+import MaskedInput from "@/components/ui/MaskedInput";
 
 interface ConsorcioRow {
   cuit: string;
@@ -74,7 +75,7 @@ export default async function ConsorciosPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">CUIT *</label>
-                  <input name="cuit" required className="input" placeholder="30-12345678-9" />
+                  <MaskedInput preset="cuit" name="cuit" required className="input" />
                 </div>
                 <div>
                   <label className="label">Código Postal</label>

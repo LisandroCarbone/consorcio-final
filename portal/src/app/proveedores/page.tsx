@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { ProveedoresTableClient } from "./ProveedoresTableClient";
 import { NuevoProveedorForm } from "./NuevoProveedorForm";
+import MaskedInput from "@/components/ui/MaskedInput";
 import {
   ClipboardList,
   AlertTriangle,
@@ -184,10 +185,9 @@ export default async function ProveedoresPage({
                                 <input type="hidden" name="ot_id" value={o.id} />
                                 <div className="flex-1">
                                   <label className="label text-xs">Monto Final *</label>
-                                  <input
+                                  <MaskedInput
+                                    preset="money"
                                     name="monto_final"
-                                    type="number"
-                                    step="0.01"
                                     required
                                     defaultValue={o.monto_presupuesto || ""}
                                     placeholder="0.00"
@@ -326,7 +326,7 @@ export default async function ProveedoresPage({
                 </div>
                 <div>
                   <label className="label">Presupuesto</label>
-                  <input name="monto_presupuesto" type="number" step="0.01" className="input" placeholder="$" />
+                  <MaskedInput preset="money" name="monto_presupuesto" className="input" placeholder="$" />
                 </div>
               </div>
               <button type="submit" className="btn-primary w-full justify-center">Crear OT</button>

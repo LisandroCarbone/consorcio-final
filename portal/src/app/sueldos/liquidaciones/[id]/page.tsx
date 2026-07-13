@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { getLiquidacionDetalle } from "../queries";
 import { notFound } from "next/navigation";
 import { PrintButton } from "./PrintButton";
-import { numberToWords } from "@/lib/format";
+import { numberToWords, formatCuit, formatCbu } from "@/lib/format";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -273,7 +273,7 @@ export default async function ReciboPage({
             {/* Left: employer */}
             <div className="p-3 text-xs space-y-0.5">
               <p className="font-bold text-sm text-gray-900">{liq.consorcio_nombre}</p>
-              <p className="text-gray-600">CUIT: {liq.consorcio_cuit}</p>
+              <p className="text-gray-600">CUIT: {formatCuit(liq.consorcio_cuit)}</p>
               {liq.nro_cta_suterh && (
                 <p className="text-gray-600">N° Cuenta SUTERH: {liq.nro_cta_suterh}</p>
               )}
@@ -303,7 +303,7 @@ export default async function ReciboPage({
             </div>
             <div className="p-2">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">CUIL</p>
-              <p className="font-semibold">{liq.cuil}</p>
+              <p className="font-semibold">{formatCuit(liq.cuil)}</p>
             </div>
             <div className="p-2">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Categoría / Función</p>
@@ -481,7 +481,7 @@ export default async function ReciboPage({
                 <p className="mt-1 text-gray-600">
                   Depósito bancario — Banco: <span className="font-medium">{liq.banco ?? "—"}</span>
                   {"  "}CBU:{" "}
-                  <span className="font-mono font-medium tracking-wider">{liq.cbu}</span>
+                  <span className="font-mono font-medium tracking-wider">{formatCbu(liq.cbu)}</span>
                 </p>
               )}
             </div>
@@ -516,7 +516,7 @@ export default async function ReciboPage({
             </div>
             <div className="border-t border-gray-400 pt-2 mt-1 text-xs">
               <p className="font-semibold text-gray-800">{liq.consorcio_nombre}</p>
-              <p className="text-gray-500">CUIT: {liq.consorcio_cuit}</p>
+              <p className="text-gray-500">CUIT: {formatCuit(liq.consorcio_cuit)}</p>
               <p className="text-gray-400 text-[10px] mt-0.5">Firma y Sello del Empleador</p>
               <p className="text-gray-400 text-[10px]">{signingDate}</p>
             </div>
@@ -527,7 +527,7 @@ export default async function ReciboPage({
             <div className="h-12 mb-1" />
             <div className="border-t border-gray-400 pt-2 mt-1 text-xs">
               <p className="font-semibold text-gray-800">{liq.empleado_nombre}</p>
-              <p className="text-gray-500">CUIL: {liq.cuil}</p>
+              <p className="text-gray-500">CUIL: {formatCuit(liq.cuil)}</p>
               <p className="text-gray-400 text-[10px] mt-0.5">Aclaración y Firma del Trabajador</p>
               <p className="text-gray-400 text-[10px]">&nbsp;</p>
             </div>

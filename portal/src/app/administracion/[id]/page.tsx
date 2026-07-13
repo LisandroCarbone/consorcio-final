@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionFeedback } from "@/components/ui/ActionFeedback";
+import MaskedInput from "@/components/ui/MaskedInput";
 import { getAdministrador, createAdministrador, updateAdministrador, type AdministradorRow } from "../actions";
 import { DeleteAdministradorButton } from "../DeleteAdministradorButton";
 
@@ -56,7 +57,7 @@ export default async function AdministradorPage({ params }: Props) {
           </div>
           <div>
             <label className="label">CUIT *</label>
-            <input name="cuit" required defaultValue={admin?.cuit ?? ""} className="input" placeholder="30-12345678-9" />
+            <MaskedInput preset="cuit" name="cuit" required defaultValue={admin?.cuit ?? ""} className="input" placeholder="30-12345678-9" />
           </div>
           <div>
             <label className="label">Matrícula RPA</label>
@@ -74,11 +75,11 @@ export default async function AdministradorPage({ params }: Props) {
           </div>
           <div>
             <label className="label">Teléfono</label>
-            <input name="telefono" defaultValue={admin?.telefono ?? ""} className="input" />
+            <MaskedInput preset="phone" name="telefono" defaultValue={admin?.telefono ?? ""} className="input" />
           </div>
           <div>
             <label className="label">Celular urgencias</label>
-            <input name="celular_urgencias" defaultValue={admin?.celular_urgencias ?? ""} className="input" />
+            <MaskedInput preset="phone" name="celular_urgencias" defaultValue={admin?.celular_urgencias ?? ""} className="input" />
           </div>
           <div>
             <label className="label">Horario de atención</label>
@@ -141,7 +142,7 @@ export default async function AdministradorPage({ params }: Props) {
           </div>
           <div>
             <label className="label">WhatsApp urgencias</label>
-            <input name="whatsapp_urgencias" defaultValue={admin?.whatsapp_urgencias ?? ""} className="input" />
+            <MaskedInput preset="phone" name="whatsapp_urgencias" defaultValue={admin?.whatsapp_urgencias ?? ""} className="input" />
           </div>
           <div>
             <label className="label">Sitio web</label>
