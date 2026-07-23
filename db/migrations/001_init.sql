@@ -340,6 +340,10 @@ CREATE TABLE IF NOT EXISTS app.gastos_periodo (
     liquidacion_id  INTEGER REFERENCES app.liquidaciones_sueldo(id) ON DELETE SET NULL,
     comprobante_url TEXT,
 
+    es_provision    BOOLEAN NOT NULL DEFAULT FALSE,
+    provision_pagada BOOLEAN NOT NULL DEFAULT FALSE,
+    provision_pagada_periodo_id INTEGER REFERENCES app.periodos_expensas(id) ON DELETE SET NULL,
+
     created_at      TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 

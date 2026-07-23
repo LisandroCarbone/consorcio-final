@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { formatMoney } from "@/lib/format";
-import { deleteGasto, updateGasto } from "./actions";
+import { deleteGasto, updateGasto, moverGasto } from "./actions";
+import MaskedInput from "@/components/ui/MaskedInput";
 
 export interface GastoRow {
   id: number;
@@ -10,6 +11,7 @@ export interface GastoRow {
   monto: string | number;
   tipo: string;
   categoria: number;
+  pct_a: number;
   liquidacion_id?: number | null;
   liq_bruto?: string | null;
   liq_descuentos?: string | null;
@@ -132,6 +134,91 @@ interface Props {
   periodoId: number;
 }
 
+function EditGastoRow({ g, periodoId, onCancel }: { g: GastoRow; periodoId: number; onCancel: () => void }) {
+  const initialAperturar = g.tipo !== "Particular" && Number(g.pct_a) > 0 && Number(g.pct_a) < 100;
+  const [tipo, setTipo] = useState(g.tipo);
+  const [aperturar, setAperturar] = useState(initialAperturar);
+  const [pctA, setPctA] = useState(Number(g.pct_a ?? 100));
+
+  const handleTipoChange = (val: string) => {
+    setTipo(val);
+    if (val === "A") setPctA(100);
+    else if (val === "B") setPctA(0);
+    setAperturar(false);
+  };
+
+  return (
+    <tr className="border-b border-gray-100 bg-amber-50">
+      <td className="td" colSpan={4}>
+        <form action={async (formData: FormData) => { await updateGasto(formData); window.location.reload(); }} className="flex flex-wrap gap-2 items-end py-1">
+          <input type="hidden" name="id" value={g.id} />
+          <input type="hidden" name="periodo_id" value={periodoId} />
+          <input type="hidden" name="pct_a" value={aperturar ? pctA : (tipo === "B" ? 0 : 100)} />
+          <div className="flex-1 min-w-48">
+            <label className="label text-xs">Concepto</label>
+            <input name="concepto" defaultValue={g.concepto} required className="input" />
+          </div>
+          <div className="w-36">
+            <label className="label text-xs">Monto</label>
+            <MaskedInput preset="money" name="monto" defaultValue={Number(g.monto)} required className="input" />
+          </div>
+          <div className="w-44">
+            <label className="label text-xs">Categoría</label>
+            <select name="categoria" defaultValue={g.categoria} className="input">
+              {Object.entries(CATEGORIA_LABELS).map(([v, l]) => (
+                <option key={v} value={v}>{v}. {l}</option>
+              ))}
+            </select>
+          </div>
+          <div className="w-36">
+            <label className="label text-xs">Tipo</label>
+            <select name="tipo" value={tipo} onChange={(e) => handleTipoChange(e.target.value)} className="input">
+              <option value="A">Coeficiente A</option>
+              <option value="B">Coeficiente B</option>
+              <option value="Particular">Particular</option>
+            </select>
+          </div>
+          {tipo !== "Particular" && (
+            <div className="flex items-end gap-2">
+              <label className="flex items-center gap-1.5 text-xs text-gray-600 pb-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={aperturar}
+                  onChange={(e) => {
+                    setAperturar(e.target.checked);
+                    if (!e.target.checked) setPctA(tipo === "B" ? 0 : 100);
+                    else setPctA(50);
+                  }}
+                  className="rounded border-gray-300 text-brand-600"
+                />
+                Aperturar A/B
+              </label>
+              {aperturar && (
+                <div className="w-24">
+                  <label className="label text-xs">% Coef A</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    value={pctA}
+                    onChange={(e) => setPctA(Number(e.target.value))}
+                    className="input"
+                  />
+                  <p className="text-xs text-gray-400">({100 - pctA}% Coef B)</p>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex gap-2 self-end">
+            <button type="submit" className="btn-primary text-xs px-3 py-1.5">Guardar</button>
+            <button type="button" onClick={onCancel} className="btn-secondary text-xs px-3 py-1.5">Cancelar</button>
+          </div>
+        </form>
+      </td>
+    </tr>
+  );
+}
+
 export function ExpensasTableClient({ gastos, periodoId }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -149,12 +236,12 @@ export function ExpensasTableClient({ gastos, periodoId }: Props) {
     if (!grouped.has(g.categoria)) grouped.set(g.categoria, []);
     grouped.get(g.categoria)!.push(g);
   }
-  const sortedCategories = Array.from(grouped.keys()).sort((a, b) => a - b);
+  const allCategories = Object.keys(CATEGORIA_LABELS).map(Number).sort((a, b) => a - b);
 
   return (
     <div>
-      {sortedCategories.map((cat) => {
-        const rows = grouped.get(cat)!;
+      {allCategories.map((cat) => {
+        const rows = grouped.get(cat) ?? [];
         const subtotal = rows.reduce((sum, r) => sum + Number(r.monto), 0);
         const colorClass = CATEGORIA_COLORS[cat] ?? "bg-gray-50 border-gray-200 text-gray-700";
 
@@ -173,42 +260,7 @@ export function ExpensasTableClient({ gastos, periodoId }: Props) {
               <tbody>
                 {rows.map((g) =>
                   editingId === g.id ? (
-                    <tr key={g.id} className="border-b border-gray-100 bg-amber-50">
-                      <td className="td" colSpan={4}>
-                        <form action={updateGasto} className="flex flex-wrap gap-2 items-end py-1">
-                          <input type="hidden" name="id" value={g.id} />
-                          <input type="hidden" name="periodo_id" value={periodoId} />
-                          <div className="flex-1 min-w-48">
-                            <label className="label text-xs">Concepto</label>
-                            <input name="concepto" defaultValue={g.concepto} required className="input" />
-                          </div>
-                          <div className="w-32">
-                            <label className="label text-xs">Monto</label>
-                            <input name="monto" type="number" step="0.01" defaultValue={Number(g.monto)} required className="input" />
-                          </div>
-                          <div className="w-44">
-                            <label className="label text-xs">Categoría</label>
-                            <select name="categoria" defaultValue={g.categoria} className="input">
-                              {Object.entries(CATEGORIA_LABELS).map(([v, l]) => (
-                                <option key={v} value={v}>{v}. {l}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="w-36">
-                            <label className="label text-xs">Tipo</label>
-                            <select name="tipo" defaultValue={g.tipo} className="input">
-                              <option value="A">Coeficiente A</option>
-                              <option value="B">Coeficiente B</option>
-                              <option value="Particular">Particular</option>
-                            </select>
-                          </div>
-                          <div className="flex gap-2 self-end">
-                            <button type="submit" className="btn-primary text-xs px-3 py-1.5">Guardar</button>
-                            <button type="button" onClick={() => setEditingId(null)} className="btn-secondary text-xs px-3 py-1.5">Cancelar</button>
-                          </div>
-                        </form>
-                      </td>
-                    </tr>
+                    <EditGastoRow key={g.id} g={g} periodoId={periodoId} onCancel={() => setEditingId(null)} />
                   ) : (
                     <tr key={g.id} className="group border-b border-gray-100 last:border-b-0 hover:bg-gray-50/60 transition-colors">
                       <td className="px-5 py-2.5">
@@ -218,19 +270,52 @@ export function ExpensasTableClient({ gastos, periodoId }: Props) {
                         )}
                       </td>
                       <td className="px-3 py-2.5 w-24 shrink-0">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          g.tipo === "A" ? "bg-blue-100 text-blue-700" :
-                          g.tipo === "B" ? "bg-purple-100 text-purple-700" :
-                          "bg-green-100 text-green-700"
-                        }`}>
-                          {g.tipo === "A" ? "Coef A" : g.tipo === "B" ? "Coef B" : g.tipo}
-                        </span>
+                        {(() => {
+                          const pctA = Number(g.pct_a ?? 100);
+                          if (g.tipo === "Particular") {
+                            return (
+                              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
+                                {g.tipo}
+                              </span>
+                            );
+                          }
+                          if (pctA > 0 && pctA < 100) {
+                            return (
+                              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-teal-100 text-teal-700">
+                                {`${pctA}%A / ${100 - pctA}%B`}
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              pctA === 100 ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                            }`}>
+                              {pctA === 100 ? "Coef A" : "Coef B"}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-3 py-2.5 text-right w-36 font-mono font-semibold text-gray-900 text-sm whitespace-nowrap">
                         {formatMoney(g.monto)}
                       </td>
-                      <td className="px-3 py-2.5 w-16">
-                        <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                      <td className="px-3 py-2.5 w-28">
+                        <div className="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={async () => { await moverGasto(g.id, "up"); window.location.reload(); }}
+                            className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors text-xs"
+                            title="Mover arriba"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => { await moverGasto(g.id, "down"); window.location.reload(); }}
+                            className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors text-xs"
+                            title="Mover abajo"
+                          >
+                            ▼
+                          </button>
                           <button
                             type="button"
                             onClick={() => setEditingId(g.id)}
@@ -239,7 +324,7 @@ export function ExpensasTableClient({ gastos, periodoId }: Props) {
                           >
                             ✏️
                           </button>
-                          <form action={deleteGasto.bind(null, g.id, periodoId)} onSubmit={(e) => { if (!confirm("¿Eliminar este gasto?")) e.preventDefault(); }}>
+                          <form action={async () => { await deleteGasto(g.id, periodoId); window.location.reload(); }} onSubmit={(e) => { if (!confirm("¿Eliminar este gasto?")) e.preventDefault(); }}>
                             <button
                               type="submit"
                               className="p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors"

@@ -101,7 +101,11 @@ const MaskedInput = forwardRef<HTMLInputElement, Props>(function MaskedInput(
       <input
         type="hidden"
         name={name}
-        defaultValue={defaultValue != null ? stripMask(String(defaultValue), preset) : ""}
+        defaultValue={defaultValue != null
+          ? (preset === "money" || preset === "percentage")
+            ? String(Number(defaultValue) || 0)
+            : stripMask(String(defaultValue), preset)
+          : ""}
       />
       <IMaskInput
         {...(config as Record<string, unknown>)}

@@ -8,25 +8,40 @@ import { CuentaCorrienteTableClient, CuentaCorrienteRow } from "./CuentaCorrient
 import CobrosChartClient from "./CobrosChartClient";
 import { Landmark } from "lucide-react";
 
-async function getCuentaCorriente(consorcioCuit: string): Promise<CuentaCorrienteRow[]> {
+async function getCuentaCorriente(
+  consorcioCuit: string,
+  anio: number,
+  mes: number
+): Promise<CuentaCorrienteRow[]> {
   return query<CuentaCorrienteRow>(
     `SELECT
        u.id AS unidad_id,
        u.uf::text AS unidad_numero,
        NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '') AS propietario,
-       COALESCE((SELECT SUM(total_pagar) FROM app.res_cuenta_periodo WHERE unidad_id=u.id), 0)::text            AS total_expensas,
-       COALESCE((SELECT SUM(monto) FROM app.pagos WHERE unidad_id=u.id), 0)::text                               AS total_pagado,
-       COALESCE((SELECT COUNT(*) FROM app.pagos WHERE unidad_id=u.id), 0)::int                                  AS total_pagado_count,
-       COALESCE((SELECT SUM(total_pagar) FROM app.res_cuenta_periodo WHERE unidad_id=u.id AND estado='pendiente'), 0)::text AS saldo,
-       (SELECT MAX(fecha)::text FROM app.pagos WHERE unidad_id=u.id)                                            AS ultimo_pago,
-       (SELECT id FROM app.res_cuenta_periodo WHERE unidad_id=u.id AND estado='pendiente' ORDER BY id LIMIT 1)  AS expensa_pendiente_id,
-       (SELECT total_pagar::text FROM app.res_cuenta_periodo WHERE unidad_id=u.id AND estado='pendiente' ORDER BY id LIMIT 1) AS expensa_pendiente_monto
+       COALESCE(rcp.saldo_anterior, 0)::numeric AS saldo_anterior,
+       COALESCE(rcp.su_pago, 0)::numeric AS su_pago,
+       COALESCE(rcp.coef_a, 0)::numeric AS coef_a,
+       COALESCE(rcp.expensas_a, 0)::numeric AS expensas_a,
+       COALESCE(rcp.coef_b, 0)::numeric AS coef_b,
+       COALESCE(rcp.expensas_b, 0)::numeric AS expensas_b,
+       COALESCE(rcp.total_mes, 0)::numeric AS total_mes,
+       COALESCE(rcp.deuda, 0)::numeric AS deuda,
+       COALESCE(rcp.intereses, 0)::numeric AS intereses,
+       COALESCE(rcp.total_pagar, 0)::numeric AS total_pagar,
+       rcp.estado,
+       COALESCE((SELECT SUM(monto) FROM app.pagos WHERE unidad_id=u.id), 0)::text AS total_pagado,
+       COALESCE((SELECT COUNT(*) FROM app.pagos WHERE unidad_id=u.id), 0)::int AS total_pagado_count,
+       (SELECT MAX(fecha)::text FROM app.pagos WHERE unidad_id=u.id) AS ultimo_pago,
+       rcp.id AS expensa_pendiente_id,
+       rcp.total_pagar::text AS expensa_pendiente_monto
      FROM app.unidades u
      LEFT JOIN app.ocupantes o ON o.unidad_id = u.id AND o.activo = true AND o.rol = 'propietario'
      LEFT JOIN app.personas  p ON p.id = o.persona_id
+     LEFT JOIN app.periodos_expensas pe ON pe.consorcio_cuit = u.consorcio_cuit AND pe.anio = $2 AND pe.mes = $3
+     LEFT JOIN app.res_cuenta_periodo rcp ON rcp.unidad_id = u.id AND rcp.periodo_id = pe.id
      WHERE u.consorcio_cuit = $1
      ORDER BY u.uf`,
-    [consorcioCuit]
+    [consorcioCuit, anio, mes]
   );
 }
 
@@ -64,12 +79,16 @@ export default async function CuentaCorrientePage({
 
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+  const activePeriodo = cookieStore.get("active_periodo")?.value || "";
+  const [anio, mes] = activePeriodo
+    ? activePeriodo.split("-").map(Number)
+    : [new Date().getFullYear(), new Date().getMonth() + 1];
 
   const [consorcios, rows, cobrosTrend] = await Promise.all([
     query<{ cuit: string; nombre: string }>(
       "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
     ),
-    activeCuit ? getCuentaCorriente(activeCuit) : Promise.resolve([] as CuentaCorrienteRow[]),
+    activeCuit ? getCuentaCorriente(activeCuit, anio, mes) : Promise.resolve([] as CuentaCorrienteRow[]),
     activeCuit ? getCobrosTrend(activeCuit) : Promise.resolve([])
   ]);
 
@@ -85,9 +104,9 @@ export default async function CuentaCorrientePage({
   const selectedCuit = activeCuit;
   const selectedConsorcio = consorcios.find((c) => c.cuit === selectedCuit);
 
-  const totalDeuda = rows.reduce((s, r) => s + Number(r.saldo), 0);
+  const totalDeuda = rows.reduce((s, r) => s + (Number(r.total_pagar) > 0 ? Number(r.total_pagar) : 0), 0);
   const totalPagado = rows.reduce((s, r) => s + Number(r.total_pagado), 0);
-  const unidadesDeudoras = rows.filter((r) => Number(r.saldo) > 0).length;
+  const unidadesDeudoras = rows.filter((r) => Number(r.total_pagar) > 0).length;
 
   // Query details if modals are active
   let historyUnitDetails: { uf: string; propietario: string }[] = [];
@@ -157,7 +176,7 @@ export default async function CuentaCorrientePage({
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Cuenta Corriente</h2>
         <p className="text-gray-500 text-sm mt-1">
-          Saldo por unidad · pagos registrados — <strong>{selectedConsorcio?.nombre}</strong>
+          Saldo por unidad · cobranzas registradas — <strong>{selectedConsorcio?.nombre}</strong>
         </p>
       </div>
 
@@ -168,15 +187,15 @@ export default async function CuentaCorrientePage({
           {selectedCuit && (
             <div className="grid grid-cols-3 gap-4">
               <div className="card p-4 text-center">
-                <p className="text-xs text-gray-500 mb-1">Deuda total</p>
+                <p className="text-xs text-gray-500 mb-1">Crédito a cobrar</p>
                 <p className="text-xl font-bold text-red-600">{formatMoney(totalDeuda)}</p>
               </div>
               <div className="card p-4 text-center">
-                <p className="text-xs text-gray-500 mb-1">Cobrado histórico</p>
+                <p className="text-xs text-gray-500 mb-1">Cobranzas históricas</p>
                 <p className="text-xl font-bold text-green-600">{formatMoney(totalPagado)}</p>
               </div>
               <div className="card p-4 text-center">
-                <p className="text-xs text-gray-500 mb-1">Unidades con deuda</p>
+                <p className="text-xs text-gray-500 mb-1">Unidades con saldo pendiente</p>
                 <p className="text-xl font-bold text-gray-800">{unidadesDeudoras} / {rows.length}</p>
               </div>
             </div>
@@ -289,7 +308,7 @@ export default async function CuentaCorrientePage({
 
               <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col min-h-0">
                 <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <span>💰</span> Pagos Realizados
+                  <span>💰</span> Cobranzas Realizadas
                 </h4>
                 <div className="overflow-x-auto flex-1 max-h-[50vh]">
                   <table className="w-full text-xs text-left">
@@ -320,7 +339,7 @@ export default async function CuentaCorrientePage({
                       {pagos.length === 0 && (
                         <tr>
                           <td colSpan={4} className="py-4 text-center text-gray-400">
-                            No hay pagos registrados.
+                            No hay cobranzas registradas.
                           </td>
                         </tr>
                       )}

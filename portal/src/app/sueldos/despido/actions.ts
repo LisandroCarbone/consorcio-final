@@ -2,7 +2,6 @@
 
 import { liquidarIndemnizacion } from "@/lib/liquidacion/engine";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 export async function accionLiquidarDespido(formData: FormData) {
   const empleadoCuil = String(formData.get("empleado_cuil") || formData.get("empleado_id") || "");
@@ -15,5 +14,4 @@ export async function accionLiquidarDespido(formData: FormData) {
 
   await liquidarIndemnizacion(empleadoCuil, fechaEgreso, tipoEgreso);
   revalidatePath("/sueldos/despido");
-  redirect(`/sueldos/despido?empleado_cuil=${empleadoCuil}&fecha_egreso=${fechaEgreso}&tipo_egreso=${tipoEgreso}&liquidado=1`);
 }

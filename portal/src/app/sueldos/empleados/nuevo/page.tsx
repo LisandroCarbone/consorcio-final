@@ -1,18 +1,18 @@
 export const dynamic = 'force-dynamic';
 
 import { pool } from "@/lib/db";
-import { redirect } from "next/navigation";
 import { FUNCIONES } from "../constants";
 import MaskedInput from "@/components/ui/MaskedInput";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { EmpleadoFormClient } from "../EmpleadoFormClient";
 
 async function getConsorcios() {
   const { rows } = await pool.query("SELECT cuit, nombre FROM app.consorcios ORDER BY nombre");
   return rows;
 }
 
-async function crearEmpleado(formData: FormData) {
+async function crearEmpleado(formData: FormData): Promise<{ error?: string }> {
   'use server';
   const get = (k: string) => formData.get(k) as string | null;
   const bool = (k: string) => formData.get(k) === 'true';
@@ -50,12 +50,12 @@ async function crearEmpleado(formData: FormData) {
   } catch (err: unknown) {
     const pg = err as { code?: string };
     if (pg.code === '23505') {
-      redirect('/sueldos/empleados/nuevo?error=cuil_duplicado');
+      return { error: 'cuil_duplicado' };
     }
     throw err;
   }
   revalidatePath('/sueldos');
-  redirect('/sueldos');
+  return {};
 }
 
 export default async function NuevoEmpleadoPage({
@@ -86,7 +86,7 @@ export default async function NuevoEmpleadoPage({
         </div>
       )}
 
-      <form action={crearEmpleado} className="space-y-6">
+      <EmpleadoFormClient action={crearEmpleado} successHref="/sueldos" className="space-y-6">
 
         {/* Identificación */}
         <div className="card p-5">
@@ -233,7 +233,7 @@ export default async function NuevoEmpleadoPage({
           <a href="/sueldos" className="btn-secondary">Cancelar</a>
           <button type="submit" className="btn-primary">Guardar empleado</button>
         </div>
-      </form>
+      </EmpleadoFormClient>
     </div>
   );
 }

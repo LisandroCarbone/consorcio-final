@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { addGasto, buscarGastosSimilares } from "./actions";
 import { formatMoney } from "@/lib/format";
+import MaskedInput from "@/components/ui/MaskedInput";
 import { CATEGORIA_LABELS } from "./ExpensasTableClient";
 
 type UF = { id: number; uf: number };
-type Suggestion = { descripcion: string; monto: string; categoria: number; tipo: string };
+type Suggestion = { descripcion: string; monto: string; categoria: number; tipo: string; pct_a?: number };
 
 export function AddGastoForm({
   periodoId,
@@ -17,10 +17,11 @@ export function AddGastoForm({
   unidades: UF[];
 }) {
   const [tipo, setTipo] = useState<"A" | "B" | "Particular">("A");
+  const [aperturar, setAperturar] = useState(false);
+  const [pctA, setPctA] = useState(100);
   const [ufsSel, setUfsSel] = useState<number[]>([]);
   const [showUfDropdown, setShowUfDropdown] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
   // Controlled fields for autocomplete fill
   const [concepto, setConcepto] = useState("");
@@ -60,6 +61,14 @@ export function AddGastoForm({
     if (tipoSelectRef.current) {
       setTipo(s.tipo as "A" | "B" | "Particular");
     }
+    const sPctA = s.pct_a != null ? Number(s.pct_a) : (s.tipo === "B" ? 0 : 100);
+    if (s.tipo !== "Particular" && sPctA > 0 && sPctA < 100) {
+      setAperturar(true);
+      setPctA(sPctA);
+    } else {
+      setAperturar(false);
+      setPctA(100);
+    }
     setSuggestions([]);
     setShowSuggestions(false);
   };
@@ -80,6 +89,8 @@ export function AddGastoForm({
     setMonto("");
     setCategoria("10");
     setTipo("A");
+    setAperturar(false);
+    setPctA(100);
     setUfsSel([]);
     setSuggestions([]);
   };
@@ -98,13 +109,14 @@ export function AddGastoForm({
           sfd.set("target_uf", String(u.uf));
           sfd.set("categoria", categoria);
           sfd.set("cuotas", fd.get("cuotas") as string);
+          sfd.set("pct_a", String(aperturar ? pctA : 0));
           await addGasto(sfd);
         }
       } else {
         await addGasto(fd);
       }
       resetForm();
-      router.refresh();
+      window.location.reload();
     });
   };
 
@@ -115,6 +127,7 @@ export function AddGastoForm({
     >
       <input type="hidden" name="periodo_id" value={periodoId} />
       <input type="hidden" name="tipo" value={tipo} />
+      <input type="hidden" name="pct_a" value={aperturar ? pctA : (tipo === "B" ? 0 : 100)} />
       {tipo === "Particular" && particularUf && (
         <input type="hidden" name="target_uf" value={particularUf.uf} />
       )}
@@ -180,18 +193,16 @@ export function AddGastoForm({
         )}
       </div>
 
-      <div className="w-28">
+      <div className="w-36">
         <label className="label text-xs">Monto total</label>
-        <input
+        <MaskedInput
+          key={monto}
+          preset="money"
           name="monto"
-          type="number"
-          step="0.01"
           required
-          placeholder="0.00"
+          placeholder="Ej: 300.000"
           className="input"
-          value={monto}
-          onChange={(e) => setMonto(e.target.value)}
-          disabled={isPending}
+          defaultValue={monto ? Number(monto) : ""}
         />
       </div>
 
@@ -216,8 +227,11 @@ export function AddGastoForm({
           className="input"
           value={tipo}
           onChange={(e) => {
-            setTipo(e.target.value as "A" | "B" | "Particular");
+            const v = e.target.value as "A" | "B" | "Particular";
+            setTipo(v);
             setUfsSel([]);
+            setAperturar(false);
+            setPctA(v === "B" ? 0 : 100);
           }}
           disabled={isPending}
         >
@@ -226,6 +240,39 @@ export function AddGastoForm({
           <option value="Particular">Particular</option>
         </select>
       </div>
+
+      {tipo !== "Particular" && (
+        <div className="flex items-end gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-gray-600 pb-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={aperturar}
+              onChange={(e) => {
+                setAperturar(e.target.checked);
+                setPctA(e.target.checked ? 50 : (tipo === "B" ? 0 : 100));
+              }}
+              disabled={isPending}
+              className="rounded border-gray-300 text-brand-600"
+            />
+            Aperturar A/B
+          </label>
+          {aperturar && (
+            <div className="w-24">
+              <label className="label text-xs">% Coef A</label>
+              <input
+                type="number"
+                min="1"
+                max="99"
+                value={pctA}
+                onChange={(e) => setPctA(Number(e.target.value))}
+                className="input"
+                disabled={isPending}
+              />
+              <p className="text-xs text-gray-400">({100 - pctA}% Coef B)</p>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="min-w-40">
         <label className="label text-xs">

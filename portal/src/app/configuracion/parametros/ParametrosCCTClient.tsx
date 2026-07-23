@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { formatMoney } from "@/lib/format";
 import MaskedInput from "@/components/ui/MaskedInput";
-import { agregarParametroCCT, eliminarParametroCCT, agregarParametroART, eliminarParametroART } from "./actions";
+import { agregarParametroCCT, eliminarParametroCCT, agregarParametroART, eliminarParametroART, guardarSCVORenovacion } from "./actions";
+
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
 
 export type ParametroCCTRow = {
   id: number;
@@ -44,9 +49,18 @@ type Props = {
   artParams: ARTRow[];
   consorcioCuit: string;
   consorcioNombre: string;
+  scvoRenovacionMes: number | null;
+  scvoRenovacionMonto: string;
 };
 
-export function ParametrosCCTClient({ params, artParams, consorcioCuit, consorcioNombre }: Props) {
+export function ParametrosCCTClient({
+  params,
+  artParams,
+  consorcioCuit,
+  consorcioNombre,
+  scvoRenovacionMes,
+  scvoRenovacionMonto,
+}: Props) {
   const [editing, setEditing] = useState<ParametroCCTRow | null>(null);
   const [editingART, setEditingART] = useState<ARTRow | null>(null);
 
@@ -175,7 +189,15 @@ export function ParametrosCCTClient({ params, artParams, consorcioCuit, consorci
                 className="text-xs text-gray-400 hover:text-gray-600">✕</button>
             )}
           </div>
-          <form key={editing?.id ?? "new"} action={agregarParametroCCT} className="space-y-3">
+          <form
+            key={editing?.id ?? "new"}
+            onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              agregarParametroCCT(fd).then(() => window.location.reload());
+            }}
+            className="space-y-3"
+          >
             <div>
               <label className="label">Vigente desde *</label>
               <input name="fecha_desde" type="date" required className="input text-sm"
@@ -365,7 +387,15 @@ export function ParametrosCCTClient({ params, artParams, consorcioCuit, consorci
                   </button>
                 )}
               </div>
-              <form key={`art-${editingART?.id ?? "new"}`} action={agregarParametroART} className="space-y-4">
+              <form
+                key={`art-${editingART?.id ?? "new"}`}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  agregarParametroART(fd).then(() => window.location.reload());
+                }}
+                className="space-y-4"
+              >
                 <input type="hidden" name="consorcio_cuit" value={consorcioCuit} />
                 <div>
                   <label className="label">Vigente desde *</label>
@@ -412,6 +442,77 @@ export function ParametrosCCTClient({ params, artParams, consorcioCuit, consorci
                 </button>
               </form>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* SCVO Renovación anual */}
+      <div className="mt-8">
+        <div className="mb-4">
+          <h3 className="text-lg font-bold text-gray-900">SCVO Renovación anual</h3>
+          {consorcioCuit ? (
+            <p className="text-sm text-gray-500 mt-1">
+              Renovación anual del Seguro Colectivo de Vida Obligatorio de{" "}
+              <span className="font-semibold text-gray-700">{consorcioNombre}</span>.
+            </p>
+          ) : (
+            <p className="text-sm text-amber-600 mt-1">
+              Seleccioná un consorcio desde el selector global para configurar su renovación de SCVO.
+            </p>
+          )}
+        </div>
+
+        {consorcioCuit && (
+          <div className="card p-5 w-full lg:w-1/2">
+            {scvoRenovacionMes && (
+              <p className="text-xs text-gray-500 mb-3">
+                Actual: renueva en <span className="font-semibold text-gray-700">{MESES[scvoRenovacionMes - 1]}</span> por{" "}
+                <span className="font-semibold text-gray-700">{formatMoney(scvoRenovacionMonto)}</span>
+              </p>
+            )}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                guardarSCVORenovacion(fd).then(() => window.location.reload());
+              }}
+              className="space-y-4"
+            >
+              <input type="hidden" name="consorcio_cuit" value={consorcioCuit} />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Mes de renovación *</label>
+                  <select
+                    name="scvo_renovacion_mes"
+                    required
+                    className="input"
+                    defaultValue={scvoRenovacionMes ?? ""}
+                  >
+                    <option value="" disabled>
+                      Seleccioná un mes
+                    </option>
+                    {MESES.map((mes, i) => (
+                      <option key={mes} value={i + 1}>
+                        {mes}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Monto anual</label>
+                  <MaskedInput
+                    preset="money"
+                    name="scvo_renovacion_monto"
+                    className="input"
+                    placeholder="0"
+                    defaultValue={Number(scvoRenovacionMonto).toString()}
+                  />
+                </div>
+              </div>
+              <button type="submit" className="btn-primary w-full justify-center">
+                Guardar
+              </button>
+            </form>
           </div>
         )}
       </div>

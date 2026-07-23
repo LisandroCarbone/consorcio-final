@@ -1,7 +1,7 @@
 import { getEmpleados } from "../actions";
 import { calcularSACPreview, SACPreview } from "@/lib/liquidacion/engine";
 import { formatMoney, formatEmpleadoOption } from "@/lib/format";
-import { accionLiquidarSAC } from "./actions";
+import { ConfirmarSACButton } from "./ConfirmarSACButton";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { pool } from "@/lib/db";
@@ -189,14 +189,7 @@ export default async function SACPage({
           </div>
 
           <div className="flex gap-3 items-center">
-            <form action={accionLiquidarSAC}>
-              <input type="hidden" name="empleado_cuil" value={empleadoCuil!} />
-              <input type="hidden" name="anio" value={anio} />
-              <input type="hidden" name="semestre" value={semestre} />
-              <button type="submit" className="btn-primary">
-                Confirmar y guardar liquidación SAC
-              </button>
-            </form>
+            <ConfirmarSACButton empleadoCuil={empleadoCuil!} anio={anio} semestre={semestre} />
             <a
               href={`/sueldos/liquidaciones?periodo=${anio}-${semestre === 1 ? "06" : "12"}-01&tipo=sac_${semestre}`}
               className="btn-secondary text-sm"

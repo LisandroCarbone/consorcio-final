@@ -2,10 +2,10 @@ export const dynamic = "force-dynamic";
 
 import { queryOne } from "@/lib/db";
 import { notFound } from "next/navigation";
-import { updateConsorcio } from "../../actions";
 import { Suspense } from "react";
 import { ActionFeedback } from "@/components/ui/ActionFeedback";
 import MaskedInput from "@/components/ui/MaskedInput";
+import { SaveButton } from "./SaveButton";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -25,6 +25,10 @@ export default async function EditarConsorcioPage({ params }: Props) {
     tiene_compactador: boolean; tiene_montacargas: boolean;
     tiene_otros_servicios_centrales: boolean;
     interest_rate: string | null;
+    tipo_expensas: string;
+    formato_cobro: string;
+    monto_fijo_default: string | null;
+    pct_expensa_a: string;
   }>("SELECT * FROM app.consorcios WHERE cuit = $1", [id]);
 
   if (!c) notFound();
@@ -61,7 +65,7 @@ export default async function EditarConsorcioPage({ params }: Props) {
         <h2 className="text-2xl font-bold text-gray-900">Editar consorcio</h2>
       </div>
 
-      <form action={updateConsorcio} className="card p-6 space-y-5">
+      <form className="card p-6 space-y-5">
         <input type="hidden" name="cuit" value={c.cuit} />
 
         <div className="grid grid-cols-2 gap-4">
@@ -120,6 +124,53 @@ export default async function EditarConsorcioPage({ params }: Props) {
             />
             <p className="text-xs text-gray-400 mt-0.5">Porcentaje mensual definido en asamblea</p>
           </div>
+          <div className="col-span-2">
+            <label className="label">Tipo de expensas</label>
+            <select name="tipo_expensas" defaultValue={c.tipo_expensas ?? "variable"} className="input">
+              <option value="variable">Variable</option>
+              <option value="fija">Fija</option>
+            </select>
+            <p className="text-xs text-gray-400 mt-0.5">Fija: monto mensual definido en asamblea, prorrateado por coeficiente</p>
+          </div>
+
+          <div className="col-span-2">
+            <label className="label">Formato de cobro</label>
+            <select name="formato_cobro" defaultValue={c.formato_cobro ?? "exacto"} className="input">
+              <option value="exacto">Monto exacto</option>
+              <option value="identificacion_uf">Identificación por UF (centavos = N° UF)</option>
+            </select>
+            <p className="text-xs text-gray-400 mt-0.5">Identificación por UF: los centavos del total a pagar se reemplazan por el N° de UF para facilitar la identificación de pagos</p>
+          </div>
+
+          {c.tipo_expensas === "fija" && (
+            <>
+              <div>
+                <label className="label">Monto fijo mensual default</label>
+                <MaskedInput
+                  name="monto_fijo_default"
+                  defaultValue={c.monto_fijo_default ? Number(c.monto_fijo_default) : ""}
+                  placeholder="0,00"
+                  preset="money"
+                />
+                <p className="text-xs text-gray-400 mt-0.5">Se usa como valor inicial al crear un nuevo período</p>
+              </div>
+              <div>
+                <label className="label">% Coeficiente A</label>
+                <input
+                  name="pct_expensa_a"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  defaultValue={c.pct_expensa_a ? (Number(c.pct_expensa_a) * 100).toFixed(2) : "100"}
+                  className="input"
+                />
+                <p className="text-xs text-gray-400 mt-0.5">
+                  El resto ({c.pct_expensa_a ? (100 - Number(c.pct_expensa_a) * 100).toFixed(2) : "0"}%) se asigna a Coef. B
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="border-t pt-4">
@@ -148,7 +199,7 @@ export default async function EditarConsorcioPage({ params }: Props) {
 
         <div className="flex justify-between items-center border-t pt-4">
           <a href={`/consorcios/${id}`} className="btn-secondary">Cancelar</a>
-          <button type="submit" className="btn-primary">Guardar cambios</button>
+          <SaveButton cuit={c.cuit} />
         </div>
       </form>
     </div>

@@ -1,7 +1,7 @@
 import { getEmpleados } from "../actions";
 import { calcularIndemnizacionPreview, IndemnizacionPreview } from "@/lib/liquidacion/engine";
 import { formatMoney, formatEmpleadoOption } from "@/lib/format";
-import { accionLiquidarDespido } from "./actions";
+import { ConfirmarDespidoButton } from "./ConfirmarDespidoButton";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { pool } from "@/lib/db";
@@ -195,14 +195,11 @@ export default async function DespidoPage({
             <strong>Atención:</strong> Al confirmar, el empleado será marcado como <strong>inactivo</strong> con fecha de egreso {fechaEgreso}.
           </div>
 
-          <form action={accionLiquidarDespido}>
-            <input type="hidden" name="empleado_cuil" value={empleadoCuil!} />
-            <input type="hidden" name="fecha_egreso" value={fechaEgreso} />
-            <input type="hidden" name="tipo_egreso" value={tipoEgreso} />
-            <button type="submit" className="btn-primary">
-              Confirmar liquidación por egreso
-            </button>
-          </form>
+          <ConfirmarDespidoButton
+            empleadoCuil={empleadoCuil!}
+            fechaEgreso={fechaEgreso}
+            tipoEgreso={tipoEgreso}
+          />
         </>
       )}
     </div>

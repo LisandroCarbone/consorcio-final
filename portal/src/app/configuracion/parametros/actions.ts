@@ -2,7 +2,6 @@
 
 import { query } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 // Converts a human-entered percentage (e.g. "4.5") into a decimal fraction (0.045)
 function pctToDecimal(formData: FormData, field: string): number {
@@ -65,7 +64,6 @@ export async function agregarParametroCCT(formData: FormData) {
   );
 
   revalidatePath("/configuracion/parametros");
-  redirect("/configuracion/parametros");
 }
 
 export async function eliminarParametroCCT(id: number) {
@@ -93,10 +91,28 @@ export async function agregarParametroART(formData: FormData) {
   );
 
   revalidatePath("/configuracion/parametros");
-  redirect("/configuracion/parametros");
 }
 
 export async function eliminarParametroART(id: number) {
   await query("DELETE FROM app.parametros_art_consorcio WHERE id = $1", [id]);
+  revalidatePath("/configuracion/parametros");
+}
+
+export async function guardarSCVORenovacion(formData: FormData) {
+  const consorcio_cuit = formData.get("consorcio_cuit") as string;
+  const sv_renueva_mes = Number(formData.get("scvo_renovacion_mes"));
+  const sv_costo_emision = Number(formData.get("scvo_renovacion_monto") || 0);
+
+  if (!consorcio_cuit || isNaN(sv_renueva_mes) || sv_renueva_mes < 1 || sv_renueva_mes > 12) {
+    throw new Error("Datos inválidos");
+  }
+
+  await query(
+    `UPDATE app.consorcios
+     SET sv_renueva_mes = $2, sv_costo_emision = $3
+     WHERE cuit = $1`,
+    [consorcio_cuit, sv_renueva_mes, sv_costo_emision]
+  );
+
   revalidatePath("/configuracion/parametros");
 }

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "portal",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "echo already-running"],
+      "port": 3010,
+      "url": "http://localhost:3010"
+    }
+  ]
+}

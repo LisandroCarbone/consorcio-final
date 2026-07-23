@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { updatePeriodoVencimiento, deletePeriodo } from "./actions";
 
 interface Props {
@@ -14,13 +13,12 @@ export function PeriodoActionsMenu({ periodoId, fechaVencimiento, estado }: Prop
   const [editingVenc, setEditingVenc] = useState(false);
   const [vencValue, setVencValue] = useState(fechaVencimiento?.slice(0, 10) ?? "");
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
   const handleSaveVenc = () => {
     startTransition(async () => {
       await updatePeriodoVencimiento(periodoId, vencValue || null);
       setEditingVenc(false);
-      router.refresh();
+      window.location.reload();
     });
   };
 
@@ -28,7 +26,7 @@ export function PeriodoActionsMenu({ periodoId, fechaVencimiento, estado }: Prop
     if (!confirm("¿Eliminar este período? Se borrarán todos sus gastos. Esta acción no se puede deshacer.")) return;
     startTransition(async () => {
       await deletePeriodo(periodoId);
-      router.refresh();
+      window.location.reload();
     });
   };
 

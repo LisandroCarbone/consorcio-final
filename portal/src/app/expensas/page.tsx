@@ -1,6 +1,9 @@
-import { query } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import { formatMoney, formatMonth, formatDate, cleanPeriodo } from "@/lib/format";
-import { createPeriodo, calcularExpensas } from "./actions";
+import { RecalcularButton } from "./RecalcularButton";
+import { CreatePeriodoButton } from "./CreatePeriodoButton";
+import { SaveMontoFijoButton } from "./SaveMontoFijoButton";
+import MaskedInput from "@/components/ui/MaskedInput";
 import { RegenerarCat1Button } from "./RegenerarCat1Button";
 import { CopiarGastosButton } from "./CopiarGastosButton";
 import { cookies } from "next/headers";
@@ -8,6 +11,8 @@ import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { AddGastoForm } from "./AddGastoForm";
 import { ExpensasTableClient } from "./ExpensasTableClient";
 import { CalendarDays, HelpCircle, FileText } from "lucide-react";
+import { ProvisionesSection } from "./ProvisionesSection";
+import { EstadoFinancieroSection } from "./EstadoFinancieroSection";
 import { BulkSendButton } from "./SendExpensasButtons";
 import { UfLiquidacionesTableClient } from "./UfLiquidacionesTableClient";
 import { PeriodoActionsMenu } from "./PeriodoActionsMenu";
@@ -25,16 +30,18 @@ async function getData(activeCuit?: string) {
       id: number; consorcio_id: string; consorcio_nombre: string;
       anio: number; mes: number; estado: string; fecha_vencimiento: string | null;
       total_gastos: string; total_expensas: string; pagadas: string;
+      monto_fijo: string | null; tipo_expensas: string;
     }>(
       `SELECT p.id, p.consorcio_cuit AS consorcio_id, c.nombre AS consorcio_nombre,
-              p.anio, p.mes, p.estado, p.fecha_vencimiento::text,
+              p.anio, p.mes, p.estado, p.fecha_vencimiento::text, p.monto_fijo::text,
+              c.tipo_expensas,
               COALESCE((SELECT SUM(monto) FROM app.gastos_periodo WHERE periodo_id=p.id), 0) AS total_gastos,
               (SELECT COUNT(*) FROM app.res_cuenta_periodo WHERE periodo_id=p.id) AS total_expensas,
               (SELECT COUNT(*) FROM app.res_cuenta_periodo WHERE periodo_id=p.id AND estado='pagada') AS pagadas
        FROM app.periodos_expensas p
        JOIN app.consorcios c ON c.cuit = p.consorcio_cuit
        ${where}
-       GROUP BY p.id, c.nombre, p.anio, p.mes, p.estado, p.fecha_vencimiento
+       GROUP BY p.id, c.nombre, p.anio, p.mes, p.estado, p.fecha_vencimiento, p.monto_fijo, c.tipo_expensas
        ORDER BY p.anio DESC, p.mes DESC`,
       params
     ),
@@ -44,14 +51,16 @@ async function getData(activeCuit?: string) {
 }
 
 async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
-  const [gastos, unidades] = await Promise.all([
+  const [gastos, provisiones, unidades] = await Promise.all([
     query<{
       id: number; concepto: string; monto: string; tipo: string; categoria: number;
       liquidacion_id: number | null;
       liq_bruto: string | null; liq_descuentos: string | null; liq_neto: string | null; liq_tipo: string | null;
       conceptos: string | null;
+      pct_a: number;
     }>(
       `SELECT g.id, g.descripcion AS concepto, g.monto::numeric, g.tipo, g.categoria,
+              g.pct_a::numeric,
               g.liquidacion_id,
               l.remuneracion_bruta::numeric AS liq_bruto,
               l.total_descuentos_empleado::numeric AS liq_descuentos,
@@ -61,7 +70,7 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
                FROM app.conceptos_liquidacion c WHERE c.liquidacion_id = l.id) AS conceptos
        FROM app.gastos_periodo g
        LEFT JOIN app.liquidaciones_sueldo l ON l.id = g.liquidacion_id
-       WHERE g.periodo_id = $1
+       WHERE g.periodo_id = $1 AND g.es_provision = false
        ORDER BY g.categoria,
          CASE
            WHEN g.liquidacion_id IS NOT NULL AND l.tipo = 'mensual' THEN 1
@@ -69,7 +78,20 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
            WHEN g.liquidacion_id IS NOT NULL THEN 3
            ELSE 4
          END,
-         g.descripcion`,
+         g.orden, g.descripcion`,
+      [periodoId]
+    ),
+    query<{
+      id: number; concepto: string; monto: string; tipo: string; categoria: number;
+      provision_pagada: boolean; provision_pagada_periodo_id: number | null;
+      pct_a: number;
+    }>(
+      `SELECT g.id, g.descripcion AS concepto, g.monto::numeric, g.tipo, g.categoria,
+              g.pct_a::numeric,
+              g.provision_pagada, g.provision_pagada_periodo_id
+       FROM app.gastos_periodo g
+       WHERE g.periodo_id = $1 AND g.es_provision = true
+       ORDER BY g.categoria, g.orden, g.descripcion`,
       [periodoId]
     ),
     query<{ id: number; uf: number }>(
@@ -77,10 +99,86 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
       [consorcioCuit]
     ),
   ]);
-  return { gastos, unidades };
+  return { gastos, provisiones, unidades };
 }
 
-async function getPeriodoChecklist(periodoId: number, consorcioCuit: string, anio: number, mes: number) {
+async function getEstadoFinanciero(periodoId: number, consorcioCuit: string, anio: number, mes: number) {
+  const startDate = `${anio}-${String(mes).padStart(2, "0")}-01`;
+
+  // Previous period saldo al cierre
+  let prevAnio = anio;
+  let prevMes = mes - 1;
+  if (prevMes === 0) { prevMes = 12; prevAnio -= 1; }
+
+  const [periodoData, cobranzasRes, prevSaldoRes, totalGastosRes] = await Promise.all([
+    queryOne<{
+      ef_saldo_anterior: string;
+      ef_cobranzas_sin_identificar: string;
+      ef_gastos_extra: string;
+    }>(
+      `SELECT COALESCE(ef_saldo_anterior, 0)::numeric AS ef_saldo_anterior,
+              COALESCE(ef_cobranzas_sin_identificar, 0)::numeric AS ef_cobranzas_sin_identificar,
+              COALESCE(ef_gastos_extra, '[]') AS ef_gastos_extra
+       FROM app.periodos_expensas WHERE id = $1`,
+      [periodoId]
+    ),
+    queryOne<{ total: string }>(
+      `SELECT COALESCE(SUM(monto), 0)::numeric AS total
+       FROM app.pagos
+       WHERE consorcio_cuit = $1 AND fecha >= $2::date AND fecha < $2::date + interval '1 month'`,
+      [consorcioCuit, startDate]
+    ),
+    queryOne<{ ef_saldo_anterior: string; cobranzas: string; cobranzas_sin_id: string; gastos: string; gastos_extra_sum: string }>(
+      `SELECT COALESCE(p.ef_saldo_anterior, 0)::numeric AS ef_saldo_anterior,
+              COALESCE((SELECT SUM(monto) FROM app.pagos WHERE consorcio_cuit = $1 AND fecha >= ($4 || '-01')::date AND fecha < ($4 || '-01')::date + interval '1 month'), 0)::numeric AS cobranzas,
+              COALESCE(p.ef_cobranzas_sin_identificar, 0)::numeric AS cobranzas_sin_id,
+              COALESCE((SELECT SUM(monto) FROM app.gastos_periodo WHERE periodo_id = p.id), 0)::numeric AS gastos,
+              '0' AS gastos_extra_sum
+       FROM app.periodos_expensas p
+       WHERE p.consorcio_cuit = $1 AND p.anio = $2 AND p.mes = $3`,
+      [consorcioCuit, prevAnio, prevMes, `${prevAnio}-${String(prevMes).padStart(2, "0")}`]
+    ),
+    queryOne<{ total: string }>(
+      "SELECT COALESCE(SUM(monto), 0)::numeric AS total FROM app.gastos_periodo WHERE periodo_id = $1",
+      [periodoId]
+    ),
+  ]);
+
+  const saldoAnterior = Number(periodoData?.ef_saldo_anterior ?? 0);
+  const cobranzas = Number(cobranzasRes?.total ?? 0);
+  const cobranzasSinIdentificar = Number(periodoData?.ef_cobranzas_sin_identificar ?? 0);
+  const totalGastos = Number(totalGastosRes?.total ?? 0);
+
+  let gastosExtra: { concepto: string; monto: number }[] = [];
+  try {
+    gastosExtra = JSON.parse(periodoData?.ef_gastos_extra ?? "[]");
+  } catch { /* ignore */ }
+  const gastosExtraTotal = gastosExtra.reduce((s, g) => s + g.monto, 0);
+
+  // Auto-calculate previous period saldo al cierre if saldo_anterior is 0 and we have prev period data
+  let saldoAnteriorCalculado = saldoAnterior;
+  if (saldoAnterior === 0 && prevSaldoRes) {
+    const prevSaldo = Number(prevSaldoRes.ef_saldo_anterior);
+    const prevCobranzas = Number(prevSaldoRes.cobranzas);
+    const prevCobranzasSinId = Number(prevSaldoRes.cobranzas_sin_id);
+    const prevGastos = Number(prevSaldoRes.gastos);
+    saldoAnteriorCalculado = prevSaldo + prevCobranzas + prevCobranzasSinId - prevGastos;
+  }
+
+  const saldoCierre = saldoAnteriorCalculado + cobranzas + cobranzasSinIdentificar - totalGastos + gastosExtraTotal;
+
+  return {
+    saldoAnterior: saldoAnteriorCalculado,
+    cobranzas,
+    cobranzasSinIdentificar,
+    totalGastos,
+    gastosExtra,
+    saldoCierre,
+    periodoId,
+  };
+}
+
+async function getPeriodoChecklist(periodoId: number, consorcioCuit: string, anio: number, mes: number, tipoExpensas?: string, montoFijo?: string | null) {
   const periodStr = `${anio}-${String(mes).padStart(2, "0")}-01`;
   const [gastosRes, liqsRes, expensasRes, pagosRes, empRes] = await Promise.all([
     query<{ count: string }>("SELECT COUNT(*) FROM app.gastos_periodo WHERE periodo_id = $1", [periodoId]),
@@ -129,10 +227,14 @@ async function getPeriodoChecklist(periodoId: number, consorcioCuit: string, ani
     const realPagos = Number(totalPagosRealRes[0]?.sum ?? 0);
     const prorrateadoPagos = Number(totalSuPagoProrrateadoRes[0]?.sum ?? 0);
 
-    diffGastos = Math.abs(realGastos - prorrateadoGastos);
+    if (tipoExpensas === "fija") {
+      const fijo = Number(montoFijo ?? 0);
+      diffGastos = Math.abs(fijo - prorrateadoGastos);
+    } else {
+      diffGastos = Math.abs(realGastos - prorrateadoGastos);
+    }
     diffPagos = Math.abs(realPagos - prorrateadoPagos);
 
-    // Difference greater than 1 ARS is considered out of sync
     if (diffGastos > 1.0 || diffPagos > 1.0) {
       isProrrateoDesactualizado = true;
     }
@@ -203,7 +305,11 @@ export default async function ExpensasPage({
     : null;
 
   const checklist = selected
-    ? await getPeriodoChecklist(selected.id, selected.consorcio_id, selected.anio, selected.mes)
+    ? await getPeriodoChecklist(selected.id, selected.consorcio_id, selected.anio, selected.mes, selected.tipo_expensas, selected.monto_fijo)
+    : null;
+
+  const estadoFinanciero = selected
+    ? await getEstadoFinanciero(selected.id, selected.consorcio_id, selected.anio, selected.mes)
     : null;
 
   const resCuentaRows = selected
@@ -303,7 +409,7 @@ export default async function ExpensasPage({
           {/* Nuevo período */}
           <div className="card p-5">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Nuevo período</h3>
-            <form action={createPeriodo} className="space-y-3">
+            <form className="space-y-3">
               <div>
                 <label className="label">Consorcio *</label>
                 <select disabled value={activeCuit} className="input bg-gray-50 cursor-not-allowed">
@@ -325,7 +431,7 @@ export default async function ExpensasPage({
                 <label className="label">Vencimiento</label>
                 <input name="fecha_vencimiento" type="date" className="input" />
               </div>
-              <button type="submit" className="btn-primary w-full justify-center">Crear período</button>
+              <CreatePeriodoButton />
             </form>
           </div>
 
@@ -384,7 +490,7 @@ export default async function ExpensasPage({
               </p>
               <div className="max-w-sm mx-auto bg-gray-50 p-5 rounded-lg border border-gray-100 text-left">
                 <h5 className="text-xs font-bold text-gray-700 uppercase mb-2">Crear período ahora</h5>
-                <form action={createPeriodo} className="space-y-3">
+                <form className="space-y-3">
                   <input type="hidden" name="consorcio_id" value={activeCuit} />
                   <input type="hidden" name="anio" value={activeYear} />
                   <input type="hidden" name="mes" value={activeMonth} />
@@ -397,9 +503,7 @@ export default async function ExpensasPage({
                       defaultValue={new Date(activeYear, activeMonth - 1, 10).toISOString().slice(0, 10)}
                     />
                   </div>
-                  <button type="submit" className="btn-primary w-full justify-center">
-                    Crear período {formatMonth(activeYear, activeMonth)}
-                  </button>
+                  <CreatePeriodoButton />
                 </form>
               </div>
             </div>
@@ -465,12 +569,17 @@ export default async function ExpensasPage({
                           ? "text-amber-700"
                           : "text-gray-500"
                       }`}>
-                        {checklist.isProrrateoDesactualizado 
-                          ? "Desactualizado" 
-                          : checklist.expensasCount > 0 
-                          ? "Generado" 
+                        {checklist.isProrrateoDesactualizado
+                          ? "Desactualizado"
+                          : checklist.expensasCount > 0
+                          ? "Generado"
                           : "Pendiente"}
                       </p>
+                      {(checklist.isProrrateoDesactualizado || checklist.expensasCount === 0) && (
+                        <div className="mt-2">
+                          <RecalcularButton periodoId={selected.id} variant="small" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Step 4 */}
@@ -529,16 +638,11 @@ export default async function ExpensasPage({
                   <div className="flex gap-2 flex-wrap">
                     <RegenerarCat1Button periodoId={selected.id} />
                     <CopiarGastosButton periodoId={selected.id} />
-                    {isUltimoPeriodo && (
-                      <form action={calcularExpensas.bind(null, selected.id)}>
-                        <button type="submit" className={`btn-primary transition-all duration-300 ${
-                          checklist?.isProrrateoDesactualizado 
-                            ? "bg-amber-600 hover:bg-amber-700 border-amber-600 shadow-md text-white animate-pulse" 
-                            : ""
-                        }`}>
-                          🔁 Recalcular prorrateo
-                        </button>
-                      </form>
+                    {(isUltimoPeriodo || checklist?.isProrrateoDesactualizado) && (
+                      <RecalcularButton
+                        periodoId={selected.id}
+                        isDesactualizado={checklist?.isProrrateoDesactualizado}
+                      />
                     )}
                   </div>
                 </div>
@@ -556,6 +660,31 @@ export default async function ExpensasPage({
                     <p className="font-bold text-green-600">{selected.pagadas} / {selected.total_expensas}</p>
                   </div>
                 </div>
+
+                {selected.tipo_expensas === "fija" && (
+                  <div className="mt-4 p-4 bg-brand-50 border border-brand-200 rounded-lg">
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-2">
+                      Expensa fija del período
+                    </p>
+                    <form className="flex items-end gap-3">
+                      <input type="hidden" name="periodo_id" value={selected.id} />
+                      <div>
+                        <label className="label">Monto fijo mensual</label>
+                        <MaskedInput
+                          preset="money"
+                          name="monto_fijo"
+                          defaultValue={selected.monto_fijo ? Number(selected.monto_fijo) : ""}
+                          className="input w-48"
+                          placeholder="Ej: 1.500.000"
+                        />
+                      </div>
+                      <SaveMontoFijoButton />
+                    </form>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Este consorcio liquida expensas fijas: el monto se prorratea entre las unidades según coeficiente.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Gastos */}
@@ -570,6 +699,18 @@ export default async function ExpensasPage({
                   unidades={detail?.unidades ?? []}
                 />
               </div>
+
+              {/* Previsiones / Provisiones */}
+              <ProvisionesSection
+                provisiones={detail?.provisiones ?? []}
+                periodoId={selected.id}
+                unidades={detail?.unidades ?? []}
+              />
+
+              {/* Estado Financiero */}
+              {estadoFinanciero && (
+                <EstadoFinancieroSection data={estadoFinanciero} />
+              )}
 
               {/* Liquidación por UF */}
               {selected.estado === "liquidado" && resCuentaRows.length > 0 && (

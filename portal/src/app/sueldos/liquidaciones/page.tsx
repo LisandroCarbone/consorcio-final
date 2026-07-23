@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { getLiquidacionesPeriodo } from "../actions";
-import { confirmarLiquidacionAction } from "./actions";
+import { ConfirmarLiquidacionButton } from "./ConfirmarLiquidacionButton";
 import { RecalcularButton } from "./RecalcularButton";
 import { LsdExportButton } from "./LsdExportButton";
 import { formatMoney0, cleanPeriodo } from "@/lib/format";
@@ -220,12 +220,7 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
                           <div className="flex gap-3">
                             <a href={`/sueldos/liquidaciones/${l.id}`} className="text-blue-600 hover:text-blue-800 font-medium">Ver recibo</a>
                             {l.estado === "borrador" && (
-                              <form action={confirmarLiquidacionAction}>
-                                <input type="hidden" name="id" value={l.id} />
-                                <input type="hidden" name="periodo" value={periodo} />
-                                <input type="hidden" name="tipo" value={tipo} />
-                                <button type="submit" className="text-green-600 hover:text-green-800 font-medium">Confirmar</button>
-                              </form>
+                              <ConfirmarLiquidacionButton id={l.id} periodo={periodo} tipo={tipo} />
                             )}
                           </div>
                         </td>

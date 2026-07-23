@@ -52,6 +52,8 @@ export default async function ParametrosCCTPage() {
 
   let artParams: ARTParam[] = [];
   let consorcioNombre = "";
+  let scvoRenovacionMes: number | null = null;
+  let scvoRenovacionMonto: string = "0";
   if (activeCuit) {
     artParams = await query<ARTParam>(
       `SELECT id, fecha_desde::text, art_pct_variable::numeric, art_costo_fijo::numeric
@@ -60,11 +62,13 @@ export default async function ParametrosCCTPage() {
        ORDER BY fecha_desde DESC`,
       [activeCuit]
     );
-    const c = await queryOne<{ nombre: string }>(
-      "SELECT nombre FROM app.consorcios WHERE cuit = $1",
+    const c = await queryOne<{ nombre: string; sv_renueva_mes: number | null; sv_costo_emision: string }>(
+      "SELECT nombre, sv_renueva_mes, COALESCE(sv_costo_emision, 0)::numeric::text AS sv_costo_emision FROM app.consorcios WHERE cuit = $1",
       [activeCuit]
     );
     consorcioNombre = c?.nombre || activeCuit;
+    scvoRenovacionMes = c?.sv_renueva_mes ?? null;
+    scvoRenovacionMonto = c?.sv_costo_emision ?? "0";
   }
 
   const vigente = params[0];
@@ -145,6 +149,8 @@ export default async function ParametrosCCTPage() {
         artParams={artParams as ARTRow[]}
         consorcioCuit={activeCuit}
         consorcioNombre={consorcioNombre}
+        scvoRenovacionMes={scvoRenovacionMes}
+        scvoRenovacionMonto={scvoRenovacionMonto}
       />
     </div>
   );

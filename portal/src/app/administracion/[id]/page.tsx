@@ -6,6 +6,7 @@ import { ActionFeedback } from "@/components/ui/ActionFeedback";
 import MaskedInput from "@/components/ui/MaskedInput";
 import { getAdministrador, createAdministrador, updateAdministrador, type AdministradorRow } from "../actions";
 import { DeleteAdministradorButton } from "../DeleteAdministradorButton";
+import { AdministradorFormClient } from "../AdministradorFormClient";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -40,7 +41,7 @@ export default async function AdministradorPage({ params }: Props) {
         </h2>
       </div>
 
-      <form action={action} className="card p-6 space-y-5">
+      <AdministradorFormClient action={action} isNew={isNew}>
         {!isNew && <input type="hidden" name="id" value={admin!.id} />}
 
         <div className="grid grid-cols-2 gap-4">
@@ -159,7 +160,7 @@ export default async function AdministradorPage({ params }: Props) {
             </button>
           </div>
         </div>
-      </form>
+      </AdministradorFormClient>
     </div>
   );
 }

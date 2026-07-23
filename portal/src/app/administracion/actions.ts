@@ -2,7 +2,6 @@
 
 import { query, queryOne } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 export type AdministradorRow = {
   id: number;
@@ -60,7 +59,7 @@ export async function getAdministrador(id: number) {
   );
 }
 
-export async function createAdministrador(formData: FormData) {
+export async function createAdministrador(formData: FormData): Promise<{ error?: string }> {
   const d = formToAdministrador(formData);
   try {
     await queryOne(
@@ -80,15 +79,15 @@ export async function createAdministrador(formData: FormData) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
     if (msg.includes("unique") || msg.includes("duplicate")) {
-      redirect("/administracion/nuevo?error=cuit_duplicado");
+      return { error: "cuit_duplicado" };
     }
     throw e;
   }
   revalidatePath("/administracion");
-  redirect("/administracion");
+  return {};
 }
 
-export async function updateAdministrador(formData: FormData) {
+export async function updateAdministrador(formData: FormData): Promise<{ error?: string }> {
   const id = Number(formData.get("id"));
   const d = formToAdministrador(formData);
   try {
@@ -110,26 +109,26 @@ export async function updateAdministrador(formData: FormData) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
     if (msg.includes("unique") || msg.includes("duplicate")) {
-      redirect(`/administracion/${id}?error=cuit_duplicado`);
+      return { error: "cuit_duplicado" };
     }
     throw e;
   }
   revalidatePath("/administracion");
   revalidatePath(`/administracion/${id}`);
-  redirect(`/administracion/${id}?ok=guardado`);
+  return {};
 }
 
-export async function deleteAdministrador(formData: FormData) {
+export async function deleteAdministrador(formData: FormData): Promise<{ error?: string }> {
   const id = Number(formData.get("id"));
   try {
     await query("DELETE FROM app.administradores WHERE id = $1", [id]);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
     if (msg.includes("foreign key") || msg.includes("violates")) {
-      redirect(`/administracion/${id}?error=admin_vinculado`);
+      return { error: "admin_vinculado" };
     }
     throw e;
   }
   revalidatePath("/administracion");
-  redirect("/administracion");
+  return {};
 }

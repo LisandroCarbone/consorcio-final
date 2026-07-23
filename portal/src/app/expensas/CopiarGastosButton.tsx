@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { getGastosAnteriores, copiarGastos } from "./actions";
 import { formatMoney } from "@/lib/format";
 import { CATEGORIA_LABELS } from "./ExpensasTableClient";
@@ -19,7 +18,6 @@ export function CopiarGastosButton({ periodoId }: { periodoId: number }) {
   const [source, setSource] = useState<SourcePeriodo>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
   const handleOpen = async () => {
     if (open) { setOpen(false); return; }
@@ -48,7 +46,7 @@ export function CopiarGastosButton({ periodoId }: { periodoId: number }) {
     startTransition(async () => {
       await copiarGastos(periodoId, Array.from(selected));
       setOpen(false);
-      router.refresh();
+      window.location.reload();
     });
   };
 

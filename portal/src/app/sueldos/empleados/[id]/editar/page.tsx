@@ -1,11 +1,12 @@
 export const dynamic = 'force-dynamic';
 
 import { pool } from "@/lib/db";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { FUNCIONES } from "../../constants";
 import MaskedInput from "@/components/ui/MaskedInput";
+import { EmpleadoFormClient } from "../../EmpleadoFormClient";
 
 async function getEmpleado(cuil: string) {
   const { rows } = await pool.query(
@@ -23,7 +24,7 @@ async function getConsorcios() {
   return rows;
 }
 
-async function actualizarEmpleado(cuil: string, formData: FormData) {
+async function actualizarEmpleado(cuil: string, formData: FormData): Promise<{ error?: string }> {
   'use server';
   const get = (k: string) => formData.get(k) as string | null;
   const bool = (k: string) => formData.get(k) === 'true';
@@ -64,7 +65,7 @@ async function actualizarEmpleado(cuil: string, formData: FormData) {
     ]
   );
   revalidatePath('/sueldos');
-  redirect('/sueldos');
+  return {};
 }
 
 export default async function EditarEmpleadoPage({
@@ -99,7 +100,7 @@ export default async function EditarEmpleadoPage({
         <p className="text-gray-500 text-sm">{emp.nombre}</p>
       </div>
 
-      <form action={action} className="space-y-6">
+      <EmpleadoFormClient action={action} successHref="/sueldos" className="space-y-6">
 
         {/* Identificación */}
         <div className="card p-5">
@@ -250,7 +251,7 @@ export default async function EditarEmpleadoPage({
           <a href="/sueldos" className="btn-secondary">Cancelar</a>
           <button type="submit" className="btn-primary">Guardar cambios</button>
         </div>
-      </form>
+      </EmpleadoFormClient>
     </div>
   );
 }

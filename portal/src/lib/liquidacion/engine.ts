@@ -643,7 +643,8 @@ export async function calcularLiquidacion(
   const descVivienda = emp.tiene_vivienda ? adic("valor_vivienda", VALOR_VIVIENDA) : 0;
 
   // Diferencia Obra Social Ley 26475: for part-time workers, OS must be based on the
-  // full-time equivalent salary.
+  // full-time equivalent salary. In SAC months (6/12), subtract the OS already paid
+  // in the SAC liquidation so we don't double-charge.
   let difObraSocial = 0;
   if (emp.jornada === "Media") {
     const catKey2 = `cat_${emp.categoria_edificio}` as "cat_1" | "cat_2" | "cat_3" | "cat_4";
@@ -655,7 +656,26 @@ export async function calcularLiquidacion(
     } else {
       baseOSCompleta = sueldoBasico * 2;
     }
-    difObraSocial = Math.max(0, baseOSCompleta * 0.03 - totalRemunerativoFinal * 0.03);
+    let osSACPagada = 0;
+    if (periodoMonth === 6 || periodoMonth === 12) {
+      const sacTipo = periodoMonth === 6 ? "sac_1" : "sac_2";
+      const sacOSRow = await pool.query<{ importe: string }>(
+        `SELECT cl.importe::numeric AS importe
+         FROM app.conceptos_liquidacion cl
+         JOIN app.liquidaciones_sueldo ls ON ls.id = cl.liquidacion_id
+         WHERE ls.empleado_cuil = $1
+           AND ls.tipo = $2
+           AND EXTRACT(YEAR FROM ls.periodo::date) = $3
+           AND ls.estado != 'anulada'
+           AND cl.code = '5100'
+         LIMIT 1`,
+        [empleadoCuil, sacTipo, periodoYear]
+      );
+      if (sacOSRow.rows.length > 0) {
+        osSACPagada = Number(sacOSRow.rows[0].importe);
+      }
+    }
+    difObraSocial = Math.max(0, baseOSCompleta * 0.03 - totalRemunerativoFinal * 0.03 - osSACPagada);
   }
 
   const esSuplente = emp.jornada === "Suplente";

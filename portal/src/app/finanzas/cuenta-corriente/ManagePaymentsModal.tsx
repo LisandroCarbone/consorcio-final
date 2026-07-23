@@ -70,7 +70,7 @@ export default function ManagePaymentsModal({
         {/* Header */}
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold text-gray-900">Gestionar Pagos Registrados</h3>
+            <h3 className="text-lg font-bold text-gray-900">Gestionar Cobranzas Registradas</h3>
             <p className="text-xs text-gray-500 mt-0.5">
               Unidad {uf} · Propietario: {propietario || "—"}
             </p>
@@ -91,7 +91,7 @@ export default function ManagePaymentsModal({
           {editingPago && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm animate-in slide-in-from-top-4 duration-200">
               <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-1.5 text-sm">
-                <span>✏️</span> Editar Movimiento de Pago
+                <span>✏️</span> Editar Movimiento de Cobranza
               </h4>
               <form
                 action={async (formData) => {
@@ -242,7 +242,7 @@ export default function ManagePaymentsModal({
                 {pagos.length === 0 && (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-gray-400">
-                      No hay pagos registrados para esta unidad.
+                      No hay cobranzas registradas para esta unidad.
                     </td>
                   </tr>
                 )}

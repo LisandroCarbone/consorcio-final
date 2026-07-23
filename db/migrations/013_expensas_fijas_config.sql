@@ -1,0 +1,2 @@
+ALTER TABLE app.consorcios ADD COLUMN IF NOT EXISTS monto_fijo_default NUMERIC(14,2);
+ALTER TABLE app.consorcios ADD COLUMN IF NOT EXISTS pct_expensa_a NUMERIC(5,4) DEFAULT 1.0 NOT NULL;

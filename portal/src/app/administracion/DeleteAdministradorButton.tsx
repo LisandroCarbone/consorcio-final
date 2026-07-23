@@ -1,16 +1,29 @@
 "use client";
 
+import { useState } from "react";
 import { deleteAdministrador } from "./actions";
 
 export function DeleteAdministradorButton({ id, compact }: { id: number; compact?: boolean }) {
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!confirm("¿Eliminar este administrador?")) return;
+    const fd = new FormData();
+    fd.set("id", String(id));
+    const result = await deleteAdministrador(fd);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+    window.location.href = "/administracion";
+  }
+
   return (
-    <form
-      action={deleteAdministrador}
-      onSubmit={(e) => {
-        if (!confirm("¿Eliminar este administrador?")) e.preventDefault();
-      }}
-    >
-      <input type="hidden" name="id" value={id} />
+    <form onSubmit={handleSubmit}>
+      {error === "admin_vinculado" && (
+        <p className="text-xs text-red-600 mb-1">No se puede eliminar: hay datos vinculados.</p>
+      )}
       {compact ? (
         <button
           type="submit"

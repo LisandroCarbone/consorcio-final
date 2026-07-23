@@ -86,8 +86,9 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
     anio: number;
     mes: number;
     total_previsiones: number;
+    monto_fijo: number | null;
   }>(
-    "SELECT consorcio_cuit, anio, mes, COALESCE(total_previsiones, 0)::numeric AS total_previsiones FROM app.periodos_expensas WHERE id = $1",
+    "SELECT consorcio_cuit, anio, mes, COALESCE(total_previsiones, 0)::numeric AS total_previsiones, monto_fijo::numeric FROM app.periodos_expensas WHERE id = $1",
     [periodoId]
   );
   if (!periodo) {
@@ -102,8 +103,11 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
     divisor_a: number;
     divisor_b: number;
     interest_rate: number;
+    tipo_expensas: string;
+    pct_expensa_a: number;
+    formato_cobro: string;
   }>(
-    "SELECT cuit, divisor_a, divisor_b, interest_rate FROM app.consorcios WHERE cuit = $1",
+    "SELECT cuit, divisor_a, divisor_b, interest_rate, tipo_expensas, COALESCE(pct_expensa_a, 1)::numeric AS pct_expensa_a, COALESCE(formato_cobro, 'exacto') AS formato_cobro FROM app.consorcios WHERE cuit = $1",
     [cuit]
   );
   if (!consorcio) {
@@ -118,11 +122,12 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
   const units = await query<{
     id: number;
     uf: number;
+    uf_numero: number | null;
     depto: string;
     coef_a: number;
     coef_b: number;
   }>(
-    "SELECT id, uf, depto, coef_a::numeric, coef_b::numeric FROM app.unidades WHERE consorcio_cuit = $1 ORDER BY uf",
+    "SELECT id, uf, uf_numero, depto, coef_a::numeric, coef_b::numeric FROM app.unidades WHERE consorcio_cuit = $1 ORDER BY uf",
     [cuit]
   );
 
@@ -134,8 +139,9 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
     monto: number;
     tipo: "A" | "B" | "Particular";
     unidad_id: number | null;
+    pct_a: number;
   }>(
-    "SELECT id, categoria, descripcion, monto::numeric, tipo, unidad_id FROM app.gastos_periodo WHERE periodo_id = $1",
+    "SELECT id, categoria, descripcion, monto::numeric, tipo, unidad_id, pct_a::numeric FROM app.gastos_periodo WHERE periodo_id = $1 AND provision_pagada = false",
     [periodoId]
   );
 
@@ -177,6 +183,7 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
   let totalPagosB = 0;
   let totalGastosParticulares = 0;
   const unitParticularMap = new Map<number, number>(); // Map of unidad_id -> particular amount
+  const unitAMap = new Map<number, number>(); // Map of unidad_id -> unit-specific Coef A amount (from split B expenses)
   const unitBMap = new Map<number, number>(); // Map of unidad_id -> unit-specific Coef B amount
 
   expenses.forEach(e => {
@@ -186,22 +193,32 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
       if (e.unidad_id) {
         unitParticularMap.set(e.unidad_id, (unitParticularMap.get(e.unidad_id) || 0) + val);
       }
-    } else if (e.tipo === "B") {
-      if (e.unidad_id) {
-        unitBMap.set(e.unidad_id, (unitBMap.get(e.unidad_id) || 0) + val);
-      } else {
-        totalPagosB += val;
-      }
     } else {
-      totalPagosA += val;
+      const montoA = round2(val * (Number(e.pct_a ?? 100) / 100));
+      const montoB = round2(val - montoA);
+      if (e.tipo === "B" && e.unidad_id) {
+        if (montoA > 0) unitAMap.set(e.unidad_id, (unitAMap.get(e.unidad_id) || 0) + montoA);
+        if (montoB > 0) unitBMap.set(e.unidad_id, (unitBMap.get(e.unidad_id) || 0) + montoB);
+      } else if (e.tipo === "B") {
+        totalPagosA += montoA;
+        totalPagosB += montoB;
+      } else {
+        totalPagosA += montoA;
+        totalPagosB += montoB;
+      }
     }
   });
 
+  const isFija = consorcio.tipo_expensas === "fija";
   const totalPrevisiones = Number(periodo.total_previsiones || 0);
-  const totalProrrateoA = round2(totalPagosA + totalPrevisiones);
-  const totalProrrateoB = round2(totalPagosB);
+  const pctA = Number(consorcio.pct_expensa_a);
+  const montoFijo = Number(periodo.monto_fijo || 0);
+  const totalProrrateoA = isFija
+    ? round2(montoFijo * pctA)
+    : round2(totalPagosA + totalPrevisiones);
+  const totalProrrateoB = isFija ? round2(montoFijo * (1 - pctA)) : round2(totalPagosB);
   // Calculate total prorrateo including specific Coef B expenses and particulars for trace
-  const totalBAndPart = Array.from(unitBMap.values()).reduce((sum, v) => sum + v, 0);
+  const totalBAndPart = isFija ? 0 : Array.from(unitBMap.values()).reduce((sum, v) => sum + v, 0);
   const totalProrrateoAyB = round2(totalProrrateoA + totalProrrateoB + totalBAndPart);
 
   // 8. Fetch payments in app.pagos for each unit in this period
@@ -220,9 +237,9 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
 
   // 9. Calculate prorrateo for each unit and save to res_cuenta_periodo
   for (const u of units) {
-    const expensasA = round2(totalProrrateoA * Number(u.coef_a) / divisorA);
-    const expensasB = round2(totalProrrateoB * Number(u.coef_b) / divisorB) + round2(unitBMap.get(u.id) || 0);
-    const gastPart = round2(unitParticularMap.get(u.id) || 0);
+    const expensasA = round2(totalProrrateoA * Number(u.coef_a) / divisorA) + (isFija ? 0 : round2(unitAMap.get(u.id) || 0));
+    const expensasB = (isFija && pctA >= 1) ? 0 : round2(totalProrrateoB * Number(u.coef_b) / divisorB) + (isFija ? 0 : round2(unitBMap.get(u.id) || 0));
+    const gastPart = isFija ? 0 : round2(unitParticularMap.get(u.id) || 0);
 
     const exist = existingMap.get(u.id);
     const sAsamblea = exist ? Number(exist.s_asamblea || 0) : 0;
@@ -241,17 +258,21 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
     const deuda = round2(saldoAnterior - suPago);
     const intereses = deuda > 0 ? round2(deuda * interestRate) : 0;
 
-    // Generated columns total_mes and total_pagar will be computed automatically by PostgreSQL.
-    // We only need to write the base values.
     const totalMes = round2(expensasA + expensasB + sAsamblea + otros + gastPart);
-    const totalPagar = round2(totalMes + deuda + intereses);
+    let totalPagar = round2(totalMes + deuda + intereses);
+
+    if (consorcio.formato_cobro === 'identificacion_uf' && u.uf_numero && totalPagar > 0) {
+      const ufNum = u.uf_numero % 100;
+      totalPagar = Math.floor(totalPagar) + ufNum / 100;
+    }
+
     const estado = totalPagar <= 0 ? "pagada" : "pendiente";
 
     await query(
       `INSERT INTO app.res_cuenta_periodo
          (periodo_id, unidad_id, coef_a, coef_b, saldo_anterior, su_pago,
-          expensas_a, expensas_b, s_asamblea, otros, gast_part, deuda, intereses, estado)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          expensas_a, expensas_b, s_asamblea, otros, gast_part, deuda, intereses, total_mes, total_pagar, estado)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        ON CONFLICT (periodo_id, unidad_id) DO UPDATE SET
          coef_a = EXCLUDED.coef_a,
          coef_b = EXCLUDED.coef_b,
@@ -264,11 +285,13 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
          gast_part = EXCLUDED.gast_part,
          deuda = EXCLUDED.deuda,
          intereses = EXCLUDED.intereses,
+         total_mes = EXCLUDED.total_mes,
+         total_pagar = EXCLUDED.total_pagar,
          estado = EXCLUDED.estado,
          updated_at = now()`,
       [
         periodoId, u.id, u.coef_a, u.coef_b, saldoAnterior, suPago,
-        expensasA, expensasB, sAsamblea, otros, gastPart, deuda, intereses, estado
+        expensasA, expensasB, sAsamblea, otros, gastPart, deuda, intereses, totalMes, totalPagar, estado
       ]
     );
   }

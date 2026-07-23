@@ -2,9 +2,8 @@
 
 import { liquidarSAC } from "@/lib/liquidacion/engine";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
-export async function accionLiquidarSAC(formData: FormData) {
+export async function accionLiquidarSAC(formData: FormData): Promise<{ error?: string }> {
   const empleadoCuil = String(formData.get("empleado_cuil") || formData.get("empleado_id") || "");
   const anio = Number(formData.get("anio"));
   const semestreRaw = Number(formData.get("semestre"));
@@ -19,8 +18,8 @@ export async function accionLiquidarSAC(formData: FormData) {
     await liquidarSAC(empleadoCuil, anio, semestre);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    redirect(`/sueldos/sac?empleado_cuil=${empleadoCuil}&anio=${anio}&semestre=${semestre}&error=${encodeURIComponent(msg)}`);
+    return { error: msg };
   }
   revalidatePath("/sueldos/sac");
-  redirect(`/sueldos/sac?empleado_cuil=${empleadoCuil}&anio=${anio}&semestre=${semestre}&liquidado=1`);
+  return {};
 }

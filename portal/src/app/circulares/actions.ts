@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { query } from "@/lib/db";
 
 export async function sendCircular(formData: FormData) {
@@ -28,6 +27,4 @@ export async function sendCircular(formData: FormData) {
     "INSERT INTO app.circulares (consorcio_cuit, mensaje) VALUES ($1, $2)",
     [consorcio_id, message]
   );
-
-  redirect("/circulares?sent=true");
 }

@@ -26,9 +26,6 @@ export async function recalcularPeriodoAction(formData: FormData) {
 
 export async function confirmarLiquidacionAction(formData: FormData) {
   const id = Number(formData.get("id"));
-  const periodo = String(formData.get("periodo"));
-  const tipo = String(formData.get("tipo") ?? "mensual");
   await confirmarLiquidacion(id);
   revalidatePath("/sueldos/liquidaciones");
-  redirect(`/sueldos/liquidaciones?periodo=${periodo}&tipo=${tipo}&ok=confirmado`);
 }

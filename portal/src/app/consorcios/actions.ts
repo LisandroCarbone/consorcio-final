@@ -34,6 +34,14 @@ function formToConsorcio(formData: FormData) {
     intereses_mora_pct: formData.get("intereses_mora_pct")
       ? Number(formData.get("intereses_mora_pct")) / 100
       : null,
+    tipo_expensas: (formData.get("tipo_expensas") as string) || "variable",
+    formato_cobro: (formData.get("formato_cobro") as string) || "exacto",
+    monto_fijo_default: formData.get("monto_fijo_default")
+      ? Number(formData.get("monto_fijo_default"))
+      : null,
+    pct_expensa_a: formData.get("pct_expensa_a")
+      ? Number(formData.get("pct_expensa_a")) / 100
+      : 1.0,
   };
 }
 
@@ -48,8 +56,8 @@ export async function createConsorcio(formData: FormData) {
         tiene_calefaccion_central, tiene_aire_acondicionado_central,
         tiene_grupo_electrogeno, tiene_seguridad_centralizada,
         tiene_compactador, tiene_montacargas, tiene_otros_servicios_centrales,
-        interest_rate)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+        interest_rate, tipo_expensas, monto_fijo_default, pct_expensa_a, formato_cobro)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
     [d.nombre, d.direccion, d.cuit, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.categoria_edificio, d.banco,
      d.tiene_cochera, d.tiene_movimiento_coches, d.tiene_jardin, d.zona_desfavorable,
@@ -57,7 +65,7 @@ export async function createConsorcio(formData: FormData) {
      d.tiene_calefaccion_central, d.tiene_aire_acondicionado_central,
      d.tiene_grupo_electrogeno, d.tiene_seguridad_centralizada,
      d.tiene_compactador, d.tiene_montacargas, d.tiene_otros_servicios_centrales,
-     d.intereses_mora_pct]
+     d.intereses_mora_pct, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro]
   );
   revalidatePath("/consorcios");
 }
@@ -76,8 +84,9 @@ export async function updateConsorcio(formData: FormData) {
        tiene_grupo_electrogeno = $18, tiene_seguridad_centralizada = $19,
        tiene_compactador = $20, tiene_montacargas = $21,
        tiene_otros_servicios_centrales = $22, interest_rate = $23,
-       clave_suterh = $24
-     WHERE cuit = $25`,
+       clave_suterh = $24, tipo_expensas = $25,
+       monto_fijo_default = $26, pct_expensa_a = $27, formato_cobro = $28
+     WHERE cuit = $29`,
     [d.nombre, d.direccion, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.categoria_edificio, d.banco,
      d.tiene_cochera, d.tiene_movimiento_coches, d.tiene_jardin,
@@ -87,11 +96,43 @@ export async function updateConsorcio(formData: FormData) {
      d.tiene_grupo_electrogeno, d.tiene_seguridad_centralizada,
      d.tiene_compactador, d.tiene_montacargas,
      d.tiene_otros_servicios_centrales, d.intereses_mora_pct,
-     d.clave_suterh, cuit]
+     d.clave_suterh, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro, cuit]
   );
   revalidatePath("/consorcios");
   revalidatePath(`/consorcios/${cuit}`);
   redirect(`/consorcios/${cuit}/editar?ok=guardado`);
+}
+
+export async function updateConsorcioNoRedirect(formData: FormData) {
+  const cuit = formData.get("cuit") as string;
+  const d = formToConsorcio(formData);
+  await queryOne(
+    `UPDATE app.consorcios SET
+       nombre = $1, direccion = $2, codigo_postal = $3,
+       suterh_key = $4, cant_uf = $5, categoria_edificio = $6, banco = $7,
+       tiene_cochera = $8, tiene_movimiento_coches = $9, tiene_jardin = $10,
+       zona_desfavorable = $11, tiene_pileta = $12, tiene_caldera = $13,
+       tiene_ascensor = $14, tiene_agua_caliente_central = $15,
+       tiene_calefaccion_central = $16, tiene_aire_acondicionado_central = $17,
+       tiene_grupo_electrogeno = $18, tiene_seguridad_centralizada = $19,
+       tiene_compactador = $20, tiene_montacargas = $21,
+       tiene_otros_servicios_centrales = $22, interest_rate = $23,
+       clave_suterh = $24, tipo_expensas = $25,
+       monto_fijo_default = $26, pct_expensa_a = $27, formato_cobro = $28
+     WHERE cuit = $29`,
+    [d.nombre, d.direccion, d.codigo_postal, d.nro_cta_suterh,
+     d.cant_uf, d.categoria_edificio, d.banco,
+     d.tiene_cochera, d.tiene_movimiento_coches, d.tiene_jardin,
+     d.zona_desfavorable, d.tiene_pileta, d.tiene_caldera,
+     d.tiene_ascensor, d.tiene_agua_caliente_central,
+     d.tiene_calefaccion_central, d.tiene_aire_acondicionado_central,
+     d.tiene_grupo_electrogeno, d.tiene_seguridad_centralizada,
+     d.tiene_compactador, d.tiene_montacargas,
+     d.tiene_otros_servicios_centrales, d.intereses_mora_pct,
+     d.clave_suterh, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro, cuit]
+  );
+  revalidatePath("/consorcios");
+  revalidatePath(`/consorcios/${cuit}`);
 }
 
 export async function createUnidad(formData: FormData) {
