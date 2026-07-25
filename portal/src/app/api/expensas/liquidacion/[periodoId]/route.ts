@@ -40,7 +40,7 @@ function formatDate(d: string | Date | null): string {
 }
 
 function pct(n: number | string | null): string {
-  return `${(Number(n ?? 0) * 100).toFixed(2)}`;
+  return Number(n ?? 0).toFixed(2);
 }
 
 function esc(s: string | null | undefined): string {

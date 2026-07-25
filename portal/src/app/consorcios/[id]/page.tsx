@@ -18,11 +18,12 @@ async function getData(cuit: string) {
     ),
     query<{
       id: number; uf: string; uf_numero: number | null; coef_a: string; coef_b: string; tipo: string;
-      propietario_nombre: string | null; propietario_email: string | null; propietario_whatsapp: string | null;
+      propietario_nombre: string | null; propietario_dni: string | null; propietario_email: string | null; propietario_whatsapp: string | null;
       inquilino_nombre: string | null; inquilino_email: string | null; inquilino_whatsapp: string | null;
     }>(
       `SELECT u.id, u.uf, u.uf_numero, u.coef_a, u.coef_b, u.tipo,
               prop.nombre || ' ' || prop.apellido AS propietario_nombre,
+              prop.dni AS propietario_dni,
               prop.email AS propietario_email,
               prop.whatsapp AS propietario_whatsapp,
               inq.nombre || ' ' || inq.apellido AS inquilino_nombre,
@@ -99,7 +100,10 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                   <td className="td text-gray-500 capitalize">{u.tipo}</td>
                   <td className="td text-right font-mono text-sm">{parseFloat(u.coef_a).toFixed(4)}</td>
                   <td className="td text-right font-mono text-sm">{parseFloat(u.coef_b).toFixed(4)}</td>
-                  <td className="td font-medium text-gray-800">{u.propietario_nombre ?? <span className="text-gray-400 italic text-xs font-normal">Sin asignar</span>}</td>
+                  <td className="td font-medium text-gray-800">
+                    {u.propietario_nombre ?? <span className="text-gray-400 italic text-xs font-normal">Sin asignar</span>}
+                    {u.propietario_dni && <span className="block text-xs font-mono text-gray-400">{u.propietario_dni}</span>}
+                  </td>
                   <td className="td text-xs text-gray-600 font-mono">{u.propietario_email ?? "—"}</td>
                   <td className="td text-xs text-gray-600 font-mono">{formatPhone(u.propietario_whatsapp)}</td>
                   <td className="td font-medium text-gray-800">{u.inquilino_nombre ?? <span className="text-gray-400 italic text-xs font-normal">Sin asignar</span>}</td>
@@ -189,9 +193,15 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                 <input name="apellido" required className="input" />
               </div>
             </div>
-            <div>
-              <label className="label">Email</label>
-              <input name="email" type="email" className="input" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">DNI / CUIT</label>
+                <input name="dni" className="input" placeholder="20123456789" />
+              </div>
+              <div>
+                <label className="label">Email</label>
+                <input name="email" type="email" className="input" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

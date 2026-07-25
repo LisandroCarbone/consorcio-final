@@ -66,7 +66,9 @@ export function CuentaCorrienteTableClient({
     (acc, r) => ({
       saldo_anterior: acc.saldo_anterior + Number(r.saldo_anterior),
       su_pago: acc.su_pago + Number(r.su_pago),
+      coef_a: acc.coef_a + Number(r.coef_a),
       expensas_a: acc.expensas_a + Number(r.expensas_a),
+      coef_b: acc.coef_b + Number(r.coef_b),
       expensas_b: acc.expensas_b + Number(r.expensas_b),
       total_mes: acc.total_mes + Number(r.total_mes),
       deuda: acc.deuda + Number(r.deuda),
@@ -76,7 +78,9 @@ export function CuentaCorrienteTableClient({
     {
       saldo_anterior: 0,
       su_pago: 0,
+      coef_a: 0,
       expensas_a: 0,
+      coef_b: 0,
       expensas_b: 0,
       total_mes: 0,
       deuda: 0,
@@ -175,9 +179,13 @@ export function CuentaCorrienteTableClient({
                 </td>
                 <MoneyCell value={totals.saldo_anterior} bold />
                 <MoneyCell value={-totals.su_pago} bold />
-                <td className="py-2 px-3" />
+                <td className="py-2 px-3 text-right font-mono font-bold text-gray-900">
+                  {formatPercent(totals.coef_a)}
+                </td>
                 <MoneyCell value={totals.expensas_a} bold />
-                <td className="py-2 px-3" />
+                <td className="py-2 px-3 text-right font-mono font-bold text-gray-900">
+                  {formatPercent(totals.coef_b)}
+                </td>
                 <MoneyCell value={totals.expensas_b} bold />
                 <MoneyCell value={totals.total_mes} bold />
                 <MoneyCell value={totals.deuda} bold />
