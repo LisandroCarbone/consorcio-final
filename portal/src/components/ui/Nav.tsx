@@ -21,7 +21,7 @@ const sueldosSublinks = [
 
 const expensasSublinks = [
   { href: "/expensas", label: "Expensas" },
-  { href: "/expensas/extracto-bancario", label: "Extracto Bancario" },
+  { href: "/expensas/conciliacion-bancaria", label: "Conciliación Bancaria" },
   { href: "/configuracion/parametros", label: "Parámetros" },
   { href: "/configuracion/arca", label: "Credenciales ARCA" },
 ];
