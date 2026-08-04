@@ -7,9 +7,10 @@ interface Props {
   periodoId: number;
   fechaVencimiento: string | null;
   estado: string;
+  esUltimoPeriodo?: boolean;
 }
 
-export function PeriodoActionsMenu({ periodoId, fechaVencimiento, estado }: Props) {
+export function PeriodoActionsMenu({ periodoId, fechaVencimiento, estado, esUltimoPeriodo = false }: Props) {
   const [editingVenc, setEditingVenc] = useState(false);
   const [vencValue, setVencValue] = useState(fechaVencimiento?.slice(0, 10) ?? "");
   const [isPending, startTransition] = useTransition();
@@ -23,7 +24,10 @@ export function PeriodoActionsMenu({ periodoId, fechaVencimiento, estado }: Prop
   };
 
   const handleDelete = () => {
-    if (!confirm("¿Eliminar este período? Se borrarán todos sus gastos. Esta acción no se puede deshacer.")) return;
+    const msg = estado === "abierto"
+      ? "¿Eliminar este período? Se borrarán todos sus gastos. Esta acción no se puede deshacer."
+      : "¿Eliminar este período? Se borrarán sus gastos, liquidación, extractos bancarios y matches asociados. Esta acción no se puede deshacer.";
+    if (!confirm(msg)) return;
     startTransition(async () => {
       await deletePeriodo(periodoId);
       window.location.reload();
@@ -71,7 +75,7 @@ export function PeriodoActionsMenu({ periodoId, fechaVencimiento, estado }: Prop
       >
         📅
       </button>
-      {estado === "abierto" && (
+      {(estado === "abierto" || esUltimoPeriodo) && (
         <button
           type="button"
           onClick={handleDelete}

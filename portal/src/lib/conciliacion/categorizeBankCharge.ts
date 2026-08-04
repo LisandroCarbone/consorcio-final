@@ -5,8 +5,7 @@ export type BankChargeCategoria =
   | "ley_25413"
   | "comision"
   | "iva"
-  | "mantenimiento"
-  | "debito_directo";
+  | "mantenimiento";
 
 type BankChargePattern = {
   pattern: RegExp;
@@ -17,10 +16,9 @@ type BankChargePattern = {
 export const BANK_CHARGE_PATTERNS: BankChargePattern[] = [
   { pattern: /LEY\s*NRO?\s*25\.?4/i, categoria: "ley_25413", label: "Imp. Ley 25.413" },
   { pattern: /IMPUESTO\s*LEY/i, categoria: "ley_25413", label: "Imp. Débito/Crédito" },
-  { pattern: /COMISION\s*TRA/i, categoria: "comision", label: "Comisión Transferencia" },
+  { pattern: /COMISION\s*(TRA|MOV|EXT)/i, categoria: "comision", label: "Comisión Bancaria" },
   { pattern: /IVA\s*TASA/i, categoria: "iva", label: "IVA s/Comisiones" },
   { pattern: /COM\s*MANT/i, categoria: "mantenimiento", label: "Comisión Mantenimiento" },
-  { pattern: /OG.DEBITO\s*DI/i, categoria: "debito_directo", label: "Débito Directo" },
 ];
 
 export function categorizeBankCharge(descripcion: string | null | undefined): BankChargeCategoria | null {

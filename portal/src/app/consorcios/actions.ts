@@ -135,6 +135,15 @@ export async function updateConsorcioNoRedirect(formData: FormData) {
   revalidatePath(`/consorcios/${cuit}`);
 }
 
+export async function updateUfNumero(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const uf_numero_raw = formData.get("uf_numero");
+  const uf_numero = uf_numero_raw && String(uf_numero_raw).trim() !== "" ? Number(uf_numero_raw) : null;
+  const consorcio_cuit = formData.get("consorcio_cuit") as string;
+  await query("UPDATE app.unidades SET uf_numero = $1 WHERE id = $2", [uf_numero, id]);
+  revalidatePath(`/consorcios/${consorcio_cuit}`);
+}
+
 export async function createUnidad(formData: FormData) {
   const consorcio_cuit = formData.get("consorcio_cuit") as string;
   const uf_numero_raw = formData.get("uf_numero");

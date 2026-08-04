@@ -1,6 +1,6 @@
 "use server";
 
-import { pool } from "@/lib/db";
+import { pool, query } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
 import { runCalculateExpenses } from "@/lib/expenses/engine";
@@ -111,6 +111,34 @@ export async function editarPago(formData: FormData) {
     client.release();
   }
 
+  revalidatePath("/finanzas/cuenta-corriente");
+}
+
+export async function guardarSaldosIniciales(
+  periodoId: number,
+  saldos: { unidad_id: number; saldo_anterior: number }[]
+) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const s of saldos) {
+      await client.query(
+        `INSERT INTO app.res_cuenta_periodo (periodo_id, unidad_id, saldo_anterior, coef_a, coef_b)
+         VALUES ($1, $2, $3, 0, 0)
+         ON CONFLICT (periodo_id, unidad_id) DO UPDATE SET
+           saldo_anterior = $3, updated_at = now()`,
+        [periodoId, s.unidad_id, s.saldo_anterior]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+
+  await runCalculateExpenses(periodoId);
   revalidatePath("/finanzas/cuenta-corriente");
 }
 

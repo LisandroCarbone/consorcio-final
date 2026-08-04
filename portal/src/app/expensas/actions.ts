@@ -179,8 +179,41 @@ export async function updatePeriodoVencimiento(periodoId: number, fechaVencimien
 }
 
 export async function deletePeriodo(periodoId: number) {
-  await query("DELETE FROM app.periodos_expensas WHERE id = $1 AND estado = 'abierto'", [periodoId]);
+  const periodo = await queryOne<{ consorcio_cuit: string; anio: number; mes: number }>(
+    "SELECT consorcio_cuit, anio, mes FROM app.periodos_expensas WHERE id = $1",
+    [periodoId]
+  );
+  if (!periodo) return;
+
+  const later = await query<{ id: number }>(
+    `SELECT id FROM app.periodos_expensas
+     WHERE consorcio_cuit = $1 AND (anio > $2 OR (anio = $2 AND mes > $3)) LIMIT 1`,
+    [periodo.consorcio_cuit, periodo.anio, periodo.mes]
+  );
+  if (later.length > 0) throw new Error("Solo se puede eliminar el último período del consorcio.");
+
+  const extractoIds = (await query<{ id: number }>(
+    "SELECT id FROM app.extractos_bancarios WHERE periodo_id = $1", [periodoId]
+  )).map(e => e.id);
+
+  if (extractoIds.length > 0) {
+    await query(
+      `UPDATE app.extracto_movimientos
+       SET estado_match = 'pendiente', match_tipo = NULL, match_id = NULL, match_confianza = NULL
+       WHERE extracto_id = ANY($1) AND match_tipo = 'gasto'
+         AND match_id IN (SELECT id FROM app.gastos_periodo WHERE periodo_id = $2)`,
+      [extractoIds, periodoId]
+    );
+    await query("DELETE FROM app.extracto_movimientos WHERE extracto_id = ANY($1)", [extractoIds]);
+    await query("DELETE FROM app.extractos_bancarios WHERE periodo_id = $1", [periodoId]);
+  }
+
+  await query("DELETE FROM app.res_cuenta_periodo WHERE periodo_id = $1", [periodoId]);
+  await query("DELETE FROM app.gastos_periodo WHERE periodo_id = $1", [periodoId]);
+  await query("DELETE FROM app.periodos_expensas WHERE id = $1", [periodoId]);
+
   revalidatePath("/expensas");
+  revalidatePath("/finanzas/cuenta-corriente");
 }
 
 // ── Previsiones / Provisiones ──────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { query, queryOne, pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import * as XLSX from "xlsx";
 import { categorizeBankCharge } from "@/lib/conciliacion/categorizeBankCharge";
+import { runCalculateExpenses } from "@/lib/expenses/engine";
 
 const BASE_PATH = "/expensas/conciliacion-bancaria";
 const RUBRO_GASTOS_BANCARIOS = 6;
@@ -431,6 +432,17 @@ export async function uploadExtracto(formData: FormData) {
       const syntheticRef =
         m.referencia || `${m.fecha || "nodate"}_${m.monto}_${(m.descripcion || "").slice(0, 20)}`;
       const categoriaBancaria = m.monto < 0 ? categorizeBankCharge(m.descripcion) : null;
+      const absM = Math.abs(m.monto);
+
+      const dup = await client.query(
+        `SELECT 1 FROM app.extracto_movimientos em
+         JOIN app.extractos_bancarios eb ON eb.id = em.extracto_id
+         WHERE eb.periodo_id = $1 AND em.fecha = $2 AND em.monto = $3 AND em.referencia = $4
+         LIMIT 1`,
+        [periodoId, m.fecha, absM, syntheticRef]
+      );
+      if ((dup.rowCount ?? 0) > 0) continue;
+
       const res = await client.query(
         `INSERT INTO app.extracto_movimientos
           (extracto_id, fecha, descripcion, referencia, monto, es_credito, cbu_origen, cuit_origen, nombre_origen, estado_match, categoria_bancaria, match_tipo)
@@ -441,7 +453,7 @@ export async function uploadExtracto(formData: FormData) {
           m.fecha,
           m.descripcion,
           syntheticRef,
-          Math.abs(m.monto),
+          absM,
           m.monto > 0,
           m.cbu_origen,
           m.cuit_origen,
@@ -536,10 +548,11 @@ export async function runAutoMatch(extractoId: number) {
     cuit_origen: string | null;
     nombre_origen: string | null;
     categoria_bancaria: string | null;
+    fecha: string;
   }>(
-    `SELECT id, monto::numeric, es_credito, descripcion, cbu_origen, cuit_origen, nombre_origen, categoria_bancaria
+    `SELECT id, monto::numeric, es_credito, descripcion, cbu_origen, cuit_origen, nombre_origen, categoria_bancaria, fecha
      FROM app.extracto_movimientos
-     WHERE extracto_id = $1 AND estado_match IN ('pendiente', 'sugerido')`,
+     WHERE extracto_id = $1 AND estado_match IN ('pendiente', 'sugerido', 'rechazado')`,
     [extractoId]
   );
   if (movimientos.length === 0) return;
@@ -569,9 +582,18 @@ export async function runAutoMatch(extractoId: number) {
     [extracto.consorcio_cuit]
   );
 
-  const gastos = await query<{ id: number; descripcion: string; monto: string }>(
-    "SELECT id, descripcion, monto::numeric FROM app.gastos_periodo WHERE periodo_id = $1",
-    [extracto.periodo_id]
+  const allPeriodoIds = await query<{ id: number }>(
+    "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1",
+    [extracto.consorcio_cuit]
+  );
+  const periodoIds = allPeriodoIds.map((p) => p.id);
+
+  const gastos = await query<{ id: number; descripcion: string; monto: string; periodo_id: number; periodo_anio: number; periodo_mes: number }>(
+    `SELECT gp.id, gp.descripcion, gp.monto::numeric, gp.periodo_id, pe.anio AS periodo_anio, pe.mes AS periodo_mes
+     FROM app.gastos_periodo gp
+     JOIN app.periodos_expensas pe ON pe.id = gp.periodo_id
+     WHERE gp.periodo_id = ANY($1)`,
+    [periodoIds]
   );
 
   const formatoCobro = consorcio?.formato_cobro || "";
@@ -579,8 +601,20 @@ export async function runAutoMatch(extractoId: number) {
   for (const mov of movimientos) {
     const monto = Number(mov.monto);
 
+    if (!mov.categoria_bancaria && !mov.es_credito) {
+      const cat = categorizeBankCharge(mov.descripcion);
+      if (cat) {
+        await query(
+          `UPDATE app.extracto_movimientos
+           SET categoria_bancaria = $1, match_tipo = NULL, match_id = NULL, match_confianza = NULL, estado_match = 'pendiente'
+           WHERE id = $2`,
+          [cat, mov.id]
+        );
+        mov.categoria_bancaria = cat;
+      }
+    }
+
     if (mov.categoria_bancaria) {
-      // Already classified as a bank charge at parse time; skip credit/gasto matching.
       continue;
     }
 
@@ -669,6 +703,42 @@ export async function runAutoMatch(extractoId: number) {
         }
       }
 
+      if (!matched && /AFIP|VEP/i.test(mov.descripcion)) {
+        const afipGastos = gastos.filter((g) => /AFIP|ARCA/i.test(g.descripcion) && Number(g.monto) > 0);
+        const byPeriodo = new Map<number, typeof afipGastos>();
+        for (const g of afipGastos) {
+          const arr = byPeriodo.get(g.periodo_id) || [];
+          arr.push(g);
+          byPeriodo.set(g.periodo_id, arr);
+        }
+        const movDate = new Date(mov.fecha);
+        const movYM = movDate.getFullYear() * 12 + movDate.getMonth();
+        const entries = Array.from(byPeriodo.entries())
+          .map(([pid, items]) => {
+            const g0 = items[0];
+            const pYM = g0.periodo_anio * 12 + (g0.periodo_mes - 1);
+            return { pid, items, dist: Math.abs(movYM - pYM) };
+          })
+          .sort((a, b) => a.dist - b.dist);
+        for (const { items } of entries) {
+          if (items.length > 1) {
+            const sum = items.reduce((s, g) => s + Number(g.monto), 0);
+            if (Math.abs(sum - monto) < 1.0) {
+              matched = { gasto_id: items[0].id, confianza: 0.85 };
+              break;
+            }
+            const f931 = items.filter((g) => /F\.\s*931/i.test(g.descripcion));
+            if (f931.length > 1) {
+              const f931Sum = f931.reduce((s, g) => s + Number(g.monto), 0);
+              if (Math.abs(f931Sum - monto) < 1.0) {
+                matched = { gasto_id: f931[0].id, confianza: 0.85 };
+                break;
+              }
+            }
+          }
+        }
+      }
+
       if (matched) {
         await query(
           `UPDATE app.extracto_movimientos
@@ -748,6 +818,29 @@ export async function rechazarMatch(movimientoId: number) {
   revalidatePath(BASE_PATH);
 }
 
+export async function desconfirmarMatch(movimientoId: number) {
+  await query(
+    `UPDATE app.extracto_movimientos SET estado_match = 'sugerido' WHERE id = $1`,
+    [movimientoId]
+  );
+  revalidatePath(BASE_PATH);
+}
+
+export async function descartarMovimiento(movimientoId: number) {
+  const mov = await queryOne<{ extracto_id: number }>(
+    "SELECT extracto_id FROM app.extracto_movimientos WHERE id = $1",
+    [movimientoId]
+  );
+  await query(
+    `UPDATE app.extracto_movimientos
+     SET estado_match = 'descartado', match_tipo = NULL, match_id = NULL, match_confianza = NULL
+     WHERE id = $1`,
+    [movimientoId]
+  );
+  if (mov) await updateExtractoMatchedCount(mov.extracto_id);
+  revalidatePath(BASE_PATH);
+}
+
 export async function asignarManual(movimientoId: number, tipo: "cobranza" | "gasto", targetId: number) {
   const mov = await queryOne<{
     extracto_id: number;
@@ -793,8 +886,8 @@ export async function asignarManual(movimientoId: number, tipo: "cobranza" | "ga
 // ─────────────────────────────────────────────────────────────────────────
 
 export async function aplicarCreditos(extractoId: number) {
-  const extracto = await queryOne<{ consorcio_cuit: string; estado: string }>(
-    "SELECT consorcio_cuit, estado FROM app.extractos_bancarios WHERE id = $1",
+  const extracto = await queryOne<{ consorcio_cuit: string; estado: string; periodo_id: number | null }>(
+    "SELECT consorcio_cuit, estado, periodo_id FROM app.extractos_bancarios WHERE id = $1",
     [extractoId]
   );
   if (!extracto) throw new Error("Extracto no encontrado");
@@ -841,8 +934,13 @@ export async function aplicarCreditos(extractoId: number) {
     client.release();
   }
 
+  if (extracto.periodo_id) {
+    await runCalculateExpenses(extracto.periodo_id);
+  }
+
   revalidatePath(BASE_PATH);
   revalidatePath("/expensas");
+  revalidatePath("/finanzas/cuenta-corriente");
   return count;
 }
 
@@ -854,8 +952,11 @@ export const aplicarConciliacion = aplicarCreditos;
 // ─────────────────────────────────────────────────────────────────────────
 
 export async function aplicarDebitos(extractoId: number): Promise<{ chargesCreated: number; gastosLinked: number }> {
-  const extracto = await queryOne<{ consorcio_cuit: string; periodo_id: number }>(
-    "SELECT consorcio_cuit, periodo_id FROM app.extractos_bancarios WHERE id = $1",
+  const extracto = await queryOne<{ consorcio_cuit: string; periodo_id: number; mes: number; anio: number }>(
+    `SELECT e.consorcio_cuit, e.periodo_id, p.mes, p.anio
+     FROM app.extractos_bancarios e
+     JOIN app.periodos_expensas p ON p.id = e.periodo_id
+     WHERE e.id = $1`,
     [extractoId]
   );
   if (!extracto) throw new Error("Extracto no encontrado");
@@ -895,13 +996,16 @@ export async function aplicarDebitos(extractoId: number): Promise<{ chargesCreat
       [extractoId]
     );
 
-    for (const mov of bankCharges) {
+    if (bankCharges.length > 0) {
+      const total = bankCharges.reduce((sum, mov) => sum + Math.abs(Number(mov.monto)), 0);
+      const mesStr = String(extracto.mes).padStart(2, "0");
+      const anioStr = String(extracto.anio);
       await client.query(
-        `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, debitado, extracto_movimiento_id)
-         VALUES ($1, $2, $3, $4, 'A', true, $5)`,
-        [extracto.periodo_id, RUBRO_GASTOS_BANCARIOS, mov.descripcion, Math.abs(Number(mov.monto)), mov.id]
+        `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, debitado)
+         VALUES ($1, $2, $3, $4, 'A', true)`,
+        [extracto.periodo_id, RUBRO_GASTOS_BANCARIOS, `Gastos Bancarios período ${mesStr}/${anioStr}`, total]
       );
-      chargesCreated++;
+      chargesCreated = 1;
     }
 
     for (const mov of matchedGastos) {
@@ -998,9 +1102,11 @@ export async function getReconciliacionSummary(
     : null;
 
   const gastosBancariosRow = await queryOne<{ total: string }>(
-    `SELECT COALESCE(SUM(monto), 0)::text AS total
-     FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = $2`,
-    [periodoId, RUBRO_GASTOS_BANCARIOS]
+    `SELECT COALESCE(SUM(m.monto), 0)::text AS total
+     FROM app.extracto_movimientos m
+     JOIN app.extractos_bancarios e ON e.id = m.extracto_id
+     WHERE e.periodo_id = $1 AND m.categoria_bancaria IS NOT NULL`,
+    [periodoId]
   );
   const gastosBancarios = gastosBancariosRow ? Number(gastosBancariosRow.total) : 0;
 
@@ -1014,6 +1120,41 @@ export async function getReconciliacionSummary(
     gastosBancarios,
     pendingCount: pending.length,
   };
+}
+
+export async function cargarGastosBancarios(periodoId: number) {
+  const movs = await query<{ monto: string; descripcion: string }>(
+    `SELECT m.monto::text, m.descripcion
+     FROM app.extracto_movimientos m
+     JOIN app.extractos_bancarios e ON e.id = m.extracto_id
+     WHERE e.periodo_id = $1 AND m.categoria_bancaria IS NOT NULL`,
+    [periodoId]
+  );
+  if (movs.length === 0) throw new Error("No hay gastos bancarios para cargar");
+
+  const total = movs.reduce((s, m) => s + Number(m.monto), 0);
+
+  const existing = await queryOne<{ id: number }>(
+    "SELECT id FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = 6 AND tipo = 'A' LIMIT 1",
+    [periodoId]
+  );
+
+  const descripcion = `Gastos bancarios extracto (${movs.length} movimientos)`;
+
+  if (existing) {
+    await query(
+      "UPDATE app.gastos_periodo SET monto = $1, descripcion = $2 WHERE id = $3",
+      [total, descripcion, existing.id]
+    );
+  } else {
+    await query(
+      `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo)
+       VALUES ($1, 6, $2, $3, 'A')`,
+      [periodoId, descripcion, total]
+    );
+  }
+
+  revalidatePath(BASE_PATH);
 }
 
 export async function eliminarExtracto(extractoId: number) {

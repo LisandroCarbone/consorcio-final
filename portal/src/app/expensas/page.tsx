@@ -132,14 +132,14 @@ async function getEstadoFinanciero(periodoId: number, consorcioCuit: string, ani
       `SELECT COALESCE(p.ef_saldo_anterior, 0)::numeric AS ef_saldo_anterior,
               COALESCE((SELECT SUM(monto) FROM app.pagos WHERE consorcio_cuit = $1 AND fecha >= ($4 || '-01')::date AND fecha < ($4 || '-01')::date + interval '1 month'), 0)::numeric AS cobranzas,
               COALESCE(p.ef_cobranzas_sin_identificar, 0)::numeric AS cobranzas_sin_id,
-              COALESCE((SELECT SUM(monto) FROM app.gastos_periodo WHERE periodo_id = p.id), 0)::numeric AS gastos,
+              COALESCE((SELECT SUM(monto) FROM app.gastos_periodo WHERE periodo_id = p.id AND (es_provision = false OR es_provision IS NULL)), 0)::numeric AS gastos,
               '0' AS gastos_extra_sum
        FROM app.periodos_expensas p
        WHERE p.consorcio_cuit = $1 AND p.anio = $2 AND p.mes = $3`,
       [consorcioCuit, prevAnio, prevMes, `${prevAnio}-${String(prevMes).padStart(2, "0")}`]
     ),
     queryOne<{ total: string }>(
-      "SELECT COALESCE(SUM(monto), 0)::numeric AS total FROM app.gastos_periodo WHERE periodo_id = $1",
+      "SELECT COALESCE(SUM(monto), 0)::numeric AS total FROM app.gastos_periodo WHERE periodo_id = $1 AND (es_provision = false OR es_provision IS NULL)",
       [periodoId]
     ),
   ]);
@@ -398,6 +398,7 @@ export default async function ExpensasPage({
                         periodoId={p.id}
                         fechaVencimiento={p.fecha_vencimiento}
                         estado={p.estado}
+                        esUltimoPeriodo={periodos.length > 0 && periodos[0].id === p.id}
                       />
                     </div>
                   </li>
@@ -638,12 +639,10 @@ export default async function ExpensasPage({
                   <div className="flex gap-2 flex-wrap">
                     <RegenerarCat1Button periodoId={selected.id} />
                     <CopiarGastosButton periodoId={selected.id} />
-                    {(isUltimoPeriodo || checklist?.isProrrateoDesactualizado) && (
-                      <RecalcularButton
-                        periodoId={selected.id}
-                        isDesactualizado={checklist?.isProrrateoDesactualizado}
-                      />
-                    )}
+                    <RecalcularButton
+                      periodoId={selected.id}
+                      isDesactualizado={checklist?.isProrrateoDesactualizado}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-center">

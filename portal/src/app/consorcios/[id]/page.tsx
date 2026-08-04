@@ -4,6 +4,7 @@ import Link from "next/link";
 import { query, queryOne } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { createUnidad, createPersonaAndOcupante } from "../actions";
+import { UfNumeroCell } from "./UfNumeroCell";
 import { formatCuit, formatPhone } from "@/lib/format";
 
 interface Props {
@@ -95,7 +96,9 @@ export default async function ConsorcioDetailPage({ params }: Props) {
             <tbody>
               {unidades.map((u) => (
                 <tr key={u.id} className="table-row hover:bg-gray-50">
-                  <td className="td font-mono text-gray-500 text-sm text-center w-12">{u.uf_numero ?? "—"}</td>
+                  <td className="td font-mono text-gray-500 text-sm text-center w-16 p-0">
+                    <UfNumeroCell id={u.id} consorcioCuit={id} defaultValue={u.uf_numero} />
+                  </td>
                   <td className="td font-medium">{u.uf}</td>
                   <td className="td text-gray-500 capitalize">{u.tipo}</td>
                   <td className="td text-right font-mono text-sm">{parseFloat(u.coef_a).toFixed(4)}</td>

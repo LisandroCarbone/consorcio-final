@@ -34,10 +34,10 @@ export function EstadoFinancieroSection({ data }: Props) {
   const gastosExtraTotal = gastosExtra.reduce((s, g) => s + g.monto, 0);
 
   const rows: { label: string; value: number; bold?: boolean; negative?: boolean; editable?: string }[] = [
-    { label: "Saldo anterior (Conf. Art. 10 inc. c Ley N°941)", value: data.saldoAnterior, editable: "ef_saldo_anterior" },
+    { label: "Saldo anterior", value: data.saldoAnterior, editable: "ef_saldo_anterior" },
     { label: "Cobranzas del período", value: data.cobranzas },
     { label: "Cobranzas bancarias sin identificar", value: data.cobranzasSinIdentificar, editable: "ef_cobranzas_sin_identificar" },
-    { label: "Pagos del período (gastos A y B)", value: -data.totalGastos, negative: true },
+    { label: "Pagos del período", value: -data.totalGastos, negative: true },
   ];
 
   const handleSave = (fd: FormData) => {
@@ -72,7 +72,7 @@ export function EstadoFinancieroSection({ data }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-lg">💰</span>
           <h3 className="font-semibold text-gray-800 text-base">Estado Financiero</h3>
-          <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Caja</span>
+          <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Caja — Conf. Art. 10 inc. c Ley N°941</span>
         </div>
         <div className="flex items-center gap-3">
           {!editing && (
@@ -92,13 +92,14 @@ export function EstadoFinancieroSection({ data }: Props) {
           <input type="hidden" name="periodo_id" value={data.periodoId} />
 
           <div className="px-5 py-3 flex items-center justify-between hover:bg-gray-50/50">
-            <span className="text-sm text-gray-700">Saldo anterior (Conf. Art. 10 inc. c Ley N°941)</span>
+            <span className="text-sm text-gray-700">Saldo anterior</span>
             <div className="w-48">
               <MaskedInput
                 preset="money"
                 name="ef_saldo_anterior"
                 defaultValue={data.saldoAnterior}
                 className="input text-right text-sm"
+                allowNegative
               />
             </div>
           </div>
@@ -121,7 +122,7 @@ export function EstadoFinancieroSection({ data }: Props) {
           </div>
 
           <div className="px-5 py-3 flex items-center justify-between bg-gray-50/30">
-            <span className="text-sm text-gray-500">Pagos del período (gastos A y B)</span>
+            <span className="text-sm text-gray-500">Pagos del período</span>
             <span className="font-mono text-sm text-red-600">-{formatMoney(data.totalGastos)}</span>
           </div>
 
@@ -129,14 +130,42 @@ export function EstadoFinancieroSection({ data }: Props) {
           <div className="px-5 py-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Movimientos adicionales</p>
             {gastosExtra.map((g, i) => (
-              <div key={i} className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-gray-700">{g.concepto}</span>
-                <div className="flex items-center gap-2">
-                  <span className={`font-mono text-sm ${g.monto < 0 ? "text-red-600" : "text-gray-900"}`}>
-                    {g.monto < 0 ? `-${formatMoney(Math.abs(g.monto))}` : formatMoney(g.monto)}
-                  </span>
-                  <button type="button" onClick={() => removeGastoExtra(i)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                </div>
+              <div key={i} className="flex items-center gap-2 py-1.5">
+                <input
+                  className="input text-sm flex-1"
+                  value={g.concepto}
+                  onChange={(e) => {
+                    const updated = [...gastosExtra];
+                    updated[i] = { ...updated[i], concepto: e.target.value };
+                    setGastosExtra(updated);
+                  }}
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  className="input text-sm text-right w-36"
+                  value={Math.abs(g.monto)}
+                  onChange={(e) => {
+                    const abs = Math.abs(Number(e.target.value) || 0);
+                    const updated = [...gastosExtra];
+                    updated[i] = { ...updated[i], monto: g.monto < 0 ? -abs : abs };
+                    setGastosExtra(updated);
+                  }}
+                />
+                <select
+                  className="input text-sm w-24"
+                  value={g.monto < 0 ? "egreso" : "ingreso"}
+                  onChange={(e) => {
+                    const abs = Math.abs(g.monto);
+                    const updated = [...gastosExtra];
+                    updated[i] = { ...updated[i], monto: e.target.value === "egreso" ? -abs : abs };
+                    setGastosExtra(updated);
+                  }}
+                >
+                  <option value="egreso">Egreso</option>
+                  <option value="ingreso">Ingreso</option>
+                </select>
+                <button type="button" onClick={() => removeGastoExtra(i)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
               </div>
             ))}
             <div className="flex gap-2 mt-2 items-end">

@@ -80,10 +80,15 @@ async function getData(consorcioCuit: string, periodoId: number | null, periodoA
       )
     : [];
 
-  const gastos = periodoId
-    ? await query<{ id: number; descripcion: string; monto: string }>(
-        "SELECT id, descripcion, monto::text FROM app.gastos_periodo WHERE periodo_id = $1 ORDER BY descripcion",
-        [periodoId]
+  const gastos = consorcioCuit
+    ? await query<{ id: number; descripcion: string; monto: string; periodo_label: string }>(
+        `SELECT gp.id, gp.descripcion, gp.monto::text,
+                pe.mes || '/' || pe.anio AS periodo_label
+         FROM app.gastos_periodo gp
+         JOIN app.periodos_expensas pe ON pe.id = gp.periodo_id
+         WHERE pe.consorcio_cuit = $1
+         ORDER BY pe.anio DESC, pe.mes DESC, gp.descripcion`,
+        [consorcioCuit]
       )
     : [];
 

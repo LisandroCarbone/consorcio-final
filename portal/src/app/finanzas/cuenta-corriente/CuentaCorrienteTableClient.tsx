@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { IMaskInput } from "react-imask";
 import { formatMoney } from "@/lib/format";
-import { registrarPago } from "../actions";
+import { registrarPago, guardarSaldosIniciales } from "../actions";
 
 export interface CuentaCorrienteRow {
   unidad_id: number;
@@ -32,6 +34,8 @@ export interface CuentaCorrienteRow {
 interface CuentaCorrienteTableClientProps {
   consorcioCuit: string;
   data: CuentaCorrienteRow[];
+  esPrimerPeriodo?: boolean;
+  periodoId?: number | null;
 }
 
 function money(n: number) {
@@ -58,9 +62,15 @@ function MoneyCell({ value, bold = false }: { value: number; bold?: boolean }) {
 export function CuentaCorrienteTableClient({
   consorcioCuit,
   data,
+  esPrimerPeriodo = false,
+  periodoId,
 }: CuentaCorrienteTableClientProps) {
+  const router = useRouter();
   const [pagoUnidad, setPagoUnidad] = useState<CuentaCorrienteRow | null>(null);
   const [montoInput, setMontoInput] = useState("");
+  const [editandoSaldos, setEditandoSaldos] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [saldosEdit, setSaldosEdit] = useState<Record<number, number>>({});
 
   const totals = data.reduce(
     (acc, r) => ({
@@ -96,6 +106,58 @@ export function CuentaCorrienteTableClient({
           No hay unidades registradas en este consorcio.
         </div>
       ) : (
+        <>
+        {esPrimerPeriodo && periodoId && (
+          <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
+            <p className="text-xs text-amber-800">
+              <strong>Primer período:</strong> podés cargar los saldos anteriores de cada unidad para iniciar la cuenta corriente.
+            </p>
+            <div className="flex gap-2">
+              {editandoSaldos ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { setEditandoSaldos(false); setSaldosEdit({}); }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50"
+                    disabled={guardando}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={guardando}
+                    onClick={async () => {
+                      setGuardando(true);
+                      try {
+                        const saldos = data.map((r) => ({
+                          unidad_id: r.unidad_id,
+                          saldo_anterior: saldosEdit[r.unidad_id] ?? (Number(r.saldo_anterior) || 0),
+                        }));
+                        await guardarSaldosIniciales(periodoId!, saldos);
+                        setEditandoSaldos(false);
+                        setSaldosEdit({});
+                        router.refresh();
+                      } finally {
+                        setGuardando(false);
+                      }
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium"
+                  >
+                    {guardando ? "Guardando..." : "Guardar saldos"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditandoSaldos(true)}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium"
+                >
+                  Cargar saldos iniciales
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs border-collapse">
             <thead>
@@ -127,7 +189,29 @@ export function CuentaCorrienteTableClient({
                   <td className="py-2 px-3 text-gray-700 whitespace-nowrap sticky left-[60px] bg-inherit z-10">
                     {r.propietario ?? "—"}
                   </td>
-                  <MoneyCell value={Number(r.saldo_anterior)} />
+                  {editandoSaldos ? (
+                    <td className="py-1 px-2">
+                      <IMaskInput
+                        mask={Number}
+                        scale={2}
+                        radix=","
+                        mapToRadix={["."]}
+                        thousandsSeparator="."
+                        padFractionalZeros={true}
+                        normalizeZeros={true}
+                        min={-99999999}
+                        defaultValue={Number(r.saldo_anterior) ? Number(r.saldo_anterior).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".") : ""}
+                        onAccept={(value: string) => {
+                          const num = Number(value.replace(/\./g, "").replace(",", ".")) || 0;
+                          setSaldosEdit((prev) => ({ ...prev, [r.unidad_id]: num }));
+                        }}
+                        className="input text-xs text-right w-full py-1 px-2"
+                        placeholder="0,00"
+                      />
+                    </td>
+                  ) : (
+                    <MoneyCell value={Number(r.saldo_anterior)} />
+                  )}
                   <MoneyCell value={-Number(r.su_pago)} />
                   <td className="py-2 px-3 text-right font-mono text-gray-500">
                     {formatPercent(Number(r.coef_a))}
@@ -196,6 +280,7 @@ export function CuentaCorrienteTableClient({
             </tfoot>
           </table>
         </div>
+        </>
       )}
 
       {/* Modal para Registrar Pago */}

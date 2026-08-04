@@ -16,7 +16,7 @@ async function getCuentaCorriente(
   return query<CuentaCorrienteRow>(
     `SELECT
        u.id AS unidad_id,
-       u.uf::text AS unidad_numero,
+       COALESCE(u.uf_numero::text, u.uf::text) AS unidad_numero,
        NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '') AS propietario,
        COALESCE(rcp.saldo_anterior, 0)::numeric AS saldo_anterior,
        COALESCE(rcp.su_pago, 0)::numeric AS su_pago,
@@ -40,7 +40,7 @@ async function getCuentaCorriente(
      LEFT JOIN app.periodos_expensas pe ON pe.consorcio_cuit = u.consorcio_cuit AND pe.anio = $2 AND pe.mes = $3
      LEFT JOIN app.res_cuenta_periodo rcp ON rcp.unidad_id = u.id AND rcp.periodo_id = pe.id
      WHERE u.consorcio_cuit = $1
-     ORDER BY u.uf`,
+     ORDER BY u.uf_numero NULLS LAST, u.uf`,
     [consorcioCuit, anio, mes]
   );
 }
@@ -84,13 +84,31 @@ export default async function CuentaCorrientePage({
     ? activePeriodo.split("-").map(Number)
     : [new Date().getFullYear(), new Date().getMonth() + 1];
 
-  const [consorcios, rows, cobrosTrend] = await Promise.all([
+  let prevYear = mes === 1 ? anio - 1 : anio;
+  let prevMonth = mes === 1 ? 12 : mes - 1;
+
+  const [consorcios, rows, cobrosTrend, periodoRow, prevPeriodoRow] = await Promise.all([
     query<{ cuit: string; nombre: string }>(
       "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
     ),
     activeCuit ? getCuentaCorriente(activeCuit, anio, mes) : Promise.resolve([] as CuentaCorrienteRow[]),
-    activeCuit ? getCobrosTrend(activeCuit) : Promise.resolve([])
+    activeCuit ? getCobrosTrend(activeCuit) : Promise.resolve([]),
+    activeCuit
+      ? query<{ id: number }>(
+          "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 AND anio = $2 AND mes = $3",
+          [activeCuit, anio, mes]
+        )
+      : Promise.resolve([]),
+    activeCuit
+      ? query<{ id: number }>(
+          "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 AND anio = $2 AND mes = $3",
+          [activeCuit, prevYear, prevMonth]
+        )
+      : Promise.resolve([]),
   ]);
+
+  const periodoId = periodoRow[0]?.id ?? null;
+  const esPrimerPeriodo = !!periodoId && prevPeriodoRow.length === 0;
 
   if (!activeCuit) {
     return (
@@ -205,7 +223,7 @@ export default async function CuentaCorrientePage({
           {rows.length > 0 ? (
             <div className="card overflow-hidden">
               <Suspense fallback={null}>
-                <CuentaCorrienteTableClient consorcioCuit={selectedCuit} data={rows} />
+                <CuentaCorrienteTableClient consorcioCuit={selectedCuit} data={rows} esPrimerPeriodo={esPrimerPeriodo} periodoId={periodoId} />
               </Suspense>
             </div>
           ) : (

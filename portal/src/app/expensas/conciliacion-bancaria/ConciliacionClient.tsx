@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatMoney, formatDate } from "@/lib/format";
 import { bankChargeLabel } from "@/lib/conciliacion/categorizeBankCharge";
 import {
@@ -8,7 +9,10 @@ import {
   runAutoMatch,
   confirmarMatch,
   rechazarMatch,
+  desconfirmarMatch,
+  descartarMovimiento,
   asignarManual,
+  cargarGastosBancarios,
   aplicarCreditos,
   aplicarDebitos,
   eliminarExtracto,
@@ -56,9 +60,11 @@ type Movimiento = {
 };
 
 type Unidad = { id: number; uf: string; uf_numero: number | null; propietario: string | null };
-type Gasto = { id: number; descripcion: string; monto: string };
+type Gasto = { id: number; descripcion: string; monto: string; periodo_label: string };
 
-type Filter = "all" | "creditos" | "debitos" | "matcheados" | "sin_match" | "confirmados";
+type TipoFilter = "todos" | "creditos" | "debitos";
+type MatchFilter = "todos" | "matcheados" | "sin_match";
+type EstadoFilter = "todos" | "confirmados" | "sin_confirmar";
 type Tab = "movimientos" | "gastos_bancarios" | "pendientes" | "resumen";
 
 export function ConciliacionClient({
@@ -84,15 +90,19 @@ export function ConciliacionClient({
   pendingDebits: PendingDebit[];
   summary: ReconciliacionSummary | null;
 }) {
+  const [localMovimientos, setLocalMovimientos] = useState(movimientos);
   const [isUploading, setIsUploading] = useState(false);
   const [isApplyingCreditos, setIsApplyingCreditos] = useState(false);
   const [isApplyingDebitos, setIsApplyingDebitos] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [corteLabel, setCorteLabel] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [tipoFilter, setTipoFilter] = useState<TipoFilter>("todos");
+  const [matchFilter, setMatchFilter] = useState<MatchFilter>("todos");
+  const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>("todos");
   const [tab, setTab] = useState<Tab>("movimientos");
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
   const [assignOpenFor, setAssignOpenFor] = useState<number | null>(null);
+  const assignTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const unidadMap = useMemo(() => {
     const m = new Map<number, Unidad>();
@@ -124,31 +134,24 @@ export function ConciliacionClient({
     ? Number(extractos[0].saldo_cierre)
     : null;
 
-  const movimientosBancarios = movimientos.filter((m) => m.categoria_bancaria !== null);
+  const movimientosBancarios = localMovimientos.filter((m) => m.categoria_bancaria !== null);
 
-  const filteredMovimientos = movimientos.filter((m) => {
-    switch (filter) {
-      case "creditos":
-        return m.es_credito;
-      case "debitos":
-        return !m.es_credito;
-      case "matcheados":
-        return m.match_tipo !== null;
-      case "sin_match":
-        return m.match_tipo === null;
-      case "confirmados":
-        return m.estado_match === "confirmado";
-      default:
-        return true;
-    }
+  const filteredMovimientos = localMovimientos.filter((m) => {
+    if (tipoFilter === "creditos" && !m.es_credito) return false;
+    if (tipoFilter === "debitos" && m.es_credito) return false;
+    if (matchFilter === "matcheados" && m.match_tipo === null) return false;
+    if (matchFilter === "sin_match" && m.match_tipo !== null) return false;
+    if (estadoFilter === "confirmados" && m.estado_match !== "confirmado") return false;
+    if (estadoFilter === "sin_confirmar" && m.estado_match === "confirmado") return false;
+    return true;
   });
 
-  const confirmedCobranzas = movimientos.filter(
+  const confirmedCobranzas = localMovimientos.filter(
     (m) => m.estado_match === "confirmado" && m.match_tipo === "cobranza" && m.es_credito
   );
   const confirmedTotal = confirmedCobranzas.reduce((s, m) => s + Number(m.monto), 0);
 
-  const confirmedDebitos = movimientos.filter(
+  const confirmedDebitos = localMovimientos.filter(
     (m) =>
       m.estado_match === "confirmado" &&
       !m.es_credito &&
@@ -173,11 +176,18 @@ export function ConciliacionClient({
     }
   }
 
-  async function withPending(id: number, fn: () => Promise<void>) {
+  async function withPending(id: number, fn: () => Promise<void>, updater?: (m: Movimiento) => Movimiento) {
     setPendingIds((prev) => new Set(prev).add(id));
     try {
       await fn();
-      window.location.reload();
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      if (updater) {
+        setLocalMovimientos((prev) => prev.map((m) => (m.id === id ? updater(m) : m)));
+      }
     } catch (e) {
       setPendingIds((prev) => {
         const next = new Set(prev);
@@ -282,11 +292,24 @@ export function ConciliacionClient({
               <p className="text-xs text-gray-500">Saldo Final</p>
               <p className="text-sm font-bold text-gray-800">{saldoCierre !== null ? formatMoney(saldoCierre) : "—"}</p>
             </div>
-            <div className="card p-4">
+            <div className="card p-4 group relative">
               <p className="text-xs text-gray-500">Gastos Bancarios</p>
               <p className="text-sm font-bold text-orange-600">
                 {summary ? formatMoney(summary.gastosBancarios) : "—"}
               </p>
+              {summary && summary.gastosBancarios > 0 && (
+                <button
+                  type="button"
+                  className="absolute inset-0 flex items-center justify-center bg-orange-600/90 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={async () => {
+                    if (!periodoId || !confirm("¿Cargar gastos bancarios en expensas del período?")) return;
+                    await cargarGastosBancarios(periodoId);
+                    alert("Gastos bancarios cargados en expensas");
+                  }}
+                >
+                  Cargar en Expensas
+                </button>
+              )}
             </div>
             <div className="card p-4">
               <p className="text-xs text-gray-500">Estado</p>
@@ -382,30 +405,31 @@ export function ConciliacionClient({
           {tab === "movimientos" && (
             <>
               {/* Filters */}
-              <div className="flex flex-wrap gap-2">
-                {(
-                  [
-                    ["all", "Todos"],
-                    ["creditos", "Créditos"],
-                    ["debitos", "Débitos"],
-                    ["matcheados", "Matcheados"],
-                    ["sin_match", "Sin match"],
-                    ["confirmados", "Confirmados"],
-                  ] as [Filter, string][]
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setFilter(key)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                      filter === key
-                        ? "bg-brand-600 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
-                  >
-                    {label}
-                  </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {([["todos", "Todos"], ["creditos", "Créditos"], ["debitos", "Débitos"]] as [TipoFilter, string][]).map(([key, label]) => (
+                  <button key={key} type="button" onClick={() => setTipoFilter(key)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${tipoFilter === key ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  >{label}</button>
                 ))}
+                <span className="w-px h-5 bg-gray-300" />
+                {([["todos", "Todos"], ["matcheados", "Matcheados"], ["sin_match", "Sin match"]] as [MatchFilter, string][]).map(([key, label]) => (
+                  <button key={key} type="button" onClick={() => setMatchFilter(key)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${matchFilter === key ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  >{label}</button>
+                ))}
+                <span className="w-px h-5 bg-gray-300" />
+                {([["todos", "Todos"], ["confirmados", "Confirmados"], ["sin_confirmar", "Sin confirmar"]] as [EstadoFilter, string][]).map(([key, label]) => (
+                  <button key={key} type="button" onClick={() => setEstadoFilter(key)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${estadoFilter === key ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  >{label}</button>
+                ))}
+              </div>
+
+              {/* Filter totals */}
+              <div className="flex flex-wrap gap-4 text-xs text-gray-600 px-1">
+                <span>{filteredMovimientos.length} movimientos</span>
+                <span>Créditos: <strong className="text-green-700">{formatMoney(String(filteredMovimientos.filter(m => m.es_credito).reduce((s, m) => s + Number(m.monto), 0)))}</strong></span>
+                <span>Débitos: <strong className="text-red-600">-{formatMoney(String(filteredMovimientos.filter(m => !m.es_credito).reduce((s, m) => s + Number(m.monto), 0)))}</strong></span>
               </div>
 
               {/* Movimientos table */}
@@ -414,6 +438,7 @@ export function ConciliacionClient({
                 pendingIds={pendingIds}
                 assignOpenFor={assignOpenFor}
                 setAssignOpenFor={setAssignOpenFor}
+                assignTriggerRef={assignTriggerRef}
                 withPending={withPending}
                 confianzaColor={confianzaColor}
                 matchLabel={matchLabel}
@@ -478,6 +503,32 @@ export function ConciliacionClient({
 
           {tab === "gastos_bancarios" && (
             <div className="card overflow-hidden">
+              {movimientosBancarios.some((m) => m.estado_match !== "confirmado") && (
+                <div className="px-4 py-3 border-b border-gray-100 flex justify-end">
+                  <button
+                    type="button"
+                    className="btn-primary text-xs px-3 py-1.5"
+                    onClick={async () => {
+                      const pending = movimientosBancarios.filter((m) => m.estado_match !== "confirmado");
+                      for (const m of pending) {
+                        await confirmarMatch(m.id);
+                      }
+                      setLocalMovimientos((prev) =>
+                        prev.map((m) =>
+                          m.categoria_bancaria !== null && m.estado_match !== "confirmado"
+                            ? { ...m, estado_match: "confirmado" }
+                            : m
+                        )
+                      );
+                    }}
+                  >
+                    Confirmar todos ({movimientosBancarios.filter((m) => m.estado_match !== "confirmado").length})
+                  </button>
+                </div>
+              )}
+              <div className="px-4 py-2 border-b border-gray-100 text-xs text-gray-600">
+                {movimientosBancarios.length} gastos bancarios · Total: <strong className="text-red-600">-{formatMoney(String(movimientosBancarios.reduce((s, m) => s + Number(m.monto), 0)))}</strong>
+              </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
@@ -504,12 +555,20 @@ export function ConciliacionClient({
                         </td>
                         <td className="px-4 py-2">
                           {m.estado_match === "confirmado" ? (
-                            <span className="text-green-600 text-xs font-medium">✓ Confirmado</span>
+                            <button
+                              type="button"
+                              className="text-green-600 hover:text-red-600 text-xs font-medium group min-w-[90px] text-left"
+                              title="Desconfirmar"
+                              onClick={() => withPending(m.id, () => desconfirmarMatch(m.id), (mv) => ({ ...mv, estado_match: "sugerido" }))}
+                            >
+                              <span className="group-hover:hidden">✓ Confirmado</span>
+                              <span className="hidden group-hover:inline">✕ Desconfirmar</span>
+                            </button>
                           ) : (
                             <button
                               type="button"
                               className="text-green-600 hover:text-green-800 text-xs"
-                              onClick={() => withPending(m.id, () => confirmarMatch(m.id))}
+                              onClick={() => withPending(m.id, () => confirmarMatch(m.id), (mv) => ({ ...mv, estado_match: "confirmado" }))}
                             >
                               Confirmar
                             </button>
@@ -599,6 +658,7 @@ function MovimientosTable({
   pendingIds,
   assignOpenFor,
   setAssignOpenFor,
+  assignTriggerRef,
   withPending,
   confianzaColor,
   matchLabel,
@@ -609,7 +669,8 @@ function MovimientosTable({
   pendingIds: Set<number>;
   assignOpenFor: number | null;
   setAssignOpenFor: (id: number | null) => void;
-  withPending: (id: number, fn: () => Promise<void>) => Promise<void>;
+  assignTriggerRef: React.RefObject<HTMLButtonElement | null>;
+  withPending: (id: number, fn: () => Promise<void>, updater?: (m: Movimiento) => Movimiento) => Promise<void>;
   confianzaColor: (conf: string | null) => string;
   matchLabel: (m: Movimiento) => string;
   unidades: Unidad[];
@@ -667,18 +728,39 @@ function MovimientosTable({
                     )}
                   </td>
                   <td
-                    className={`px-4 py-2 max-w-[220px] truncate ${
+                    className={`px-4 py-2 max-w-[280px] ${
                       m.match_tipo || m.categoria_bancaria ? confianzaColor(m.match_confianza) : "text-gray-400"
                     } rounded`}
+                    title={m.match_tipo || m.categoria_bancaria ? matchLabel(m) : ""}
                   >
-                    {m.match_tipo || m.categoria_bancaria ? matchLabel(m) : "—"}
+                    <div className="truncate text-xs">
+                      {m.match_tipo || m.categoria_bancaria ? matchLabel(m) : "—"}
+                    </div>
                   </td>
                   <td className="px-4 py-2 text-gray-500">
                     {m.match_confianza ? `${Math.round(Number(m.match_confianza) * 100)}%` : "—"}
                   </td>
                   <td className="px-4 py-2">
                     {m.estado_match === "confirmado" ? (
-                      <span className="text-green-600 text-xs font-medium">✓ Confirmado</span>
+                      <button
+                        type="button"
+                        className="text-green-600 hover:text-red-600 text-xs font-medium group min-w-[90px] text-left"
+                        title="Desconfirmar"
+                        onClick={() => withPending(m.id, () => desconfirmarMatch(m.id), (mv) => ({ ...mv, estado_match: "sugerido" }))}
+                      >
+                        <span className="group-hover:hidden">✓ Confirmado</span>
+                        <span className="hidden group-hover:inline">✕ Desconfirmar</span>
+                      </button>
+                    ) : m.estado_match === "descartado" ? (
+                      <button
+                        type="button"
+                        className="text-gray-400 hover:text-blue-600 text-xs font-medium group min-w-[90px] text-left"
+                        title="Restaurar"
+                        onClick={() => withPending(m.id, () => desconfirmarMatch(m.id), (mv) => ({ ...mv, estado_match: "sugerido" }))}
+                      >
+                        <span className="group-hover:hidden">Descartado</span>
+                        <span className="hidden group-hover:inline">↩ Restaurar</span>
+                      </button>
                     ) : (
                       <div className="flex items-center gap-2 relative">
                         {(m.match_tipo || m.categoria_bancaria) && (
@@ -687,7 +769,7 @@ function MovimientosTable({
                             disabled={isPending}
                             className="text-green-600 hover:text-green-800 text-xs"
                             title="Confirmar"
-                            onClick={() => withPending(m.id, () => confirmarMatch(m.id))}
+                            onClick={() => withPending(m.id, () => confirmarMatch(m.id), (mv) => ({ ...mv, estado_match: "confirmado" }))}
                           >
                             ✅
                           </button>
@@ -698,62 +780,47 @@ function MovimientosTable({
                             disabled={isPending}
                             className="text-red-600 hover:text-red-800 text-xs"
                             title="Rechazar"
-                            onClick={() => withPending(m.id, () => rechazarMatch(m.id))}
+                            onClick={() => withPending(m.id, () => rechazarMatch(m.id), (mv) => ({ ...mv, estado_match: "pendiente", match_tipo: null, match_id: null, match_confianza: null }))}
                           >
                             ❌
                           </button>
                         )}
                         <button
                           type="button"
+                          ref={assignOpenFor === m.id ? assignTriggerRef : undefined}
                           disabled={isPending}
                           className="text-gray-500 hover:text-gray-700 text-xs"
                           title="Asignar manualmente"
-                          onClick={() => setAssignOpenFor(assignOpenFor === m.id ? null : m.id)}
+                          onClick={(e) => { assignTriggerRef.current = e.currentTarget; setAssignOpenFor(assignOpenFor === m.id ? null : m.id); }}
                         >
                           📝
                         </button>
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          className="text-gray-400 hover:text-orange-600 text-xs"
+                          title="Descartar (conciliar sin gasto)"
+                          onClick={() => withPending(m.id, () => descartarMovimiento(m.id), (mv) => ({ ...mv, estado_match: "descartado", match_tipo: null, match_id: null, match_confianza: null }))}
+                        >
+                          🚫
+                        </button>
                         {assignOpenFor === m.id && (
-                          <div className="absolute z-10 top-6 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-56 max-h-64 overflow-y-auto">
-                            {m.es_credito ? (
-                              <>
-                                <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1 px-1">
-                                  Asignar a unidad
-                                </p>
-                                {unidades.map((u) => (
-                                  <button
-                                    key={u.id}
-                                    type="button"
-                                    className="block w-full text-left px-2 py-1 text-xs hover:bg-gray-100 rounded"
-                                    onClick={() => {
-                                      setAssignOpenFor(null);
-                                      withPending(m.id, () => asignarManual(m.id, "cobranza", u.id));
-                                    }}
-                                  >
-                                    UF {u.uf_numero ?? u.uf} {u.propietario ? `- ${u.propietario}` : ""}
-                                  </button>
-                                ))}
-                              </>
-                            ) : (
-                              <>
-                                <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1 px-1">
-                                  Asignar a gasto
-                                </p>
-                                {gastos.map((g) => (
-                                  <button
-                                    key={g.id}
-                                    type="button"
-                                    className="block w-full text-left px-2 py-1 text-xs hover:bg-gray-100 rounded"
-                                    onClick={() => {
-                                      setAssignOpenFor(null);
-                                      withPending(m.id, () => asignarManual(m.id, "gasto", g.id));
-                                    }}
-                                  >
-                                    {g.descripcion} ({formatMoney(g.monto)})
-                                  </button>
-                                ))}
-                              </>
-                            )}
-                          </div>
+                          <AssignPopover
+                            movimiento={m}
+                            unidades={unidades}
+                            gastos={gastos}
+                            onClose={() => setAssignOpenFor(null)}
+                            triggerRef={assignTriggerRef}
+                            onAssign={(tipo, targetId) => {
+                              setAssignOpenFor(null);
+                              withPending(m.id, () => asignarManual(m.id, tipo, targetId), (mv) => ({
+                                ...mv,
+                                match_tipo: tipo,
+                                match_id: targetId,
+                                estado_match: "sugerido",
+                              }));
+                            }}
+                          />
                         )}
                       </div>
                     )}
@@ -772,5 +839,144 @@ function MovimientosTable({
         </table>
       </div>
     </div>
+  );
+}
+
+function AssignPopover({
+  movimiento,
+  unidades,
+  gastos,
+  onClose,
+  onAssign,
+  triggerRef,
+}: {
+  movimiento: Movimiento;
+  unidades: Unidad[];
+  gastos: Gasto[];
+  onClose: () => void;
+  onAssign: (tipo: "cobranza" | "gasto", targetId: number) => void;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const [search, setSearch] = useState("");
+  const q = search.toLowerCase();
+  const [pos, setPos] = useState<{ top: number; left: number; openUp: boolean }>({ top: 0, left: 0, openUp: false });
+  const panelW = 420;
+  const panelH = 480;
+
+  useEffect(() => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < panelH && rect.top > spaceBelow;
+      setPos({
+        top: openUp ? rect.top - panelH - 4 : rect.bottom + 4,
+        left: Math.max(8, Math.min(rect.left - panelW / 2 + rect.width / 2, window.innerWidth - panelW - 8)),
+        openUp,
+      });
+    }
+  }, [triggerRef]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const isCredit = movimiento.es_credito;
+  const filteredUnidades = unidades.filter(
+    (u) =>
+      u.uf.toLowerCase().includes(q) ||
+      (u.propietario && u.propietario.toLowerCase().includes(q)) ||
+      String(u.uf_numero).includes(q)
+  );
+  const filteredGastos = gastos.filter(
+    (g) => g.descripcion.toLowerCase().includes(q) || g.monto.includes(q)
+  );
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-40 bg-black/10" onClick={onClose} />
+      <div
+        className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-2xl flex flex-col"
+        style={{ top: Math.max(4, pos.top), left: pos.left, width: panelW, maxHeight: panelH }}
+      >
+        <div className="px-4 pt-3 pb-2 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-semibold text-gray-800">
+              {isCredit ? "Asignar a unidad" : "Asignar a gasto"}
+            </span>
+            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+          </div>
+          <div className="text-[11px] text-gray-500 mb-2 truncate">
+            {movimiento.descripcion} · <span className="font-mono font-medium">{formatMoney(movimiento.monto)}</span>
+          </div>
+          <input
+            type="text"
+            placeholder="Buscar por nombre, monto..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input text-xs w-full"
+            autoFocus
+          />
+        </div>
+        <div className="overflow-y-auto flex-1 p-1.5">
+          {isCredit ? (
+            filteredUnidades.length > 0 ? (
+              filteredUnidades.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  className="block w-full text-left px-3 py-2 text-xs hover:bg-blue-50 rounded-lg transition-colors"
+                  onClick={() => onAssign("cobranza", u.id)}
+                >
+                  <span className="font-medium text-gray-800">UF {u.uf_numero ?? u.uf}</span>
+                  {u.propietario && <span className="text-gray-500 ml-1">· {u.propietario}</span>}
+                </button>
+              ))
+            ) : (
+              <p className="text-xs text-gray-400 text-center py-4">Sin resultados</p>
+            )
+          ) : (
+            filteredGastos.length > 0 ? (
+              (() => {
+                const grouped = new Map<string, Gasto[]>();
+                filteredGastos.forEach((g) => {
+                  const key = g.periodo_label;
+                  if (!grouped.has(key)) grouped.set(key, []);
+                  grouped.get(key)!.push(g);
+                });
+                return Array.from(grouped.entries()).map(([label, items]) => (
+                  <div key={label}>
+                    <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-50">
+                      Período {label}
+                    </div>
+                    {items.map((g) => {
+                      const montoMatch = Math.abs(Number(g.monto) - Number(movimiento.monto)) < 0.01;
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          className={`flex items-center justify-between w-full text-left px-3 py-2.5 text-xs rounded-lg transition-colors ${montoMatch ? "bg-green-50 hover:bg-green-100 ring-1 ring-green-200" : "hover:bg-blue-50"}`}
+                          onClick={() => onAssign("gasto", g.id)}
+                        >
+                          <span className="font-medium text-gray-800 truncate mr-2">{g.descripcion}</span>
+                          <span className={`font-mono whitespace-nowrap ${montoMatch ? "text-green-700 font-semibold" : "text-gray-500"}`}>
+                            {formatMoney(g.monto)}
+                            {montoMatch && " ✓"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ));
+              })()
+            ) : (
+              <p className="text-xs text-gray-400 text-center py-4">Sin resultados</p>
+            )
+          )}
+        </div>
+      </div>
+    </>,
+    document.body
   );
 }

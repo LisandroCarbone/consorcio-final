@@ -50,6 +50,7 @@ type Props = {
   required?: boolean;
   className?: string;
   placeholder?: string;
+  allowNegative?: boolean;
 };
 
 function stripMask(value: string, preset: MaskPreset): string {
@@ -66,7 +67,9 @@ function toDisplay(value: string | number | null | undefined, preset: MaskPreset
   if (preset === "money") {
     const n = Number(s);
     if (isNaN(n)) return s;
-    return n.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const abs = Math.abs(n);
+    const formatted = abs.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return n < 0 ? `-${formatted}` : formatted;
   }
   if (preset === "percentage") {
     const n = Number(s);
@@ -77,10 +80,15 @@ function toDisplay(value: string | number | null | undefined, preset: MaskPreset
 }
 
 const MaskedInput = forwardRef<HTMLInputElement, Props>(function MaskedInput(
-  { preset, name, defaultValue, required, className = "input", placeholder },
+  { preset, name, defaultValue, required, className = "input", placeholder, allowNegative },
   _ref
 ) {
-  const config = MASK_CONFIGS[preset];
+  const baseConfig = MASK_CONFIGS[preset];
+  let config = baseConfig;
+  if (allowNegative) {
+    const { min: _min, ...rest } = baseConfig;
+    config = { ...rest, signed: true };
+  }
   const initial = toDisplay(defaultValue, preset);
 
   const handleAccept = useCallback(
