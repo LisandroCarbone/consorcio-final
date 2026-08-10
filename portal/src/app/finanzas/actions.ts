@@ -41,27 +41,36 @@ export async function registrarPago(formData: FormData) {
       [consorcio_cuit, unidad_id, res_cuenta_id, fecha, monto, medio_pago, referencia, notas]
     );
 
+    let periodoId: number | null = null;
+
     if (res_cuenta_id) {
-      const { rowCount } = await client.query(
-        "SELECT id FROM app.res_cuenta_periodo WHERE id=$1 AND unidad_id=$2",
+      const resCuenta = await client.query(
+        "SELECT id, periodo_id FROM app.res_cuenta_periodo WHERE id=$1 AND unidad_id=$2",
         [res_cuenta_id, unidad_id]
       );
-      if (!rowCount) throw new Error("Estado de expensa no encontrado o no pertenece a la unidad");
+      if (!resCuenta.rowCount) throw new Error("Estado de expensa no encontrado o no pertenece a la unidad");
+      periodoId = resCuenta.rows[0].periodo_id;
+    } else {
+      // No specific periodo linked to this payment — apply it against the
+      // consorcio's latest periodo so balances still reflect the payment.
+      const latestPeriodo = await client.query(
+        "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 ORDER BY anio DESC, mes DESC LIMIT 1",
+        [consorcio_cuit]
+      );
+      if (latestPeriodo.rowCount && latestPeriodo.rowCount > 0) {
+        periodoId = latestPeriodo.rows[0].id;
+      }
     }
-  });
 
-  // Run recalculation to apply the payment to balances. `estado`,
-  // imputacion_pagos and credito_unidad are recomputed inside engine.ts.
-  if (res_cuenta_id) {
-    const res = await pool.query(
-      "SELECT periodo_id FROM app.res_cuenta_periodo WHERE id = $1",
-      [res_cuenta_id]
-    );
-    if (res.rowCount && res.rowCount > 0) {
-      const { warnings } = await runCalculateExpenses(res.rows[0].periodo_id);
+    // Run recalculation to apply the payment to balances, inside the SAME
+    // transaction as the pago insert so both commit or roll back together.
+    // `estado`, imputacion_pagos and credito_unidad are recomputed inside
+    // engine.ts.
+    if (periodoId) {
+      const { warnings } = await runCalculateExpenses(periodoId, client);
       logWarnings("registrarPago", warnings);
     }
-  }
+  });
 
   revalidatePath("/finanzas/cuenta-corriente");
 }
@@ -78,13 +87,13 @@ export async function editarPago(formData: FormData) {
   if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) throw new Error("Fecha inválida");
   if (!monto || isNaN(monto) || monto <= 0) throw new Error("Monto inválido");
 
-  const res_cuenta_id: number | null = await withTransaction(async (client) => {
+  await withTransaction(async (client) => {
     const origPago = await client.query(
-      "SELECT res_cuenta_id FROM app.pagos WHERE id = $1",
+      "SELECT res_cuenta_id, consorcio_cuit FROM app.pagos WHERE id = $1",
       [pagoId]
     );
     if (origPago.rowCount === 0) throw new Error("Pago no encontrado");
-    const { res_cuenta_id } = origPago.rows[0];
+    const { res_cuenta_id, consorcio_cuit: pagoConsorcioCuit } = origPago.rows[0];
 
     await client.query(
       `UPDATE app.pagos
@@ -93,22 +102,35 @@ export async function editarPago(formData: FormData) {
       [fecha, monto, medio_pago, referencia, notas, pagoId]
     );
 
-    return res_cuenta_id;
-  });
+    let periodoId: number | null = null;
+    if (res_cuenta_id) {
+      const resCuenta = await client.query(
+        "SELECT periodo_id FROM app.res_cuenta_periodo WHERE id = $1",
+        [res_cuenta_id]
+      );
+      if (resCuenta.rowCount && resCuenta.rowCount > 0) {
+        periodoId = resCuenta.rows[0].periodo_id;
+      }
+    } else {
+      // No specific periodo linked — apply against the consorcio's latest periodo.
+      const latestPeriodo = await client.query(
+        "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 ORDER BY anio DESC, mes DESC LIMIT 1",
+        [pagoConsorcioCuit]
+      );
+      if (latestPeriodo.rowCount && latestPeriodo.rowCount > 0) {
+        periodoId = latestPeriodo.rows[0].id;
+      }
+    }
 
-  // The old imputacion_pagos rows for this pago's unit are stale after the
-  // amount/date change; runCalculateExpenses re-runs reimputarTodosPagos for
-  // the whole unit (delete + reinsert) so no manual revert is needed here.
-  if (res_cuenta_id) {
-    const res = await pool.query(
-      "SELECT periodo_id FROM app.res_cuenta_periodo WHERE id = $1",
-      [res_cuenta_id]
-    );
-    if (res.rowCount && res.rowCount > 0) {
-      const { warnings } = await runCalculateExpenses(res.rows[0].periodo_id);
+    // The old imputacion_pagos rows for this pago's unit are stale after the
+    // amount/date change; runCalculateExpenses re-runs reimputarTodosPagos for
+    // the whole unit (delete + reinsert) so no manual revert is needed here.
+    // Runs in the SAME transaction as the pago update.
+    if (periodoId) {
+      const { warnings } = await runCalculateExpenses(periodoId, client);
       logWarnings("editarPago", warnings);
     }
-  }
+  });
 
   revalidatePath("/finanzas/cuenta-corriente");
 }
@@ -117,9 +139,7 @@ export async function guardarSaldosIniciales(
   periodoId: number,
   saldos: { unidad_id: number; saldo_anterior: number }[]
 ) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  await withTransaction(async (client) => {
     for (const s of saldos) {
       await client.query(
         `INSERT INTO app.res_cuenta_periodo (periodo_id, unidad_id, saldo_anterior, coef_a, coef_b)
@@ -129,15 +149,8 @@ export async function guardarSaldosIniciales(
         [periodoId, s.unidad_id, s.saldo_anterior]
       );
     }
-    await client.query("COMMIT");
-  } catch (e) {
-    await client.query("ROLLBACK");
-    throw e;
-  } finally {
-    client.release();
-  }
-
-  await runCalculateExpenses(periodoId);
+    await runCalculateExpenses(periodoId, client);
+  });
   revalidatePath("/finanzas/cuenta-corriente");
 }
 
@@ -145,13 +158,13 @@ export async function eliminarPago(formData: FormData) {
   const pagoId = Number(formData.get("pago_id"));
   if (!pagoId) throw new Error("Pago ID requerido");
 
-  const res_cuenta_id: number | null = await withTransaction(async (client) => {
+  await withTransaction(async (client) => {
     const origPago = await client.query(
-      "SELECT res_cuenta_id FROM app.pagos WHERE id = $1",
+      "SELECT res_cuenta_id, consorcio_cuit FROM app.pagos WHERE id = $1",
       [pagoId]
     );
     if (origPago.rowCount === 0) throw new Error("Pago no encontrado");
-    const { res_cuenta_id } = origPago.rows[0];
+    const { res_cuenta_id, consorcio_cuit: pagoConsorcioCuit } = origPago.rows[0];
 
     // app.imputacion_pagos.pago_id is ON DELETE RESTRICT, so its rows for
     // this pago must be deleted before the pago itself. credito_unidad.pago_id
@@ -159,21 +172,34 @@ export async function eliminarPago(formData: FormData) {
     await client.query("DELETE FROM app.imputacion_pagos WHERE pago_id = $1", [pagoId]);
     await client.query("DELETE FROM app.pagos WHERE id = $1", [pagoId]);
 
-    return res_cuenta_id;
-  });
+    let periodoId: number | null = null;
+    if (res_cuenta_id) {
+      const resCuenta = await client.query(
+        "SELECT periodo_id FROM app.res_cuenta_periodo WHERE id = $1",
+        [res_cuenta_id]
+      );
+      if (resCuenta.rowCount && resCuenta.rowCount > 0) {
+        periodoId = resCuenta.rows[0].periodo_id;
+      }
+    } else {
+      // No specific periodo linked — apply against the consorcio's latest periodo.
+      const latestPeriodo = await client.query(
+        "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 ORDER BY anio DESC, mes DESC LIMIT 1",
+        [pagoConsorcioCuit]
+      );
+      if (latestPeriodo.rowCount && latestPeriodo.rowCount > 0) {
+        periodoId = latestPeriodo.rows[0].id;
+      }
+    }
 
-  // estado is recomputed by runCalculateExpenses (engine.ts re-runs FIFO
-  // reimputation over the unit's remaining payments) — no manual reset needed.
-  if (res_cuenta_id) {
-    const res = await pool.query(
-      "SELECT periodo_id FROM app.res_cuenta_periodo WHERE id = $1",
-      [res_cuenta_id]
-    );
-    if (res.rowCount && res.rowCount > 0) {
-      const { warnings } = await runCalculateExpenses(res.rows[0].periodo_id);
+    // estado is recomputed by runCalculateExpenses (engine.ts re-runs FIFO
+    // reimputation over the unit's remaining payments) — no manual reset
+    // needed. Runs in the SAME transaction as the delete.
+    if (periodoId) {
+      const { warnings } = await runCalculateExpenses(periodoId, client);
       logWarnings("eliminarPago", warnings);
     }
-  }
+  });
 
   revalidatePath("/finanzas/cuenta-corriente");
 }

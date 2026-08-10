@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { withTransaction } from "../db";
 import {
   calcularInteresesPeriodo,
@@ -86,8 +87,24 @@ export function calculateEmployerObligations(
   return { f931, art, scvo, suterh, fateryh, seracarh };
 }
 
-export async function runCalculateExpenses(periodoId: number): Promise<{ warnings: string[] }> {
-  return withTransaction(async (client) => {
+export async function runCalculateExpenses(
+  periodoId: number,
+  externalClient?: PoolClient
+): Promise<{ warnings: string[] }> {
+  if (externalClient) {
+    // Already running inside an external transaction (e.g. the pago CRUD
+    // transaction in actions.ts) — reuse that client instead of opening a
+    // second, independent transaction. This keeps the CRUD + recalculation
+    // atomic: either both commit or both roll back together.
+    return _runCalculateExpenses(periodoId, externalClient);
+  }
+  return withTransaction((client) => _runCalculateExpenses(periodoId, client));
+}
+
+async function _runCalculateExpenses(
+  periodoId: number,
+  client: PoolClient
+): Promise<{ warnings: string[] }> {
     const warnings: string[] = [];
 
     async function query<T extends Record<string, unknown>>(
@@ -105,7 +122,7 @@ export async function runCalculateExpenses(periodoId: number): Promise<{ warning
       return rows[0] ?? null;
     }
 
-  // 1. Fetch period
+  // 1. Fetch period (immutable row — safe to read before lock)
   const periodo = await queryOne<{
     consorcio_cuit: string;
     anio: number;
@@ -121,6 +138,11 @@ export async function runCalculateExpenses(periodoId: number): Promise<{ warning
   }
 
   const cuit = periodo.consorcio_cuit;
+
+  // Lock on consorcio (not periodoId) because recalculation reads/writes
+  // deuda_periodo rows across ALL periods of the consorcio. Two-arg form
+  // (classid=1) avoids collisions with other advisory-lock users.
+  await client.query("SELECT pg_advisory_xact_lock(1, hashtext($1))", [cuit]);
 
   // 2. Fetch consorcio details
   const consorcio = await queryOne<{
@@ -531,5 +553,4 @@ export async function runCalculateExpenses(periodoId: number): Promise<{ warning
   );
 
     return { warnings };
-  });
 }
