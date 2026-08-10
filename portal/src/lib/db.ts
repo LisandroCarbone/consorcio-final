@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 
 declare global {
   // Prevent multiple pool instances in dev HMR
@@ -33,4 +33,25 @@ export async function queryOne<T extends Record<string, unknown>>(
 ): Promise<T | null> {
   const rows = await query<T>(sql, params);
   return rows[0] ?? null;
+}
+
+// Runs `fn` inside a BEGIN/COMMIT transaction on a dedicated pool client.
+// Rolls back and rethrows on any error. Callers must issue all statements
+// for the unit of work via the provided client (not the shared `query`
+// helper, which uses its own untransacted pool connection).
+export async function withTransaction<T>(
+  fn: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }

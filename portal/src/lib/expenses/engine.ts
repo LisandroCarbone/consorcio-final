@@ -1,4 +1,11 @@
-import { query, queryOne } from "../db";
+import { withTransaction } from "../db";
+import {
+  calcularInteresesPeriodo,
+  reimputarTodosPagos,
+  type DeudaPeriodo,
+  type TasaInteres,
+  type Pago,
+} from "./interest-engine";
 
 // Helper to format numbers to 2 decimal places
 export function round2(num: number): number {
@@ -79,7 +86,25 @@ export function calculateEmployerObligations(
   return { f931, art, scvo, suterh, fateryh, seracarh };
 }
 
-export async function runCalculateExpenses(periodoId: number): Promise<void> {
+export async function runCalculateExpenses(periodoId: number): Promise<{ warnings: string[] }> {
+  return withTransaction(async (client) => {
+    const warnings: string[] = [];
+
+    async function query<T extends Record<string, unknown>>(
+      sql: string,
+      params?: unknown[]
+    ): Promise<T[]> {
+      const result = await client.query<T>(sql, params);
+      return result.rows;
+    }
+    async function queryOne<T extends Record<string, unknown>>(
+      sql: string,
+      params?: unknown[]
+    ): Promise<T | null> {
+      const rows = await query<T>(sql, params);
+      return rows[0] ?? null;
+    }
+
   // 1. Fetch period
   const periodo = await queryOne<{
     consorcio_cuit: string;
@@ -116,7 +141,6 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
 
   const divisorA = consorcio.divisor_a || 100;
   const divisorB = consorcio.divisor_b || 100;
-  const interestRate = consorcio.interest_rate !== undefined ? Number(consorcio.interest_rate) : 0.03;
 
   // 3. Fetch all units for this consorcio
   const units = await query<{
@@ -158,24 +182,83 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
   );
   const existingMap = new Map(existingResCuenta.map(r => [r.unidad_id, r]));
 
-  // 6. Find previous period
-  let prevAnio = periodo.mes === 1 ? periodo.anio - 1 : periodo.anio;
-  let prevMes = periodo.mes === 1 ? 12 : periodo.mes - 1;
-  const prevPeriodo = await queryOne<{ id: number }>(
-    "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 AND anio = $2 AND mes = $3",
-    [cuit, prevAnio, prevMes]
+  // 6. Real per-period interest engine (Motor de Intereses Real):
+  // load every pending deuda_periodo row for this consorcio (excluding the
+  // period being calculated now, whose row is created fresh below) plus the
+  // consorcio's historical rate registry, and compute interest per period
+  // instead of a flat rate on the total balance.
+  const deudaPeriodoRows = await query<{
+    id: number;
+    unidad_id: number;
+    periodo_id: number;
+    monto_original: number;
+    monto_capital_pendiente: number;
+    monto_intereses_acumulado: number;
+    monto_intereses_pendiente: number;
+    meses_atraso: number;
+    estado: "pendiente" | "parcial" | "pagada";
+    fecha_vencimiento: string;
+  }>(
+    `SELECT dp.id, dp.unidad_id, dp.periodo_id,
+            dp.monto_original::numeric, dp.monto_capital_pendiente::numeric,
+            dp.monto_intereses_acumulado::numeric, dp.monto_intereses_pendiente::numeric,
+            dp.meses_atraso, dp.estado,
+            COALESCE(pe.fecha_vencimiento, (pe.anio || '-' || LPAD(pe.mes::text, 2, '0') || '-01')::date) AS fecha_vencimiento
+     FROM app.deuda_periodo dp
+     JOIN app.periodos_expensas pe ON pe.id = dp.periodo_id
+     JOIN app.unidades u ON u.id = dp.unidad_id
+     WHERE u.consorcio_cuit = $1 AND dp.periodo_id != $2 AND dp.estado != 'pagada'
+       AND (pe.anio < $3 OR (pe.anio = $3 AND pe.mes < $4))`,
+    [cuit, periodoId, periodo.anio, periodo.mes]
   );
 
-  // Get previous period's total_pagar for each unit to carry over as saldo_anterior
-  const prevResCuentaMap = new Map<number, number>(); // Map of unidad_id -> total_pagar
-  if (prevPeriodo) {
-    const prevResCuenta = await query<{ unidad_id: number; total_pagar: number }>(
-      "SELECT unidad_id, total_pagar::numeric FROM app.res_cuenta_periodo WHERE periodo_id = $1",
-      [prevPeriodo.id]
-    );
-    prevResCuenta.forEach(r => {
-      prevResCuentaMap.set(r.unidad_id, r.total_pagar);
-    });
+  const tasasRows = await query<{ tasa: number; fecha_desde: string; fecha_hasta: string | null }>(
+    "SELECT tasa::numeric, fecha_desde, fecha_hasta FROM app.tasas_interes WHERE consorcio_cuit = $1",
+    [cuit]
+  );
+  const tasas: TasaInteres[] = tasasRows.map(t => ({
+    tasa: Number(t.tasa),
+    fechaDesde: new Date(t.fecha_desde),
+    fechaHasta: t.fecha_hasta ? new Date(t.fecha_hasta) : null,
+  }));
+
+  const deudasPorUnidad = new Map<number, DeudaPeriodo[]>();
+  for (const row of deudaPeriodoRows) {
+    const deuda: DeudaPeriodo = {
+      id: row.id,
+      unidadId: row.unidad_id,
+      periodoId: row.periodo_id,
+      montoOriginal: Number(row.monto_original),
+      montoCapitalPendiente: Number(row.monto_capital_pendiente),
+      montoInteresesAcumulado: Number(row.monto_intereses_acumulado),
+      montoInteresesPendiente: Number(row.monto_intereses_pendiente),
+      mesesAtraso: row.meses_atraso,
+      estado: row.estado,
+      fechaVencimiento: new Date(row.fecha_vencimiento),
+    };
+    const list = deudasPorUnidad.get(row.unidad_id) || [];
+    list.push(deuda);
+    deudasPorUnidad.set(row.unidad_id, list);
+  }
+
+  // Use the period being liquidated as the reference date for interest
+  // calculation, not the wall-clock date, so recalculating an old period
+  // does not accrue interest up to today.
+  const fechaCalculo = new Date(Date.UTC(periodo.anio, periodo.mes - 1, 15));
+  const interesesResultPorUnidad = new Map<
+    number,
+    { resultados: ReturnType<typeof calcularInteresesPeriodo>["resultados"]; deudas: DeudaPeriodo[] }
+  >();
+  for (const [unidadId, deudas] of deudasPorUnidad) {
+    const { resultados, errores } = calcularInteresesPeriodo(deudas, tasas, fechaCalculo);
+    if (errores.length > 0) {
+      for (const e of errores) {
+        const msg = `[interest-engine] unidad ${unidadId}, deuda_periodo ${e.deudaPeriodoId}: ${e.mensaje}`;
+        console.warn(msg);
+        warnings.push(msg);
+      }
+    }
+    interesesResultPorUnidad.set(unidadId, { resultados, deudas });
   }
 
   // 7. Sum up expenses by type
@@ -235,6 +318,23 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
   );
   const pagosMap = new Map(pagos.map(p => [p.unidad_id, p.total_pagos]));
 
+  // 8b. Fetch ALL historical payments for every unit in this consorcio, used
+  // below to re-run FIFO imputation (interest before capital, Art. 776 CCyC)
+  // against the freshly-recalculated deuda_periodo rows.
+  const pagosHistoricos = await query<{ id: number; unidad_id: number; monto: number; fecha: string }>(
+    `SELECT id, unidad_id, monto::numeric, fecha
+     FROM app.pagos
+     WHERE consorcio_cuit = $1
+     ORDER BY fecha ASC`,
+    [cuit]
+  );
+  const pagosPorUnidad = new Map<number, Pago[]>();
+  for (const p of pagosHistoricos) {
+    const list = pagosPorUnidad.get(p.unidad_id) || [];
+    list.push({ id: p.id, monto: Number(p.monto), fecha: new Date(p.fecha) });
+    pagosPorUnidad.set(p.unidad_id, list);
+  }
+
   // 9. Calculate prorrateo for each unit and save to res_cuenta_periodo
   for (const u of units) {
     const expensasA = round2(totalProrrateoA * Number(u.coef_a) / divisorA) + (isFija ? 0 : round2(unitAMap.get(u.id) || 0));
@@ -245,10 +345,108 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
     const sAsamblea = exist ? Number(exist.s_asamblea || 0) : 0;
     const otros = exist ? Number(exist.otros || 0) : 0;
 
-    // Carryover saldo_anterior: either previous total_pagar or fallback to existing saldo_anterior
-    const saldoAnterior = prevPeriodo 
-      ? (prevResCuentaMap.get(u.id) || 0) 
+    // Motor de Intereses Real: saldo_anterior is the sum of pending capital
+    // across every unpaid deuda_periodo row for this unit (not derived from
+    // the previous period's total_pagar), and intereses is the sum of the
+    // real per-period interest calculated by calcularInteresesPeriodo,
+    // instead of a flat rate applied to the whole balance.
+    const unitInterestData = interesesResultPorUnidad.get(u.id);
+    const intereses = unitInterestData
+      ? round2(unitInterestData.resultados.reduce((sum, r) => sum + r.interesCalculado, 0))
+      : 0;
+
+    // Step 1: write the freshly-calculated theoretical interest back into
+    // deuda_periodo (monto_intereses_acumulado = full accrual,
+    // monto_intereses_pendiente = full accrual as well, for now). This MUST
+    // run before the FIFO reimputación below, which then reduces
+    // monto_intereses_pendiente/monto_capital_pendiente by whatever has
+    // actually been paid — otherwise the write-back would clobber the
+    // effect of past payments.
+    if (unitInterestData) {
+      for (const r of unitInterestData.resultados) {
+        if (r.mesesAtraso <= 0) continue;
+        await query(
+          `UPDATE app.deuda_periodo SET
+             monto_intereses_acumulado = $1,
+             monto_intereses_pendiente = $2,
+             meses_atraso = $3,
+             updated_at = now()
+           WHERE id = $4`,
+          [r.interesCalculado, r.montoInteresesPendiente, r.mesesAtraso, r.deudaPeriodoId]
+        );
+      }
+    }
+
+    // Step 2: re-run FIFO payment imputation (interest before capital,
+    // Art. 776 CCyC) across ALL of this unit's historical payments against
+    // the just-refreshed deuda_periodo rows, so monto_capital_pendiente and
+    // monto_intereses_pendiente correctly reflect what has actually been
+    // paid instead of being silently overwritten by the interest recalc.
+    let saldoAnterior = unitInterestData
+      ? round2(unitInterestData.deudas.reduce((sum, d) => sum + d.montoCapitalPendiente, 0))
       : (exist ? Number(exist.saldo_anterior || 0) : 0);
+
+    if (unitInterestData && unitInterestData.deudas.length > 0) {
+      const resultadoPorDeudaId = new Map(unitInterestData.resultados.map(r => [r.deudaPeriodoId, r]));
+      const deudasBase: DeudaPeriodo[] = unitInterestData.deudas.map(d => {
+        const r = resultadoPorDeudaId.get(d.id);
+        return r && r.mesesAtraso > 0 ? { ...d, montoInteresesAcumulado: r.interesCalculado } : d;
+      });
+
+      const pagosUnidad = pagosPorUnidad.get(u.id) || [];
+      if (pagosUnidad.length > 0) {
+        const { imputacionesPorPago, deudasFinales } = reimputarTodosPagos(deudasBase, pagosUnidad);
+        const deudaIds = deudasBase.map(d => d.id);
+
+        // Clear previous imputaciones for this unit's deudas before
+        // persisting the freshly re-run FIFO allocation.
+        await query(`DELETE FROM app.imputacion_pagos WHERE deuda_periodo_id = ANY($1::int[])`, [deudaIds]);
+
+        for (const [pagoId, resultado] of imputacionesPorPago) {
+          for (const imp of resultado.imputaciones) {
+            await query(
+              `INSERT INTO app.imputacion_pagos (pago_id, deuda_periodo_id, monto_a_interes, monto_a_capital, fecha)
+               VALUES ($1, $2, $3, $4, now())`,
+              [pagoId, imp.deudaPeriodoId, imp.montoAInteres, imp.montoACapital]
+            );
+          }
+        }
+
+        for (const df of deudasFinales) {
+          await query(
+            `UPDATE app.deuda_periodo SET
+               monto_capital_pendiente = $1,
+               monto_intereses_pendiente = $2,
+               monto_intereses_acumulado = $3,
+               estado = $4,
+               updated_at = now()
+             WHERE id = $5`,
+            [df.montoCapitalPendiente, df.montoInteresesPendiente, df.montoInteresesAcumulado, df.estado, df.id]
+          );
+        }
+
+        saldoAnterior = round2(deudasFinales.reduce((sum, d) => sum + d.montoCapitalPendiente, 0));
+
+        // Any leftover credit from the last chronological payment becomes
+        // the unit's current overpayment credit; prior open credits are
+        // superseded by this fresh reimputación.
+        const ultimoPago = pagosUnidad[pagosUnidad.length - 1];
+        const resultadoUltimoPago = imputacionesPorPago.get(ultimoPago.id);
+        const creditoFinal = resultadoUltimoPago ? resultadoUltimoPago.creditoRestante : 0;
+
+        await query(
+          `UPDATE app.credito_unidad SET aplicado = true WHERE unidad_id = $1 AND consorcio_cuit = $2 AND aplicado = false`,
+          [u.id, cuit]
+        );
+        if (creditoFinal > 0) {
+          await query(
+            `INSERT INTO app.credito_unidad (unidad_id, consorcio_cuit, monto, aplicado)
+             VALUES ($1, $2, $3, false)`,
+            [u.id, cuit, creditoFinal]
+          );
+        }
+      }
+    }
 
     // su_pago: from pagos table or fallback to existing res_cuenta_periodo.su_pago
     const suPago = pagosMap.has(u.id)
@@ -256,7 +454,6 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
       : (exist ? Number(exist.su_pago || 0) : 0);
 
     const deuda = round2(saldoAnterior - suPago);
-    const intereses = deuda > 0 ? round2(deuda * interestRate) : 0;
 
     const totalMes = round2(expensasA + expensasB + sAsamblea + otros + gastPart);
     let totalPagar = round2(totalMes + deuda + intereses);
@@ -294,6 +491,30 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
         expensasA, expensasB, sAsamblea, otros, gastPart, deuda, intereses, totalMes, totalPagar, estado
       ]
     );
+
+    // Create/refresh the deuda_periodo row for the CURRENT period: it
+    // represents this unit's newly generated debt (this period's expensas),
+    // which starts with no accrued interest and becomes subject to the
+    // interest engine once it is overdue in a future liquidación.
+    const deudaPeriodoEstado = totalMes <= 0 ? "pagada" : "pendiente";
+    await query(
+      `INSERT INTO app.deuda_periodo
+         (unidad_id, periodo_id, monto_original, monto_capital_pendiente,
+          monto_intereses_acumulado, monto_intereses_pendiente, meses_atraso, estado)
+       VALUES ($1, $2, $3, $3, 0, 0, 0, $4)
+       ON CONFLICT (unidad_id, periodo_id) DO UPDATE SET
+         monto_original = EXCLUDED.monto_original,
+         monto_capital_pendiente = CASE
+           WHEN app.deuda_periodo.monto_capital_pendiente = app.deuda_periodo.monto_original
+           THEN EXCLUDED.monto_original
+           ELSE app.deuda_periodo.monto_capital_pendiente + (EXCLUDED.monto_original - app.deuda_periodo.monto_original)
+         END,
+         estado = CASE WHEN app.deuda_periodo.monto_capital_pendiente < app.deuda_periodo.monto_original
+                        THEN app.deuda_periodo.estado
+                        ELSE EXCLUDED.estado END,
+         updated_at = now()`,
+      [u.id, periodoId, totalMes, deudaPeriodoEstado]
+    );
   }
 
   // 10. Update periodos_expensas totals and status
@@ -308,4 +529,7 @@ export async function runCalculateExpenses(periodoId: number): Promise<void> {
      WHERE id = $4`,
     [totalProrrateoAyB, totalGastosParticulares, totalProrrateoAyB, periodoId]
   );
+
+    return { warnings };
+  });
 }
