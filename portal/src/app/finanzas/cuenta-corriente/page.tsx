@@ -130,10 +130,20 @@ export default async function CuentaCorrientePage({
   let historyUnitDetails: { uf: string; propietario: string }[] = [];
   let liquidaciones: { id: number; anio: number; mes: number; total_pagar: string; estado: string; fecha_pago: string | null }[] = [];
   let pagos: { id: number; fecha: string; monto: string; medio_pago: string; referencia: string | null; notas: string | null }[] = [];
+  let deudaPeriodoDetalle: {
+    id: number;
+    anio: number;
+    mes: number;
+    monto_capital_pendiente: string;
+    monto_intereses_pendiente: string;
+    meses_atraso: number;
+    estado: string;
+    tasa_aplicada: string | null;
+  }[] = [];
 
   if (sp.ver_historial) {
     const historyUnidadId = Number(sp.ver_historial);
-    const [unitRes, liqsRes, pagosRes] = await Promise.all([
+    const [unitRes, liqsRes, pagosRes, deudaPeriodoRes] = await Promise.all([
       query<{ uf: string; propietario: string }>(
         `SELECT u.uf::text, NULLIF(TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')), '') AS propietario
          FROM app.unidades u
@@ -157,10 +167,38 @@ export default async function CuentaCorrientePage({
          ORDER BY fecha DESC, id DESC`,
         [historyUnidadId]
       ),
+      // Motor de Intereses Real — Phase 7: per-period breakdown (capital,
+      // interest, months of delay) sourced from deuda_periodo, independent
+      // of the flat res_cuenta_periodo.intereses total.
+      query<{
+        id: number;
+        anio: number;
+        mes: number;
+        monto_capital_pendiente: string;
+        monto_intereses_pendiente: string;
+        meses_atraso: number;
+        estado: string;
+        tasa_aplicada: string | null;
+      }>(
+        `SELECT dp.id, pe.anio, pe.mes,
+                dp.monto_capital_pendiente::text, dp.monto_intereses_pendiente::text,
+                dp.meses_atraso, dp.estado,
+                (SELECT ti.tasa::text FROM app.tasas_interes ti
+                 WHERE ti.consorcio_cuit = u.consorcio_cuit
+                   AND ti.fecha_desde <= COALESCE(pe.fecha_vencimiento, (pe.anio || '-' || LPAD(pe.mes::text, 2, '0') || '-01')::date)
+                 ORDER BY ti.fecha_desde DESC LIMIT 1) AS tasa_aplicada
+         FROM app.deuda_periodo dp
+         JOIN app.periodos_expensas pe ON pe.id = dp.periodo_id
+         JOIN app.unidades u ON u.id = dp.unidad_id
+         WHERE dp.unidad_id = $1
+         ORDER BY pe.anio DESC, pe.mes DESC`,
+        [historyUnidadId]
+      ),
     ]);
     historyUnitDetails = unitRes;
     liquidaciones = liqsRes;
     pagos = pagosRes;
+    deudaPeriodoDetalle = deudaPeriodoRes;
   }
 
   let pagosUnitDetails: { uf: string; propietario: string }[] = [];
@@ -258,7 +296,7 @@ export default async function CuentaCorrientePage({
             className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
           ></a>
           
-          <div className="relative bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col z-10 border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+          <div className="relative bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[85vh] overflow-hidden flex flex-col z-10 border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Historial de Cuenta Corriente</h3>
@@ -276,7 +314,7 @@ export default async function CuentaCorrientePage({
               </a>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50/50">
+            <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50/50">
               <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col min-h-0">
                 <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                   <span>📋</span> Liquidaciones Mensuales
@@ -358,6 +396,53 @@ export default async function CuentaCorrientePage({
                         <tr>
                           <td colSpan={4} className="py-4 text-center text-gray-400">
                             No hay cobranzas registradas.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col min-h-0">
+                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <span>📈</span> Desglose de Intereses por Período
+                </h4>
+                <div className="overflow-x-auto flex-1 max-h-[50vh]">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100 sticky top-0">
+                      <tr>
+                        <th className="py-2 px-3">Período</th>
+                        <th className="py-2 px-3 text-right">Capital</th>
+                        <th className="py-2 px-3 text-right">Interés</th>
+                        <th className="py-2 px-3 text-center">Tasa</th>
+                        <th className="py-2 px-3 text-center">Atraso</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {deudaPeriodoDetalle.map((d) => (
+                        <tr key={d.id} className="hover:bg-gray-50/50">
+                          <td className="py-2 px-3 font-medium">
+                            {String(d.mes).padStart(2, "0")}/{d.anio}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono">
+                            {formatMoney(d.monto_capital_pendiente)}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono text-amber-700">
+                            {formatMoney(d.monto_intereses_pendiente)}
+                          </td>
+                          <td className="py-2 px-3 text-center text-gray-500">
+                            {d.tasa_aplicada ? `${(Number(d.tasa_aplicada) * 100).toFixed(2)}%` : "—"}
+                          </td>
+                          <td className="py-2 px-3 text-center text-gray-500">
+                            {d.meses_atraso > 0 ? `${d.meses_atraso} m` : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                      {deudaPeriodoDetalle.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="py-4 text-center text-gray-400">
+                            Sin deuda por período registrada.
                           </td>
                         </tr>
                       )}

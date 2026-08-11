@@ -139,6 +139,31 @@ export async function GET(
     [receipt.periodo_id]
   );
 
+  // Motor de Intereses Real — Phase 9: per-period interest breakdown, sourced
+  // from deuda_periodo (read-only, additive; res_cuenta_periodo.intereses
+  // keeps being the authoritative total shown in RESUMEN DE CUENTA above).
+  const deudaPeriodoDetalle = await query<{
+    anio: number;
+    mes: number;
+    monto_capital_pendiente: string;
+    monto_intereses_pendiente: string;
+    meses_atraso: number;
+    tasa_aplicada: string | null;
+  }>(
+    `SELECT pe.anio, pe.mes,
+            dp.monto_capital_pendiente::text, dp.monto_intereses_pendiente::text,
+            dp.meses_atraso,
+            (SELECT ti.tasa::text FROM app.tasas_interes ti
+             WHERE ti.consorcio_cuit = $2
+               AND ti.fecha_desde <= COALESCE(pe.fecha_vencimiento, (pe.anio || '-' || LPAD(pe.mes::text, 2, '0') || '-01')::date)
+             ORDER BY ti.fecha_desde DESC LIMIT 1) AS tasa_aplicada
+     FROM app.deuda_periodo dp
+     JOIN app.periodos_expensas pe ON pe.id = dp.periodo_id
+     WHERE dp.unidad_id = $1 AND dp.meses_atraso > 0
+     ORDER BY pe.anio, pe.mes`,
+    [receipt.unidad_id, receipt.consorcio_cuit]
+  );
+
   const gastosPorCategoria = new Map<number, GastoRow[]>();
   for (const g of gastos) {
     const list = gastosPorCategoria.get(g.categoria) ?? [];
@@ -209,6 +234,32 @@ export async function GET(
       <div style="margin-top:8px;">Aviso de Pago</div>` : `<div>Aviso de Pago</div>`}
       <div class="periodo-value">${periodoLabel}</div>
     </div>`;
+
+  const interesesDetalleSection = deudaPeriodoDetalle.length > 0
+    ? `
+    <div class="section-title">DETALLE DE INTERESES POR PERÍODO</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Período</th>
+          <th class="r">Capital</th>
+          <th class="r">Interés</th>
+          <th class="r">Tasa</th>
+          <th class="r">Atraso</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${deudaPeriodoDetalle.map(d => `
+        <tr>
+          <td>${MONTH_NAMES[d.mes] ?? d.mes} ${d.anio}</td>
+          <td class="r mono">${money(d.monto_capital_pendiente)}</td>
+          <td class="r mono">${money(d.monto_intereses_pendiente)}</td>
+          <td class="r mono">${d.tasa_aplicada ? `${(Number(d.tasa_aplicada) * 100).toFixed(2)}%` : "—"}</td>
+          <td class="r mono">${d.meses_atraso} m</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`
+    : "";
 
   const paymentSection = (receipt.banco || receipt.cbu)
     ? `
@@ -363,6 +414,8 @@ export async function GET(
   </table>
 
   ${vencimientoSection}
+
+  ${interesesDetalleSection}
 
   ${paymentSection}
 

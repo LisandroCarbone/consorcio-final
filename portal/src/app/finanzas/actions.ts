@@ -135,6 +135,100 @@ export async function editarPago(formData: FormData) {
   revalidatePath("/finanzas/cuenta-corriente");
 }
 
+// Motor de Intereses Real — Phase 6: Rate Management.
+// Inserts a new historical interest rate row for a consorcio. Rates are
+// looked up by fecha_desde (the rate vigente for a period's due date is the
+// most recent fecha_desde <= that due date — see interest-engine.ts
+// buscarTasaVigente), so a duplicate fecha_desde for the same consorcio
+// would make rate lookup ambiguous and is rejected here.
+export async function crearTasaInteres(formData: FormData) {
+  const consorcio_cuit = String(formData.get("consorcio_cuit") || "");
+  const tasaPct = Number(formData.get("tasa_pct"));
+  const fecha_desde = String(formData.get("fecha_desde") || "");
+
+  if (!consorcio_cuit) throw new Error("Consorcio requerido");
+  if (!fecha_desde || !/^\d{4}-\d{2}-\d{2}$/.test(fecha_desde)) throw new Error("Fecha desde inválida");
+  if (isNaN(tasaPct) || tasaPct < 0) throw new Error("Tasa inválida");
+
+  const tasa = tasaPct / 100;
+
+  try {
+    await pool.query(
+      `INSERT INTO app.tasas_interes (consorcio_cuit, tasa, fecha_desde)
+       VALUES ($1, $2, $3)`,
+      [consorcio_cuit, tasa, fecha_desde]
+    );
+  } catch (e: any) {
+    if (e.code === "23505") {
+      throw new Error("Ya existe una tasa registrada con esa fecha de vigencia para este consorcio");
+    }
+    throw e;
+  }
+
+  revalidatePath("/finanzas/tasas-interes");
+}
+
+// Motor de Intereses Real — Phase 8: Debt Onboarding.
+// Inserts a per-period historical debt row directly into deuda_periodo for a
+// unit, creating the referenced periodos_expensas row (estado='liquidado')
+// if it does not already exist. Used to seed pre-existing debt that predates
+// the interest engine, so it is picked up by calcularInteresesPeriodo on the
+// next liquidación.
+export async function agregarDeudaHistorica(formData: FormData) {
+  const consorcio_cuit = String(formData.get("consorcio_cuit") || "");
+  const unidad_id = Number(formData.get("unidad_id"));
+  const anio = Number(formData.get("anio"));
+  const mes = Number(formData.get("mes"));
+  const monto_original = Number(formData.get("monto_original"));
+
+  if (!consorcio_cuit) throw new Error("Consorcio requerido");
+  if (!unidad_id || unidad_id <= 0) throw new Error("Unidad inválida");
+  if (!anio || anio < 2000 || anio > 2100) throw new Error("Año inválido");
+  if (!mes || mes < 1 || mes > 12) throw new Error("Mes inválido");
+  if (!monto_original || isNaN(monto_original) || monto_original <= 0) throw new Error("Monto inválido");
+
+  await withTransaction(async (client) => {
+    const unitCheck = await client.query(
+      "SELECT id FROM app.unidades WHERE id = $1 AND consorcio_cuit = $2",
+      [unidad_id, consorcio_cuit]
+    );
+    if (!unitCheck.rowCount) throw new Error("La unidad no pertenece al consorcio seleccionado");
+
+    let periodo = await client.query(
+      "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 AND anio = $2 AND mes = $3",
+      [consorcio_cuit, anio, mes]
+    );
+    let periodoId: number;
+    if (periodo.rowCount && periodo.rowCount > 0) {
+      periodoId = periodo.rows[0].id;
+    } else {
+      const inserted = await client.query(
+        `INSERT INTO app.periodos_expensas (consorcio_cuit, anio, mes, estado, fecha_vencimiento)
+         VALUES ($1, $2, $3, 'liquidado', ($2 || '-' || LPAD($3::text, 2, '0') || '-01')::date)
+         RETURNING id`,
+        [consorcio_cuit, anio, mes]
+      );
+      periodoId = inserted.rows[0].id;
+    }
+
+    await client.query(
+      `INSERT INTO app.deuda_periodo
+         (unidad_id, periodo_id, monto_original, monto_capital_pendiente,
+          monto_intereses_acumulado, monto_intereses_pendiente, meses_atraso, estado)
+       VALUES ($1, $2, $3, $3, 0, 0, 0, 'pendiente')
+       ON CONFLICT (unidad_id, periodo_id) DO UPDATE SET
+         monto_capital_pendiente = app.deuda_periodo.monto_capital_pendiente
+           + (EXCLUDED.monto_original - app.deuda_periodo.monto_original),
+         monto_original = EXCLUDED.monto_original,
+         updated_at = now()`,
+      [unidad_id, periodoId, monto_original]
+    );
+  });
+
+  revalidatePath("/finanzas/deuda-historica");
+  revalidatePath("/finanzas/cuenta-corriente");
+}
+
 export async function guardarSaldosIniciales(
   periodoId: number,
   saldos: { unidad_id: number; saldo_anterior: number }[]
