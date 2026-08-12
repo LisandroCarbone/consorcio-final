@@ -1,49 +1,47 @@
 export const dynamic = 'force-dynamic';
 
-import { query } from "@/lib/db";
-import { DashboardClient } from "@/components/dashboard/DashboardClient";
+import { getDashboardKPIs, getConsorciosForFilter } from "@/lib/queries/dashboard";
+import { DashboardFilterClient } from "@/components/dashboard/DashboardFilterClient";
+import { DashboardKPIs } from "@/components/dashboard/DashboardKPIs";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { AgendaPlaceholder } from "@/components/dashboard/AgendaPlaceholder";
 
-async function getStats() {
-  const [consorcios, tickets, expensas, periodos] = await Promise.all([
-    query<{ count: string }>("SELECT COUNT(*) FROM app.consorcios"),
-    query<{ count: string }>("SELECT COUNT(*) FROM app.tickets WHERE estado NOT IN ('resuelto','cerrado')"),
-    query<{ pendientes: string; total: string }>(
-      "SELECT COUNT(*) FILTER (WHERE estado='pendiente') AS pendientes, COALESCE(SUM(total_pagar) FILTER (WHERE estado='pendiente'), 0) AS total FROM app.res_cuenta_periodo"
-    ),
-    query<{ id: number; consorcio_nombre: string; anio: number; mes: number; estado: string }>(
-      `SELECT p.id, c.nombre AS consorcio_nombre, p.anio, p.mes, p.estado
-       FROM app.periodos_expensas p JOIN app.consorcios c ON c.cuit = p.consorcio_cuit
-       ORDER BY p.anio DESC, p.mes DESC LIMIT 5`
-    ),
+function parseCuits(raw: string | undefined): string[] | undefined {
+  if (!raw) return undefined;
+  const cuits = raw.split(",").map((c) => c.trim()).filter(Boolean);
+  return cuits.length > 0 ? cuits : undefined;
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cuits?: string }>;
+}) {
+  const sp = await searchParams;
+  const cuits = parseCuits(sp.cuits);
+
+  const [kpis, consorcios] = await Promise.all([
+    getDashboardKPIs(cuits),
+    getConsorciosForFilter(),
   ]);
-  return {
-    totalConsorcios: Number(consorcios[0]?.count ?? 0),
-    ticketsAbiertos: Number(tickets[0]?.count ?? 0),
-    expensasPendientes: Number(expensas[0]?.pendientes ?? 0),
-    montoPendiente: Number(expensas[0]?.total ?? 0),
-    ultimosPeriodos: periodos,
-  };
-}
-
-async function getTicketsRecientes() {
-  return query<{ id: number; titulo: string; categoria: string; prioridad: string; estado: string; created_at: string; consorcio_nombre: string }>(
-    `SELECT t.id, t.titulo, t.categoria, t.prioridad, t.estado, t.created_at, c.nombre AS consorcio_nombre
-     FROM app.tickets t JOIN app.consorcios c ON c.cuit = t.consorcio_cuit
-     WHERE t.estado NOT IN ('resuelto','cerrado')
-     ORDER BY t.created_at DESC LIMIT 8`
-  );
-}
-
-export default async function DashboardPage() {
-  const [stats, tickets] = await Promise.all([getStats(), getTicketsRecientes()]);
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-6">
+    <div className="w-full space-y-6">
+      <div className="flex items-center justify-between mb-2">
         <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+        <DashboardFilterClient consorcios={consorcios} selectedCuits={cuits ?? []} />
       </div>
-      <DashboardClient stats={stats} tickets={tickets} />
+
+      <DashboardKPIs data={kpis} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <QuickActions />
+        </div>
+        <div className="lg:col-span-1">
+          <AgendaPlaceholder />
+        </div>
+      </div>
     </div>
   );
 }
-
