@@ -7,11 +7,12 @@ import { query, queryOne } from "@/lib/db";
  */
 export function cuitFilter(
   cuits: string[] | undefined,
-  alias: string = "c"
+  alias: string = "c",
+  column: string = "cuit"
 ): { clause: string; params: string[] } {
   if (!cuits?.length) return { clause: "", params: [] };
   const placeholders = cuits.map((_, i) => `$${i + 1}`).join(",");
-  return { clause: `${alias}.cuit IN (${placeholders})`, params: cuits };
+  return { clause: `${alias}.${column} IN (${placeholders})`, params: cuits };
 }
 
 export interface DashboardKPIData {
@@ -227,7 +228,7 @@ export async function getEstadoCaja(cuits?: string[]): Promise<CajaRow[]> {
        COALESCE(SUM(p.monto) FILTER (WHERE p.medio_pago = 'efectivo'), 0) AS cobro_efectivo,
        COALESCE(SUM(p.monto) FILTER (WHERE p.medio_pago = 'transferencia'), 0) AS cobro_transferencia,
        COALESCE(SUM(p.monto) FILTER (WHERE p.medio_pago = 'debito_automatico'), 0) AS cobro_debito,
-       COALESCE(SUM(p.monto) FILTER (WHERE p.medio_pago NOT IN ('efectivo','transferencia','debito_automatico')), 0) AS cobro_otro
+       COALESCE(SUM(p.monto) FILTER (WHERE COALESCE(p.medio_pago, 'otro') NOT IN ('efectivo','transferencia','debito_automatico')), 0) AS cobro_otro
      FROM app.consorcios c
      LEFT JOIN app.pagos p ON p.consorcio_cuit = c.cuit
        AND p.fecha >= date_trunc('month', CURRENT_DATE)
@@ -263,10 +264,10 @@ export async function getAlertItems(cuits?: string[]): Promise<AlertItem[]> {
   const mes = now.getMonth() + 1;
   const dayOfMonth = now.getDate();
 
-  const morosidadF = cuitFilter(cuits, "u");
+  const morosidadF = cuitFilter(cuits, "u", "consorcio_cuit");
   const unliquidatedF = cuitFilter(cuits, "c");
-  const ordenesF = cuitFilter(cuits, "ot");
-  const ticketsF = cuitFilter(cuits, "t");
+  const ordenesF = cuitFilter(cuits, "ot", "consorcio_cuit");
+  const ticketsF = cuitFilter(cuits, "t", "consorcio_cuit");
 
   const [morosidadRow, unliquidatedRows, ordenesRows, ticketsRows] = await Promise.all([
     queryOne<{ count: string }>(
