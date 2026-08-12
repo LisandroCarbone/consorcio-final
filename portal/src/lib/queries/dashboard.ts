@@ -121,7 +121,7 @@ export async function getMorosidadData(cuits?: string[]): Promise<MorosidadRow[]
     `SELECT
        c.nombre AS consorcio,
        u.uf,
-       NULLIF(TRIM(COALESCE(per.nombre,'') || ' ' || COALESCE(per.apellido,'')), '') AS propietario,
+       NULLIF(TRIM(COALESCE(prop.nombre,'') || ' ' || COALESCE(prop.apellido,'')), '') AS propietario,
        SUM(dp.monto_capital_pendiente) AS capital_pendiente,
        SUM(dp.monto_intereses_pendiente) AS intereses_pendiente,
        SUM(dp.monto_capital_pendiente + dp.monto_intereses_pendiente) AS deuda_total,
@@ -130,11 +130,17 @@ export async function getMorosidadData(cuits?: string[]): Promise<MorosidadRow[]
      FROM app.deuda_periodo dp
      JOIN app.unidades u ON u.id = dp.unidad_id
      JOIN app.consorcios c ON c.cuit = u.consorcio_cuit
-     LEFT JOIN app.ocupantes o ON o.unidad_id = u.id AND o.activo AND o.rol = 'propietario'
-     LEFT JOIN app.personas per ON per.id = o.persona_id
+     LEFT JOIN LATERAL (
+       SELECT per.nombre, per.apellido
+       FROM app.ocupantes o
+       JOIN app.personas per ON per.id = o.persona_id
+       WHERE o.unidad_id = u.id AND o.activo AND o.rol = 'propietario'
+       ORDER BY o.desde DESC NULLS LAST
+       LIMIT 1
+     ) prop ON true
      WHERE dp.estado = 'pendiente'
      ${f.clause ? `AND ${f.clause}` : ""}
-     GROUP BY c.nombre, u.id, u.uf, per.nombre, per.apellido
+     GROUP BY c.cuit, c.nombre, u.id, u.uf, prop.nombre, prop.apellido
      HAVING SUM(dp.monto_capital_pendiente + dp.monto_intereses_pendiente) > 0
      ORDER BY max_meses_atraso DESC, deuda_total DESC
      LIMIT 25`,
@@ -175,7 +181,7 @@ export async function getCobranzaByConsorcio(cuits?: string[]): Promise<Cobranza
      LEFT JOIN app.res_cuenta_periodo rcp ON rcp.periodo_id = pe.id
      WHERE pe.anio = $${f.params.length + 1} AND pe.mes = $${f.params.length + 2}
      ${f.clause ? `AND ${f.clause}` : ""}
-     GROUP BY c.nombre
+     GROUP BY c.cuit, c.nombre
      ORDER BY liquidado DESC`,
     [...f.params, anio, mes]
   );
@@ -185,4 +191,168 @@ export async function getCobranzaByConsorcio(cuits?: string[]): Promise<Cobranza
     liquidado: Number(r.liquidado),
     cobrado: Number(r.cobrado),
   }));
+}
+
+export interface CajaRow {
+  consorcio: string;
+  cuit: string;
+  saldoBanco: number;
+  cobroEfectivo: number;
+  cobroTransferencia: number;
+  cobroDebito: number;
+  cobroOtro: number;
+}
+
+export async function getEstadoCaja(cuits?: string[]): Promise<CajaRow[]> {
+  const f = cuitFilter(cuits, "c");
+
+  const rows = await query<{
+    consorcio: string;
+    cuit: string;
+    saldo_banco: string;
+    cobro_efectivo: string;
+    cobro_transferencia: string;
+    cobro_debito: string;
+    cobro_otro: string;
+  }>(
+    `SELECT
+       c.nombre AS consorcio,
+       c.cuit,
+       COALESCE((
+         SELECT eb.saldo_cierre FROM app.extractos_bancarios eb
+         WHERE eb.consorcio_cuit = c.cuit
+         ORDER BY eb.anio DESC, eb.mes DESC
+         LIMIT 1
+       ), 0) AS saldo_banco,
+       COALESCE(SUM(p.monto) FILTER (WHERE p.medio_pago = 'efectivo'), 0) AS cobro_efectivo,
+       COALESCE(SUM(p.monto) FILTER (WHERE p.medio_pago = 'transferencia'), 0) AS cobro_transferencia,
+       COALESCE(SUM(p.monto) FILTER (WHERE p.medio_pago = 'debito_automatico'), 0) AS cobro_debito,
+       COALESCE(SUM(p.monto) FILTER (WHERE p.medio_pago NOT IN ('efectivo','transferencia','debito_automatico')), 0) AS cobro_otro
+     FROM app.consorcios c
+     LEFT JOIN app.pagos p ON p.consorcio_cuit = c.cuit
+       AND p.fecha >= date_trunc('month', CURRENT_DATE)
+       AND p.fecha < date_trunc('month', CURRENT_DATE) + interval '1 month'
+     ${f.clause ? `WHERE ${f.clause}` : ""}
+     GROUP BY c.cuit, c.nombre
+     ORDER BY c.nombre`,
+    f.params
+  );
+
+  return rows.map((r) => ({
+    consorcio: r.consorcio,
+    cuit: r.cuit,
+    saldoBanco: Number(r.saldo_banco),
+    cobroEfectivo: Number(r.cobro_efectivo),
+    cobroTransferencia: Number(r.cobro_transferencia),
+    cobroDebito: Number(r.cobro_debito),
+    cobroOtro: Number(r.cobro_otro),
+  }));
+}
+
+export interface AlertItem {
+  type: "morosidad" | "liquidacion" | "orden" | "ticket";
+  severity: "high" | "medium";
+  title: string;
+  description: string;
+  href: string;
+}
+
+export async function getAlertItems(cuits?: string[]): Promise<AlertItem[]> {
+  const now = new Date();
+  const anio = now.getFullYear();
+  const mes = now.getMonth() + 1;
+  const dayOfMonth = now.getDate();
+
+  const morosidadF = cuitFilter(cuits, "u");
+  const unliquidatedF = cuitFilter(cuits, "c");
+  const ordenesF = cuitFilter(cuits, "ot");
+  const ticketsF = cuitFilter(cuits, "t");
+
+  const [morosidadRow, unliquidatedRows, ordenesRows, ticketsRows] = await Promise.all([
+    queryOne<{ count: string }>(
+      `SELECT COUNT(DISTINCT dp.unidad_id) AS count
+       FROM app.deuda_periodo dp
+       JOIN app.unidades u ON u.id = dp.unidad_id
+       WHERE dp.meses_atraso >= 3 AND dp.estado = 'pendiente'
+       ${morosidadF.clause ? `AND ${morosidadF.clause}` : ""}`,
+      morosidadF.params
+    ),
+    dayOfMonth > 10
+      ? query<{ nombre: string; anio: number; mes: number }>(
+          `SELECT c.nombre, pe.anio, pe.mes
+           FROM app.periodos_expensas pe
+           JOIN app.consorcios c ON c.cuit = pe.consorcio_cuit
+           WHERE pe.estado != 'liquidado' AND pe.anio = $${unliquidatedF.params.length + 1} AND pe.mes = $${unliquidatedF.params.length + 2}
+           ${unliquidatedF.clause ? `AND ${unliquidatedF.clause}` : ""}
+           ORDER BY c.nombre`,
+          [...unliquidatedF.params, anio, mes]
+        )
+      : Promise.resolve([]),
+    query<{ id: number; descripcion: string; consorcio_cuit: string }>(
+      `SELECT ot.id, ot.descripcion, ot.consorcio_cuit
+       FROM app.ordenes_trabajo ot
+       WHERE ot.estado NOT IN ('completada','cancelada')
+       AND ot.created_at < NOW() - interval '14 days'
+       ${ordenesF.clause ? `AND ${ordenesF.clause}` : ""}
+       ORDER BY ot.created_at ASC
+       LIMIT 10`,
+      ordenesF.params
+    ),
+    query<{ id: number; titulo: string; consorcio_cuit: string; prioridad: string }>(
+      `SELECT t.id, t.titulo, t.consorcio_cuit, t.prioridad
+       FROM app.tickets t
+       WHERE t.estado NOT IN ('resuelto','cerrado')
+       AND t.prioridad IN ('urgente','alta')
+       AND t.created_at < NOW() - interval '48 hours'
+       ${ticketsF.clause ? `AND ${ticketsF.clause}` : ""}
+       ORDER BY t.created_at ASC
+       LIMIT 10`,
+      ticketsF.params
+    ),
+  ]);
+
+  const items: AlertItem[] = [];
+
+  const morosidadCount = Number(morosidadRow?.count ?? 0);
+  if (morosidadCount > 0) {
+    items.push({
+      type: "morosidad",
+      severity: "high",
+      title: `${morosidadCount} unidad${morosidadCount === 1 ? "" : "es"} con 3+ meses de atraso`,
+      description: "Requieren gestión de cobranza o carta documento.",
+      href: "/finanzas/cuenta-corriente",
+    });
+  }
+
+  for (const row of unliquidatedRows) {
+    items.push({
+      type: "liquidacion",
+      severity: "medium",
+      title: `${row.nombre}: período sin liquidar`,
+      description: `El período ${row.mes}/${row.anio} sigue sin cerrarse tras el día 10.`,
+      href: "/expensas",
+    });
+  }
+
+  for (const row of ordenesRows) {
+    items.push({
+      type: "orden",
+      severity: "medium",
+      title: `Orden de trabajo demorada #${row.id}`,
+      description: row.descripcion,
+      href: "/proveedores",
+    });
+  }
+
+  for (const row of ticketsRows) {
+    items.push({
+      type: "ticket",
+      severity: "medium",
+      title: `Ticket ${row.prioridad} sin atender #${row.id}`,
+      description: row.titulo,
+      href: "/tickets",
+    });
+  }
+
+  return items;
 }
