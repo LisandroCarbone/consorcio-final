@@ -86,10 +86,10 @@ interface EscalaRow {
 // Constants
 // ---------------------------------------------------------------------------
 
-// Antigüedad y vivienda — mayo 2026
-const PLUS_ANTIG_1PCT_SUPLENTE = 10505.8;
-const PLUS_ANTIG_2PCT_NO_SUPLENTE = 21011.6;
-const VALOR_VIVIENDA = 7130.4;
+// Antigüedad y vivienda — fallback 0 forces DB-driven values via adicionales_suterh
+const PLUS_ANTIG_1PCT_SUPLENTE = 0;
+const PLUS_ANTIG_2PCT_NO_SUPLENTE = 0;
+const VALOR_VIVIENDA = 0;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -236,7 +236,9 @@ export async function calcularLiquidacion(
   const adicionales: Record<string, number> = {};
   const adicionalesByKey: Record<string, number> = {};
   for (const row of adicionalesRows.rows) {
+    const cleanName = row.concepto.replace(/&#\d+;/g, " ").replace(/\s+/g, " ").trim();
     adicionales[row.concepto] = Number(row.valor);
+    adicionales[cleanName] = Number(row.valor);
     if (row.concepto_key) adicionalesByKey[row.concepto_key] = Number(row.valor);
   }
   const adic = (key: string, fallback: number) => adicionalesByKey[key] ?? adicionales[key] ?? fallback;
@@ -449,8 +451,10 @@ export async function calcularLiquidacion(
   // 10. Viáticos
   // ---------------------------------------------------------------------------
 
+  const esJornalizado = emp.funcion.toLowerCase().includes("jornalizado");
   const tieneViaticos =
-    !emp.tiene_vivienda && emp.jornada !== "Suplente";
+    esEncargado && !emp.tiene_vivienda && !esJornalizado &&
+    (emp.jornada === "Completa" || emp.jornada === "Media");
   const adicionalViaticos = tieneViaticos
     ? adic("adicional_viaticos", 0)
     : 0;
@@ -485,7 +489,7 @@ export async function calcularLiquidacion(
     emp.jornada === "Suplente" && horasTotalesSuplente === 0
       ? 0
       : Number(emp.adicional_voluntario ?? 0);
-  const adicionalVoluntario = novN.adicional_voluntario || empAdicionalVoluntario;
+  const adicionalVoluntario = novN.adicional_voluntario ?? empAdicionalVoluntario;
 
   // ---------------------------------------------------------------------------
   // 13. Suplencia al 100%
@@ -529,11 +533,11 @@ export async function calcularLiquidacion(
   const baseHE = haberesFijos - adicionalRemEfectivo - adicionalViaticos;
 
   let valorHora: number;
-  if (esVigilNocturna) {
-    // Vigilancia nocturna: 175 horas mensuales
+  if (emp.jornada === "Suplente") {
+    valorHora = valorEscala / 8;
+  } else if (esVigilNocturna) {
     valorHora = baseHE / 175;
   } else if (esMediaJornada) {
-    // Media jornada: 100 horas mensuales
     valorHora = baseHE / 100;
   } else {
     valorHora = baseHE / 200;
@@ -554,15 +558,6 @@ export async function calcularLiquidacion(
   // ---------------------------------------------------------------------------
   // 17. Plus vacacional
   // ---------------------------------------------------------------------------
-
-  const totalHaberesPreVac =
-    haberesFijos -
-    adicionalRemEfectivo +
-    importeHE50 +
-    importeHE100 +
-    importeFeriados +
-    descuentoDias +
-    licenciaEnfermedad;
 
   const plusVacacional =
     novN.plus_vacaciones_dias > 0
@@ -951,11 +946,7 @@ export async function calcularSACPreview(
   const mesesTrabajados = liqRows.rows.length;
 
   let sacBase = safe((mejorBruto / 2) * (mesesTrabajados / mesesTotales));
-  if (empleadoCuil === '27174620410') {
-    sacBase = 610732.70;
-  } else {
-    sacBase = Math.round(sacBase * 100) / 100;
-  }
+  sacBase = Math.round(sacBase * 100) / 100;
 
   // Bonificación remunerativa del 20% sobre básico de categoría (Res. MT 1934/2015)
   const periodoSAC = semestre === 1 ? `${anio}-06-01` : `${anio}-12-01`;
@@ -1077,6 +1068,18 @@ function diasPreaviso(anios: number): number {
   return 60;
 }
 
+// Art. 245 LCT: fraction > 3 months counts as a full year for severance
+function aniosParaIndemnizacion(fechaIngreso: string, fechaEgreso: string): number {
+  const ingreso = new Date(fechaIngreso);
+  const egreso = new Date(fechaEgreso);
+  let anios = egreso.getFullYear() - ingreso.getFullYear();
+  let mesesRestantes = egreso.getMonth() - ingreso.getMonth();
+  if (egreso.getDate() < ingreso.getDate()) mesesRestantes--;
+  if (mesesRestantes < 0) { anios--; mesesRestantes += 12; }
+  if (mesesRestantes > 3) anios++;
+  return Math.max(1, anios);
+}
+
 export interface IndemnizacionConcepto {
   label: string;
   importe: number;
@@ -1166,7 +1169,7 @@ export async function calcularIndemnizacionPreview(
 
   // Indemnización por antigüedad (No Rem) — only despido sin causa
   if (esDespidoSinCausa) {
-    const aniosIndemnizacion = Math.max(1, aniosServicio);
+    const aniosIndemnizacion = aniosParaIndemnizacion(emp.fecha_ingreso, fechaEgreso);
     const importeIndem = safe(mejorBruto * aniosIndemnizacion);
     conceptos.push({ label: `Indemnización por Antigüedad (${aniosIndemnizacion} año/s × mejor bruto)`, importe: importeIndem, remunerativo: false });
   }
