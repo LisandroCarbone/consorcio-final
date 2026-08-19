@@ -171,105 +171,89 @@ export function ProvisionesSection({ provisiones, periodoId }: Props) {
         </p>
       ) : (
         <div>
-          {sortedCats.map((cat) => {
-            const rows = grouped.get(cat)!;
-            const subtotal = rows.reduce((sum, r) => sum + Number(r.monto), 0);
-            const colorClass = CATEGORIA_COLORS[cat] ?? "bg-gray-50 border-gray-200 text-gray-700";
-
-            return (
-              <div key={cat} className="border-b border-gray-100 last:border-b-0">
-                <div className={`flex items-center justify-between px-5 py-2 border-b ${colorClass}`}>
-                  <span className="text-sm font-bold uppercase tracking-wider">
-                    {cat}. {CATEGORIA_LABELS[cat] ?? `Categoría ${cat}`}
-                  </span>
-                  <span className="text-sm font-mono font-bold">{formatMoney(subtotal)}</span>
-                </div>
-                <table className="w-full text-sm">
-                  <tbody>
-                    {rows.map((p) =>
-                      editingId === p.id ? (
-                        <EditProvisionRow key={p.id} p={p} periodoId={periodoId} onCancel={() => setEditingId(null)} />
-                      ) : (
-                        <tr key={p.id} className="group border-b border-gray-100 last:border-b-0 hover:bg-gray-50/60 transition-colors">
-                          <td className="px-5 py-2.5">
-                            <p className="font-medium text-gray-900 text-sm leading-snug">{p.concepto}</p>
-                          </td>
-                          <td className="px-3 py-2.5 w-24">
-                            {(() => {
-                              const pctA = Number(p.pct_a ?? 100);
-                              if (pctA > 0 && pctA < 100) {
-                                return (
-                                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-teal-100 text-teal-700">
-                                    {`${pctA}%A / ${100 - pctA}%B`}
-                                  </span>
-                                );
-                              }
-                              return (
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                  pctA === 100 ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
-                                }`}>
-                                  {pctA === 100 ? "Coef A" : "Coef B"}
-                                </span>
-                              );
-                            })()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right w-36 font-mono font-semibold text-gray-900 text-sm whitespace-nowrap">
-                            {formatMoney(p.monto)}
-                          </td>
-                          <td className="px-3 py-2.5 w-40">
-                            <div className="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                type="button"
-                                onClick={async () => { await moverGasto(p.id, "up"); window.location.reload(); }}
-                                className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors text-xs"
-                                title="Mover arriba"
-                              >
-                                ▲
-                              </button>
-                              <button
-                                type="button"
-                                onClick={async () => { await moverGasto(p.id, "down"); window.location.reload(); }}
-                                className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors text-xs"
-                                title="Mover abajo"
-                              >
-                                ▼
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingId(p.id)}
-                                className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors"
-                                title="Editar"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handlePagada(p.id)}
-                                className="p-1 rounded hover:bg-green-100 text-gray-400 hover:text-green-700 transition-colors text-xs"
-                                title="Marcar como pagada"
-                                disabled={isPending}
-                              >
-                                ✅
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(p.id)}
-                                className="p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors"
-                                title="Eliminar"
-                                disabled={isPending}
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })}
+          <table className="w-full text-sm">
+            <tbody>
+              {pendientes.map((p) =>
+                editingId === p.id ? (
+                  <EditProvisionRow key={p.id} p={p} periodoId={periodoId} onCancel={() => setEditingId(null)} />
+                ) : (
+                  <tr key={p.id} className="group border-b border-gray-100 last:border-b-0 hover:bg-gray-50/60 transition-colors">
+                    <td className="px-5 py-2.5">
+                      <p className="font-medium text-gray-900 text-sm leading-snug">{p.concepto}</p>
+                    </td>
+                    <td className="px-3 py-2.5 w-24">
+                      {(() => {
+                        const pctA = Number(p.pct_a ?? 100);
+                        if (pctA > 0 && pctA < 100) {
+                          return (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-teal-100 text-teal-700">
+                              {`${pctA}%A / ${100 - pctA}%B`}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            pctA === 100 ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                          }`}>
+                            {pctA === 100 ? "Coef A" : "Coef B"}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-3 py-2.5 text-right w-36 font-mono font-semibold text-gray-900 text-sm whitespace-nowrap">
+                      {formatMoney(p.monto)}
+                    </td>
+                    <td className="px-3 py-2.5 w-40">
+                      <div className="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={async () => { await moverGasto(p.id, "up"); window.location.reload(); }}
+                          className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors text-xs"
+                          title="Mover arriba"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => { await moverGasto(p.id, "down"); window.location.reload(); }}
+                          className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors text-xs"
+                          title="Mover abajo"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(p.id)}
+                          className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors"
+                          title="Editar"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePagada(p.id)}
+                          className="p-1 rounded hover:bg-green-100 text-gray-400 hover:text-green-700 transition-colors text-xs"
+                          title="Marcar como pagada"
+                          disabled={isPending}
+                        >
+                          ✅
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(p.id)}
+                          className="p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Eliminar"
+                          disabled={isPending}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
 
           {pagadas.length > 0 && (
             <details className="border-t border-gray-200">

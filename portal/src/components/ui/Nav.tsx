@@ -24,8 +24,6 @@ const expensasSublinks = [
   { href: "/expensas/conciliacion-bancaria", label: "Conciliación Bancaria" },
   { href: "/configuracion/parametros", label: "Parámetros" },
   { href: "/configuracion/arca", label: "Credenciales ARCA" },
-  { href: "/finanzas/tasas-interes", label: "Tasas de Interés" },
-  { href: "/finanzas/deuda-historica", label: "Deuda Histórica" },
 ];
 
 const operationalLinks = [
@@ -44,9 +42,7 @@ export function Nav() {
   const inExpensas =
     pathname.startsWith("/expensas") ||
     pathname.startsWith("/configuracion/parametros") ||
-    pathname.startsWith("/configuracion/arca") ||
-    pathname.startsWith("/finanzas/tasas-interes") ||
-    pathname.startsWith("/finanzas/deuda-historica");
+    pathname.startsWith("/configuracion/arca");
   const [expensasOpen, setExpensasOpen] = useState(inExpensas);
 
   useEffect(() => {

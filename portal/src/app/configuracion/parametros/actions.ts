@@ -98,6 +98,11 @@ export async function eliminarParametroART(id: number) {
   revalidatePath("/configuracion/parametros");
 }
 
+export async function eliminarTasaInteres(id: number) {
+  await query("DELETE FROM app.tasas_interes WHERE id = $1", [id]);
+  revalidatePath("/configuracion/parametros");
+}
+
 export async function guardarSCVORenovacion(formData: FormData) {
   const consorcio_cuit = formData.get("consorcio_cuit") as string;
   const sv_renueva_mes = Number(formData.get("scvo_renovacion_mes"));

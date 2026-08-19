@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { query, queryOne } from "@/lib/db";
 import { formatMoney } from "@/lib/format";
 import { ParametrosCCTClient, type ParametroCCTRow, type ARTRow } from "./ParametrosCCTClient";
+import { TasasInteresSection, type TasaRow } from "./TasasInteresSection";
 
 type ParametroCCT = {
   id: number;
@@ -51,6 +52,7 @@ export default async function ParametrosCCTPage() {
   );
 
   let artParams: ARTParam[] = [];
+  let tasas: TasaRow[] = [];
   let consorcioNombre = "";
   let scvoRenovacionMes: number | null = null;
   let scvoRenovacionMonto: string = "0";
@@ -58,6 +60,13 @@ export default async function ParametrosCCTPage() {
     artParams = await query<ARTParam>(
       `SELECT id, fecha_desde::text, art_pct_variable::numeric, art_costo_fijo::numeric
        FROM app.parametros_art_consorcio
+       WHERE consorcio_cuit = $1
+       ORDER BY fecha_desde DESC`,
+      [activeCuit]
+    );
+    tasas = await query<TasaRow>(
+      `SELECT id, tasa::text, fecha_desde::text, fecha_hasta::text
+       FROM app.tasas_interes
        WHERE consorcio_cuit = $1
        ORDER BY fecha_desde DESC`,
       [activeCuit]
@@ -151,6 +160,12 @@ export default async function ParametrosCCTPage() {
         consorcioNombre={consorcioNombre}
         scvoRenovacionMes={scvoRenovacionMes}
         scvoRenovacionMonto={scvoRenovacionMonto}
+      />
+
+      <TasasInteresSection
+        tasas={tasas}
+        consorcioCuit={activeCuit}
+        consorcioNombre={consorcioNombre}
       />
     </div>
   );

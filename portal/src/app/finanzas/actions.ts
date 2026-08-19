@@ -2,6 +2,7 @@
 
 import { pool, withTransaction } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { runCalculateExpenses } from "@/lib/expenses/engine";
 
@@ -165,68 +166,7 @@ export async function crearTasaInteres(formData: FormData) {
     throw e;
   }
 
-  revalidatePath("/finanzas/tasas-interes");
-}
-
-// Motor de Intereses Real — Phase 8: Debt Onboarding.
-// Inserts a per-period historical debt row directly into deuda_periodo for a
-// unit, creating the referenced periodos_expensas row (estado='liquidado')
-// if it does not already exist. Used to seed pre-existing debt that predates
-// the interest engine, so it is picked up by calcularInteresesPeriodo on the
-// next liquidación.
-export async function agregarDeudaHistorica(formData: FormData) {
-  const consorcio_cuit = String(formData.get("consorcio_cuit") || "");
-  const unidad_id = Number(formData.get("unidad_id"));
-  const anio = Number(formData.get("anio"));
-  const mes = Number(formData.get("mes"));
-  const monto_original = Number(formData.get("monto_original"));
-
-  if (!consorcio_cuit) throw new Error("Consorcio requerido");
-  if (!unidad_id || unidad_id <= 0) throw new Error("Unidad inválida");
-  if (!anio || anio < 2000 || anio > 2100) throw new Error("Año inválido");
-  if (!mes || mes < 1 || mes > 12) throw new Error("Mes inválido");
-  if (!monto_original || isNaN(monto_original) || monto_original <= 0) throw new Error("Monto inválido");
-
-  await withTransaction(async (client) => {
-    const unitCheck = await client.query(
-      "SELECT id FROM app.unidades WHERE id = $1 AND consorcio_cuit = $2",
-      [unidad_id, consorcio_cuit]
-    );
-    if (!unitCheck.rowCount) throw new Error("La unidad no pertenece al consorcio seleccionado");
-
-    let periodo = await client.query(
-      "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 AND anio = $2 AND mes = $3",
-      [consorcio_cuit, anio, mes]
-    );
-    let periodoId: number;
-    if (periodo.rowCount && periodo.rowCount > 0) {
-      periodoId = periodo.rows[0].id;
-    } else {
-      const inserted = await client.query(
-        `INSERT INTO app.periodos_expensas (consorcio_cuit, anio, mes, estado, fecha_vencimiento)
-         VALUES ($1, $2, $3, 'liquidado', ($2 || '-' || LPAD($3::text, 2, '0') || '-01')::date)
-         RETURNING id`,
-        [consorcio_cuit, anio, mes]
-      );
-      periodoId = inserted.rows[0].id;
-    }
-
-    await client.query(
-      `INSERT INTO app.deuda_periodo
-         (unidad_id, periodo_id, monto_original, monto_capital_pendiente,
-          monto_intereses_acumulado, monto_intereses_pendiente, meses_atraso, estado)
-       VALUES ($1, $2, $3, $3, 0, 0, 0, 'pendiente')
-       ON CONFLICT (unidad_id, periodo_id) DO UPDATE SET
-         monto_capital_pendiente = app.deuda_periodo.monto_capital_pendiente
-           + (EXCLUDED.monto_original - app.deuda_periodo.monto_original),
-         monto_original = EXCLUDED.monto_original,
-         updated_at = now()`,
-      [unidad_id, periodoId, monto_original]
-    );
-  });
-
-  revalidatePath("/finanzas/deuda-historica");
-  revalidatePath("/finanzas/cuenta-corriente");
+  revalidatePath("/configuracion/parametros");
 }
 
 export async function guardarSaldosIniciales(
@@ -297,3 +237,164 @@ export async function eliminarPago(formData: FormData) {
 
   revalidatePath("/finanzas/cuenta-corriente");
 }
+
+// Cuenta corriente history redesign — manual (historico) period entries.
+// Lets an admin seed a running-balance history for a unit that predates the
+// interest engine: an initial balance plus a chain of monthly rows.
+
+export async function actualizarSaldoInicial(formData: FormData) {
+  const unidad_id = Number(formData.get("unidad_id"));
+  const saldo_inicial = Number(formData.get("saldo_inicial"));
+
+  if (!unidad_id || unidad_id <= 0) throw new Error("Unidad inválida");
+  if (isNaN(saldo_inicial)) throw new Error("Saldo inicial inválido");
+
+  await pool.query(
+    "UPDATE app.unidades SET saldo_inicial_historico = $2 WHERE id = $1",
+    [unidad_id, saldo_inicial]
+  );
+
+  revalidatePath("/finanzas/cuenta-corriente");
+}
+
+export async function agregarPeriodoHistorial(formData: FormData) {
+  const unidad_id = Number(formData.get("unidad_id"));
+  const anio = Number(formData.get("anio"));
+  const mes = Number(formData.get("mes"));
+  const expensas = Number(formData.get("expensas"));
+  const pago = Number(formData.get("pago"));
+
+  if (!unidad_id || unidad_id <= 0) throw new Error("Unidad inválida");
+  if (!anio || anio < 2000 || anio > 2100) throw new Error("Año inválido");
+  if (!mes || mes < 1 || mes > 12) throw new Error("Mes inválido");
+  if (isNaN(expensas) || expensas < 0) throw new Error("Monto de expensas inválido");
+  if (isNaN(pago) || pago < 0) throw new Error("Monto de pago inválido");
+
+  let consorcio_cuit = "";
+  await withTransaction(async (client) => {
+    const unidadRow = await client.query(
+      "SELECT consorcio_cuit FROM app.unidades WHERE id = $1",
+      [unidad_id]
+    );
+    if (!unidadRow.rowCount) throw new Error("Unidad no encontrada");
+    consorcio_cuit = unidadRow.rows[0].consorcio_cuit;
+
+    let periodo = await client.query(
+      "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 AND anio = $2 AND mes = $3",
+      [consorcio_cuit, anio, mes]
+    );
+    let periodoId: number;
+    if (periodo.rowCount && periodo.rowCount > 0) {
+      periodoId = periodo.rows[0].id;
+    } else {
+      const inserted = await client.query(
+        `INSERT INTO app.periodos_expensas (consorcio_cuit, anio, mes, estado)
+         VALUES ($1, $2::smallint, $3::smallint, 'historico')
+         RETURNING id`,
+        [consorcio_cuit, anio, mes]
+      );
+      periodoId = inserted.rows[0].id;
+    }
+
+    await client.query(
+      `INSERT INTO app.res_cuenta_periodo
+         (periodo_id, unidad_id, coef_a, coef_b, expensas_a, total_mes, su_pago,
+          saldo_anterior, intereses, deuda, expensas_b, s_asamblea, otros, gast_part)
+       VALUES ($1, $2, 0, 0, $3, $3, $4, 0, 0, 0, 0, 0, 0, 0)
+       ON CONFLICT (periodo_id, unidad_id) DO UPDATE SET
+         expensas_a = $3, total_mes = $3, su_pago = $4`,
+      [periodoId, unidad_id, expensas, pago]
+    );
+
+    const deuda = Math.max(expensas - pago, 0);
+    await client.query(
+      `INSERT INTO app.deuda_periodo (unidad_id, periodo_id, monto_original, monto_capital_pendiente)
+       VALUES ($1, $2, $3, $3)
+       ON CONFLICT (unidad_id, periodo_id) DO UPDATE SET
+         monto_original = $3, monto_capital_pendiente = $3`,
+      [unidad_id, periodoId, deuda]
+    );
+
+  });
+
+  revalidatePath("/finanzas/cuenta-corriente");
+}
+
+export async function editarPeriodoHistorial(formData: FormData) {
+  const res_cuenta_id = Number(formData.get("res_cuenta_id"));
+  const expensas = Number(formData.get("expensas"));
+  const pago = Number(formData.get("pago"));
+
+  if (!res_cuenta_id) throw new Error("Registro inválido");
+  if (isNaN(expensas) || expensas < 0) throw new Error("Monto de expensas inválido");
+  if (isNaN(pago) || pago < 0) throw new Error("Monto de pago inválido");
+
+  await withTransaction(async (client) => {
+    const row = await client.query(
+      `SELECT pe.estado, pe.id AS periodo_id, rcp.unidad_id, u.consorcio_cuit
+       FROM app.res_cuenta_periodo rcp
+       JOIN app.periodos_expensas pe ON pe.id = rcp.periodo_id
+       JOIN app.unidades u ON u.id = rcp.unidad_id
+       WHERE rcp.id = $1`,
+      [res_cuenta_id]
+    );
+    if (!row.rowCount) throw new Error("Registro no encontrado");
+    const { estado, periodo_id, unidad_id, consorcio_cuit } = row.rows[0];
+    if (estado === "abierto" || estado === "liquidado") throw new Error("Solo se pueden modificar períodos cargados manualmente");
+
+    await client.query(
+      "UPDATE app.res_cuenta_periodo SET expensas_a = $2, total_mes = $2, su_pago = $3 WHERE id = $1",
+      [res_cuenta_id, expensas, pago]
+    );
+
+    const deuda = Math.max(expensas - pago, 0);
+    await client.query(
+      `UPDATE app.deuda_periodo SET monto_original = $3, monto_capital_pendiente = $3
+       WHERE unidad_id = $1 AND periodo_id = $2`,
+      [unidad_id, periodo_id, deuda]
+    );
+
+  });
+
+  revalidatePath("/finanzas/cuenta-corriente");
+}
+
+export async function eliminarPeriodoHistorial(formData: FormData) {
+  const res_cuenta_id = Number(formData.get("res_cuenta_id"));
+  if (!res_cuenta_id) throw new Error("Registro inválido");
+
+  await withTransaction(async (client) => {
+    const row = await client.query(
+      `SELECT pe.estado, pe.id AS periodo_id, rcp.unidad_id, u.consorcio_cuit
+       FROM app.res_cuenta_periodo rcp
+       JOIN app.periodos_expensas pe ON pe.id = rcp.periodo_id
+       JOIN app.unidades u ON u.id = rcp.unidad_id
+       WHERE rcp.id = $1`,
+      [res_cuenta_id]
+    );
+    if (!row.rowCount) throw new Error("Registro no encontrado");
+    const { estado, periodo_id, unidad_id, consorcio_cuit } = row.rows[0];
+    if (estado === "abierto" || estado === "liquidado") throw new Error("Solo se pueden modificar períodos cargados manualmente");
+
+    await client.query("DELETE FROM app.res_cuenta_periodo WHERE id = $1", [res_cuenta_id]);
+    await client.query(
+      "DELETE FROM app.imputacion_pagos WHERE deuda_periodo_id IN (SELECT id FROM app.deuda_periodo WHERE unidad_id = $1 AND periodo_id = $2)",
+      [unidad_id, periodo_id]
+    );
+    await client.query(
+      "DELETE FROM app.deuda_periodo WHERE unidad_id = $1 AND periodo_id = $2",
+      [unidad_id, periodo_id]
+    );
+
+    const remaining = await client.query(
+      "SELECT id FROM app.res_cuenta_periodo WHERE periodo_id = $1 LIMIT 1",
+      [periodo_id]
+    );
+    if (!remaining.rowCount) {
+      await client.query("DELETE FROM app.periodos_expensas WHERE id = $1", [periodo_id]);
+    }
+  });
+
+  revalidatePath("/finanzas/cuenta-corriente");
+}
+

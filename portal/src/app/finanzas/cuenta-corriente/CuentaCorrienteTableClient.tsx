@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { IMaskInput } from "react-imask";
 import { formatMoney } from "@/lib/format";
 import { registrarPago, guardarSaldosIniciales } from "../actions";
@@ -237,19 +236,19 @@ export function CuentaCorrienteTableClient({
                       >
                         💸 Cobrar
                       </button>
-                      <Link
+                      <a
                         href={`?consorcio=${consorcioCuit}&ver_historial=${r.unidad_id}`}
                         className="btn-secondary text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 flex items-center justify-center gap-1 transition-all whitespace-nowrap font-medium"
                       >
                         📋 Historial
-                      </Link>
+                      </a>
                       {(r.total_pagado_count ?? 0) > 0 && (
-                        <Link
+                        <a
                           href={`?consorcio=${consorcioCuit}&ver_pagos=${r.unidad_id}`}
                           className="btn-secondary text-xs py-1.5 px-2.5 rounded-lg border border-amber-300 text-amber-700 bg-amber-50/50 hover:bg-amber-50 flex items-center justify-center gap-1 transition-all whitespace-nowrap font-medium"
                         >
                           ⚙️
-                        </Link>
+                        </a>
                       )}
                     </div>
                   </td>

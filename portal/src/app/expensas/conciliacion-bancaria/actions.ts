@@ -896,6 +896,28 @@ export async function aplicarCreditos(extractoId: number) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
+    // Delete previously applied pagos from this extracto so re-apply works
+    const { rows: prevApplied } = await client.query<{ referencia: string }>(
+      `SELECT DISTINCT referencia FROM app.extracto_movimientos
+       WHERE extracto_id = $1 AND comprobante_ref IS NOT NULL AND match_tipo = 'cobranza' AND es_credito = true`,
+      [extractoId]
+    );
+    if (prevApplied.length > 0) {
+      const refs = prevApplied.map(r => r.referencia).filter(Boolean);
+      if (refs.length > 0) {
+        await client.query(
+          `DELETE FROM app.pagos WHERE consorcio_cuit = $1 AND medio_pago = 'transferencia' AND referencia = ANY($2)`,
+          [extracto.consorcio_cuit, refs]
+        );
+      }
+      await client.query(
+        `UPDATE app.extracto_movimientos SET comprobante_ref = NULL
+         WHERE extracto_id = $1 AND comprobante_ref IS NOT NULL AND match_tipo = 'cobranza' AND es_credito = true`,
+        [extractoId]
+      );
+    }
+
     const { rows: confirmados } = await client.query<{
       id: number;
       fecha: string;
@@ -935,7 +957,16 @@ export async function aplicarCreditos(extractoId: number) {
   }
 
   if (extracto.periodo_id) {
-    await runCalculateExpenses(extracto.periodo_id);
+    await query(
+      `UPDATE app.res_cuenta_periodo rcp
+       SET su_pago = COALESCE((
+         SELECT SUM(p.monto) FROM app.pagos p
+         WHERE p.unidad_id = rcp.unidad_id
+           AND p.consorcio_cuit = (SELECT consorcio_cuit FROM app.periodos_expensas WHERE id = rcp.periodo_id)
+       ), 0)
+       WHERE rcp.periodo_id = $1`,
+      [extracto.periodo_id]
+    );
   }
 
   revalidatePath(BASE_PATH);
