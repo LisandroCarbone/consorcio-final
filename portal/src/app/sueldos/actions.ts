@@ -464,6 +464,15 @@ export async function confirmarLiquidacion(liquidacionId: number) {
   try {
     await client.query("BEGIN");
 
+    // Check estado
+    const check = await client.query(
+      "SELECT estado FROM app.liquidaciones_sueldo WHERE id = $1",
+      [liquidacionId]
+    );
+    if (check.rows[0]?.estado === "requiere_revision") {
+      throw new Error("No se puede confirmar una liquidación con escala pendiente. Cargá las escalas del período y reliquidá.");
+    }
+
     // 1. Update status
     await client.query(
       "UPDATE app.liquidaciones_sueldo SET estado = 'confirmada', updated_at = now() WHERE id = $1",
@@ -564,13 +573,40 @@ export async function deleteConceptoAdicionalPeriodo(id: number): Promise<void> 
   revalidatePath("/sueldos/novedades");
 }
 
-export async function getAdicionalRemuneratorio(periodo: string): Promise<number | null> {
-  const row = await queryOne<{ valor: string }>(
-    `SELECT valor::numeric::text AS valor FROM app.adicionales_suterh
+export interface AdicionalRemInfo {
+  valor: number;
+  fuente: string;
+  valorEscala: number | null;
+}
+
+export async function getAdicionalRemuneratorio(periodo: string): Promise<AdicionalRemInfo | null> {
+  const row = await queryOne<{ valor: string; fuente_url: string }>(
+    `SELECT valor::numeric::text AS valor, fuente_url FROM app.adicionales_suterh
      WHERE periodo = $1 AND concepto_key = 'adicional_remuneratorio_mensual'`,
     [periodo]
   );
-  return row ? Number(row.valor) : null;
+  if (!row) return null;
+
+  const esManual = row.fuente_url === "manual";
+  let valorEscala: number | null = null;
+
+  if (esManual) {
+    const escalaRow = await queryOne<{ valor: string }>(
+      `SELECT valor::numeric::text AS valor FROM app.adicionales_suterh
+       WHERE concepto_key = 'adicional_remuneratorio_mensual'
+         AND fuente_url != 'manual'
+         AND periodo <= $1
+       ORDER BY periodo DESC LIMIT 1`,
+      [periodo]
+    );
+    valorEscala = escalaRow ? Number(escalaRow.valor) : null;
+  }
+
+  return {
+    valor: Number(row.valor),
+    fuente: esManual ? "manual" : "escala",
+    valorEscala: esManual ? valorEscala : Number(row.valor),
+  };
 }
 
 export async function upsertAdicionalRemuneratorio(periodo: string, valor: number): Promise<void> {

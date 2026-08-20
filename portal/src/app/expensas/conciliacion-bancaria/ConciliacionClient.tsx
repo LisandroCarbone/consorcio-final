@@ -57,6 +57,7 @@ type Movimiento = {
   estado_match: string;
   comprobante_ref: string | null;
   categoria_bancaria: string | null;
+  match_group_ids: number[] | null;
 };
 
 type Unidad = { id: number; uf: string; uf_numero: number | null; propietario: string | null };
@@ -134,7 +135,7 @@ export function ConciliacionClient({
     ? Number(extractos[0].saldo_cierre)
     : null;
 
-  const movimientosBancarios = localMovimientos.filter((m) => m.categoria_bancaria !== null);
+  const movimientosBancarios = localMovimientos.filter((m) => m.categoria_bancaria !== null && m.estado_match !== "descartado");
 
   const filteredMovimientos = localMovimientos.filter((m) => {
     if (tipoFilter === "creditos" && !m.es_credito) return false;
@@ -212,6 +213,12 @@ export function ConciliacionClient({
       const u = unidadMap.get(m.match_id);
       if (!u) return `UF ${m.match_id}`;
       return `UF ${u.uf_numero ?? u.uf}${u.propietario ? ` - ${u.propietario}` : ""}`;
+    }
+    if (m.match_group_ids && m.match_group_ids.length > 1) {
+      const labels = m.match_group_ids
+        .map((id) => gastoMap.get(id)?.descripcion ?? `#${id}`)
+        .join(" + ");
+      return `Gastos: ${labels}`;
     }
     const g = gastoMap.get(m.match_id);
     return `Gasto: ${g ? g.descripcion : m.match_id}`;

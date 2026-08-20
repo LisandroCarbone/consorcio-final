@@ -137,6 +137,12 @@ export default async function ReciboPage({
       const anios = parseInt(antigMatch[1]);
       return { unidad: `${anios} años`, valorUnit: fmt(Math.round((i / anios) * 100) / 100) };
     }
+    // Plus Vacacional: "Plus Vacacional (14 días)"
+    const vacMatch = concepto.match(/plus vacacional.*\((\d+)\s*días?\)/i);
+    if (vacMatch) {
+      const dias = parseInt(vacMatch[1]);
+      return { unidad: `${dias} días`, valorUnit: fmt(Math.round((i / dias) * 100) / 100) };
+    }
     // Horas extras: "Horas Extras 50% (36hs)"
     const hsMatch = concepto.match(/\((\d+(?:\.\d+)?)\s*hs?\)/i);
     if (hsMatch) {
@@ -255,6 +261,13 @@ export default async function ReciboPage({
           <PrintButton liquidacionId={liq.id} empleadoEmail={liq.email} empleadoWhatsapp={liq.whatsapp} />
         </div>
 
+        {liq.estado === "requiere_revision" && (
+          <div className="print:hidden mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <strong>Liquidación calculada con escala de otro período.</strong>{" "}
+            Los valores pueden diferir de los definitivos. Cargá las escalas del período y recalculá para poder confirmar.
+          </div>
+        )}
+
         {/* ══════════════════════════════════════════════════
             BLOQUE 1 — ENCABEZADO EMPLEADOR / EMPLEADO
         ══════════════════════════════════════════════════ */}
@@ -273,6 +286,9 @@ export default async function ReciboPage({
             {/* Left: employer */}
             <div className="p-3 text-xs space-y-0.5">
               <p className="font-bold text-sm text-gray-900">{liq.consorcio_nombre}</p>
+              {liq.consorcio_direccion && liq.consorcio_direccion !== "S/D" && (
+                <p className="text-gray-600">{liq.consorcio_direccion}</p>
+              )}
               <p className="text-gray-600">CUIT: {formatCuit(liq.consorcio_cuit)}</p>
               {liq.nro_cta_suterh && (
                 <p className="text-gray-600">N° Cuenta SUTERH: {liq.nro_cta_suterh}</p>

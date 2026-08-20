@@ -184,10 +184,11 @@ export default async function CuentaCorrientePage({
       if (saldoIni > 0 || hist.length > 0) {
         const { intereses, saldoFinal, saldoAnterior } = calcularInteresSimple(saldoIni, hist, tasa);
         const r = row as Record<string, unknown>;
-        r.saldo_anterior = saldoAnterior;
-        r.intereses = intereses;
-        r.deuda = saldoAnterior + Number(row.total_mes) - Number(row.su_pago);
-        r.total_pagar = saldoFinal;
+        const hasRcp = Number(row.total_mes) !== 0 || Number(row.su_pago) !== 0 || row.estado !== null;
+        r.saldo_anterior = hasRcp ? saldoAnterior : saldoFinal;
+        r.intereses = hasRcp ? intereses : 0;
+        r.deuda = Number(r.saldo_anterior) + Number(row.total_mes) - Number(row.su_pago);
+        r.total_pagar = hasRcp ? saldoFinal : Number(r.saldo_anterior);
       }
     }
   }

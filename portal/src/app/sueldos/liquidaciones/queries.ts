@@ -10,6 +10,7 @@ export async function getLiquidacionDetalle(id: number) {
        DATE_PART('year', AGE(l.periodo, e.fecha_ingreso))::int AS antiguedad_anios,
        e.obra_social, e.cbu, e.banco, e.legajo,
        c.nombre AS consorcio_nombre, c.cuit AS consorcio_cuit,
+       c.direccion AS consorcio_direccion,
        c.suterh_key AS nro_cta_suterh,
        c.pct_contrib_jubilacion, c.pct_contrib_obra_social,
        c.art_pct_variable, c.art_fijo,

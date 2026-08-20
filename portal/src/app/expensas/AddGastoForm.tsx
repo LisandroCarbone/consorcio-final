@@ -123,7 +123,7 @@ export function AddGastoForm({
   return (
     <form
       action={handleSubmit}
-      className="flex flex-wrap gap-2 px-5 py-3 bg-gray-50 border-t border-gray-100 items-end"
+      className="px-5 py-3 bg-gray-50 border-t border-gray-100 space-y-2"
     >
       <input type="hidden" name="periodo_id" value={periodoId} />
       <input type="hidden" name="tipo" value={tipo} />
@@ -132,37 +132,15 @@ export function AddGastoForm({
         <input type="hidden" name="target_uf" value={particularUf.uf} />
       )}
 
-      <div className="w-48">
-        <label className="label text-xs">Categoría</label>
-        <select
-          name="categoria"
-          className="input"
-          value={categoria}
-          onChange={(e) => setCategoria(e.target.value)}
-          disabled={isPending}
-        >
-          <option value="1">1 - Sueldos y Cargas Sociales</option>
-          <option value="2">2 - Servicios Públicos</option>
-          <option value="3">3 - Abonos de Servicios</option>
-          <option value="4">4 - Mantenimiento Común</option>
-          <option value="5">5 - Reparaciones en Unidades</option>
-          <option value="6">6 - Gastos Bancarios</option>
-          <option value="7">7 - Gastos de Limpieza</option>
-          <option value="8">8 - Gastos Administración</option>
-          <option value="9">9 - Seguros</option>
-          <option value="10">10 - Otros</option>
-        </select>
-      </div>
-
-      {/* Concepto with autocomplete */}
-      <div className="flex-1 min-w-40 relative" ref={conceptoRef as React.RefObject<HTMLDivElement>}>
+      {/* Row 1: Concepto full width */}
+      <div className="relative" ref={conceptoRef as React.RefObject<HTMLDivElement>}>
         <label className="label text-xs">Concepto</label>
         <input
           ref={conceptoRef}
           name="concepto"
           required
-          placeholder="Concepto"
-          className="input"
+          placeholder="Ej: EMEGA SRL (30-71582332-9): abono mantenimiento ascensor 06/26 FC 51191"
+          className="input w-full"
           value={concepto}
           onChange={(e) => handleConceptoChange(e.target.value)}
           onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
@@ -191,6 +169,31 @@ export function AddGastoForm({
             ))}
           </div>
         )}
+      </div>
+
+      {/* Row 2: Rest of the fields */}
+      <div className="flex flex-wrap gap-2 items-end">
+
+      <div className="w-48">
+        <label className="label text-xs">Categoría</label>
+        <select
+          name="categoria"
+          className="input"
+          value={categoria}
+          onChange={(e) => setCategoria(e.target.value)}
+          disabled={isPending}
+        >
+          <option value="1">1 - Sueldos y Cargas Sociales</option>
+          <option value="2">2 - Servicios Públicos</option>
+          <option value="3">3 - Abonos de Servicios</option>
+          <option value="4">4 - Mantenimiento Común</option>
+          <option value="5">5 - Reparaciones en Unidades</option>
+          <option value="6">6 - Gastos Bancarios</option>
+          <option value="7">7 - Gastos de Limpieza</option>
+          <option value="8">8 - Gastos Administración</option>
+          <option value="9">9 - Seguros</option>
+          <option value="10">10 - Otros</option>
+        </select>
       </div>
 
       <div className="w-36">
@@ -347,6 +350,8 @@ export function AddGastoForm({
       <button type="submit" className="btn-primary shrink-0 self-end" disabled={isPending}>
         {isPending ? "Guardando…" : "+ Agregar"}
       </button>
+
+      </div>{/* end row 2 */}
     </form>
   );
 }

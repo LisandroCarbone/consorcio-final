@@ -4,11 +4,35 @@ import Link from "next/link";
 import { query, queryOne } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { createUnidad, createPersonaAndOcupante } from "../actions";
-import { UfNumeroCell } from "./UfNumeroCell";
-import { formatCuit, formatPhone } from "@/lib/format";
+import { UnidadRow } from "./UnidadRow";
+import { formatCuit } from "@/lib/format";
 
 interface Props {
   params: Promise<{ id: string }>;
+}
+
+interface Propietario {
+  ocupante_id: number;
+  persona_id: number;
+  nombre: string | null;
+  apellido: string | null;
+  dni: string | null;
+  email: string | null;
+  whatsapp: string | null;
+}
+
+interface Inquilino {
+  ocupante_id: number;
+  persona_id: number;
+  nombre: string | null;
+  apellido: string | null;
+  email: string | null;
+  whatsapp: string | null;
+}
+
+interface CbuEntry {
+  cbu_o_cuit: string;
+  nombre_referencia: string | null;
 }
 
 async function getData(cuit: string) {
@@ -19,20 +43,44 @@ async function getData(cuit: string) {
     ),
     query<{
       id: number; uf: string; uf_numero: number | null; coef_a: string; coef_b: string; tipo: string;
-      propietario_nombre: string | null; propietario_dni: string | null; propietario_email: string | null; propietario_whatsapp: string | null;
-      inquilino_nombre: string | null; inquilino_email: string | null; inquilino_whatsapp: string | null;
+      propietarios: Propietario[] | null;
+      inquilino_ocupante_id: number | null; inquilino_persona_id: number | null;
+      inquilino_nombre: string | null; inquilino_apellido: string | null;
+      inquilino_email: string | null; inquilino_whatsapp: string | null;
+      cbu_entries: CbuEntry[] | null;
     }>(
       `SELECT u.id, u.uf, u.uf_numero, u.coef_a, u.coef_b, u.tipo,
-              prop.nombre || ' ' || prop.apellido AS propietario_nombre,
-              prop.dni AS propietario_dni,
-              prop.email AS propietario_email,
-              prop.whatsapp AS propietario_whatsapp,
-              inq.nombre || ' ' || inq.apellido AS inquilino_nombre,
+              COALESCE(
+                (SELECT json_agg(json_build_object(
+                    'ocupante_id', o_prop.id,
+                    'persona_id', prop.id,
+                    'nombre', prop.nombre,
+                    'apellido', prop.apellido,
+                    'dni', prop.dni,
+                    'email', prop.email,
+                    'whatsapp', prop.whatsapp
+                  ) ORDER BY o_prop.id)
+                 FROM app.ocupantes o_prop
+                 JOIN app.personas prop ON prop.id = o_prop.persona_id
+                 WHERE o_prop.unidad_id = u.id AND o_prop.activo = true AND o_prop.rol = 'propietario'
+                ), '[]'
+              ) AS propietarios,
+              o_inq.id AS inquilino_ocupante_id,
+              inq.id AS inquilino_persona_id,
+              inq.nombre AS inquilino_nombre,
+              inq.apellido AS inquilino_apellido,
               inq.email AS inquilino_email,
-              inq.whatsapp AS inquilino_whatsapp
+              inq.whatsapp AS inquilino_whatsapp,
+              COALESCE(
+                (SELECT json_agg(json_build_object(
+                    'cbu_o_cuit', cm.cbu_o_cuit,
+                    'nombre_referencia', cm.nombre_referencia
+                  ) ORDER BY cm.cbu_o_cuit) FILTER (WHERE cm.cbu_o_cuit IS NOT NULL)
+                 FROM app.cbu_unidad_map cm
+                 WHERE cm.unidad_id = u.id
+                ), '[]'
+              ) AS cbu_entries
        FROM app.unidades u
-       LEFT JOIN app.ocupantes o_prop ON o_prop.unidad_id=u.id AND o_prop.activo=true AND o_prop.rol='propietario'
-       LEFT JOIN app.personas prop ON prop.id=o_prop.persona_id
        LEFT JOIN app.ocupantes o_inq ON o_inq.unidad_id=u.id AND o_inq.activo=true AND o_inq.rol='inquilino'
        LEFT JOIN app.personas inq ON inq.id=o_inq.persona_id
        WHERE u.consorcio_cuit=$1
@@ -91,28 +139,35 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                 <th className="th">Inquilino</th>
                 <th className="th">Email Inq.</th>
                 <th className="th">WhatsApp Inq.</th>
+                <th className="th">CBU</th>
               </tr>
             </thead>
             <tbody>
               {unidades.map((u) => (
-                <tr key={u.id} className="table-row hover:bg-gray-50">
-                  <td className="td font-mono text-gray-500 text-sm text-center w-16 p-0">
-                    <UfNumeroCell id={u.id} consorcioCuit={id} defaultValue={u.uf_numero} />
-                  </td>
-                  <td className="td font-medium">{u.uf}</td>
-                  <td className="td text-gray-500 capitalize">{u.tipo}</td>
-                  <td className="td text-right font-mono text-sm">{parseFloat(u.coef_a).toFixed(4)}</td>
-                  <td className="td text-right font-mono text-sm">{parseFloat(u.coef_b).toFixed(4)}</td>
-                  <td className="td font-medium text-gray-800">
-                    {u.propietario_nombre ?? <span className="text-gray-400 italic text-xs font-normal">Sin asignar</span>}
-                    {u.propietario_dni && <span className="block text-xs font-mono text-gray-400">{u.propietario_dni}</span>}
-                  </td>
-                  <td className="td text-xs text-gray-600 font-mono">{u.propietario_email ?? "—"}</td>
-                  <td className="td text-xs text-gray-600 font-mono">{formatPhone(u.propietario_whatsapp)}</td>
-                  <td className="td font-medium text-gray-800">{u.inquilino_nombre ?? <span className="text-gray-400 italic text-xs font-normal">Sin asignar</span>}</td>
-                  <td className="td text-xs text-gray-600 font-mono">{u.inquilino_email ?? "—"}</td>
-                  <td className="td text-xs text-gray-600 font-mono">{formatPhone(u.inquilino_whatsapp)}</td>
-                </tr>
+                <UnidadRow
+                  key={u.id}
+                  id={u.id}
+                  uf={u.uf}
+                  uf_numero={u.uf_numero}
+                  tipo={u.tipo}
+                  coefA={u.coef_a}
+                  coefB={u.coef_b}
+                  consorcioCuit={id}
+                  propietarios={u.propietarios ?? []}
+                  inquilino={
+                    u.inquilino_ocupante_id && u.inquilino_persona_id
+                      ? {
+                          ocupante_id: u.inquilino_ocupante_id,
+                          persona_id: u.inquilino_persona_id,
+                          nombre: u.inquilino_nombre,
+                          apellido: u.inquilino_apellido,
+                          email: u.inquilino_email,
+                          whatsapp: u.inquilino_whatsapp,
+                        }
+                      : null
+                  }
+                  cbuEntries={u.cbu_entries ?? []}
+                />
               ))}
             </tbody>
           </table>

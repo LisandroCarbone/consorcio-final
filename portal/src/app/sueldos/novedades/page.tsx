@@ -113,7 +113,9 @@ export default async function NovedadesPage({ searchParams }: Props) {
       <AdicionalRemuneratorioCard
         periodo={periodo}
         consorcioCuit={activeCuit}
-        valorInicial={adicionalRem}
+        valorInicial={adicionalRem?.valor ?? null}
+        fuenteInicial={adicionalRem?.fuente ?? null}
+        valorEscalaRef={adicionalRem?.valorEscala ?? null}
         fondoEducacionInicial={fondoEdu}
         conceptosIniciales={conceptosAdicionales}
       />

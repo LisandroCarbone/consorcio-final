@@ -22,6 +22,8 @@ interface Props {
   periodo: string;
   consorcioCuit: string;
   valorInicial: number | null;
+  fuenteInicial: string | null;
+  valorEscalaRef: number | null;
   fondoEducacionInicial: boolean;
   conceptosIniciales: ConceptoAdicional[];
 }
@@ -30,6 +32,8 @@ export function AdicionalRemuneratorioCard({
   periodo,
   consorcioCuit,
   valorInicial,
+  fuenteInicial,
+  valorEscalaRef,
   fondoEducacionInicial,
   conceptosIniciales,
 }: Props) {
@@ -90,20 +94,33 @@ export function AdicionalRemuneratorioCard({
       <h3 className="text-sm font-semibold text-gray-700 mb-4">Adicionales del período</h3>
 
       {/* Adicional Remuneratorio */}
-      <div className="flex items-center gap-3 mb-4">
-        <label className="text-sm text-gray-600 w-56 shrink-0">Adicional Remuneratorio Mensual (CCT):</label>
-        <span className="text-sm text-gray-400">$</span>
-        <input
-          type="text"
-          value={remVal}
-          onChange={(e) => { setRemVal(e.target.value); setSavedRem(false); }}
-          placeholder="0"
-          className="w-36 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-mono text-right focus:outline-none focus:ring-1 focus:ring-brand-600"
-        />
-        <button onClick={handleSaveRem} disabled={savingRem} className="btn-primary py-1.5 text-xs">
-          {savingRem ? "Guardando…" : savedRem ? "Guardado ✓" : "Guardar"}
-        </button>
-        <p className="text-xs text-gray-400">Proporcional para suplentes.</p>
+      <div className="mb-4">
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-gray-600 w-56 shrink-0">Adicional Remuneratorio Mensual (CCT):</label>
+          <span className="text-sm text-gray-400">$</span>
+          <input
+            type="text"
+            value={remVal}
+            onChange={(e) => { setRemVal(e.target.value); setSavedRem(false); }}
+            placeholder="0"
+            className="w-36 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-mono text-right focus:outline-none focus:ring-1 focus:ring-brand-600"
+          />
+          <button onClick={handleSaveRem} disabled={savingRem} className="btn-primary py-1.5 text-xs">
+            {savingRem ? "Guardando…" : savedRem ? "Guardado ✓" : "Guardar"}
+          </button>
+        </div>
+        <div className="ml-[14.5rem] mt-1 flex items-center gap-2">
+          {fuenteInicial === "escala" ? (
+            <span className="text-xs text-green-600">Cargado desde escala SUTERH</span>
+          ) : fuenteInicial === "manual" && valorEscalaRef != null ? (
+            <span className="text-xs text-amber-600">
+              Valor manual — Escala SUTERH: {formatMoney0(valorEscalaRef)}
+            </span>
+          ) : fuenteInicial === "manual" ? (
+            <span className="text-xs text-gray-400">Valor cargado manualmente</span>
+          ) : null}
+          <span className="text-xs text-gray-400">· Proporcional para suplentes</span>
+        </div>
       </div>
 
       {/* Fondo Educación */}

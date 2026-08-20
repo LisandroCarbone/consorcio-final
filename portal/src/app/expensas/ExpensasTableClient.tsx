@@ -18,6 +18,10 @@ export interface GastoRow {
   liq_neto?: string | null;
   liq_tipo?: string | null;
   conceptos?: string | null; // JSON string from postgres
+  cuota_grupo_id?: string | null;
+  cuota_nro?: number | null;
+  cuota_total?: number | null;
+  cuota_completa?: boolean | null;
 }
 
 export const CATEGORIA_LABELS: Record<number, string> = {
@@ -154,15 +158,15 @@ function EditGastoRow({ g, periodoId, onCancel }: { g: GastoRow; periodoId: numb
           <input type="hidden" name="id" value={g.id} />
           <input type="hidden" name="periodo_id" value={periodoId} />
           <input type="hidden" name="pct_a" value={aperturar ? pctA : (tipo === "B" ? 0 : 100)} />
-          <div className="flex-1 min-w-48">
+          <div className="flex-[2] min-w-64">
             <label className="label text-xs">Concepto</label>
-            <input name="concepto" defaultValue={g.concepto} required className="input" />
+            <input name="concepto" defaultValue={g.concepto} required className="input" title={g.concepto} />
           </div>
-          <div className="w-36">
+          <div className="w-32">
             <label className="label text-xs">Monto</label>
             <MaskedInput preset="money" name="monto" defaultValue={Number(g.monto)} required className="input" />
           </div>
-          <div className="w-44">
+          <div className="w-40">
             <label className="label text-xs">Categoría</label>
             <select name="categoria" defaultValue={g.categoria} className="input">
               {Object.entries(CATEGORIA_LABELS).map(([v, l]) => (
@@ -264,7 +268,20 @@ export function ExpensasTableClient({ gastos, periodoId }: Props) {
                   ) : (
                     <tr key={g.id} className="group border-b border-gray-100 last:border-b-0 hover:bg-gray-50/60 transition-colors">
                       <td className="px-5 py-2.5">
-                        <p className="font-medium text-gray-900 text-sm sm:text-base leading-snug">{g.concepto}</p>
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium text-sm sm:text-base leading-snug ${
+                            g.cuota_grupo_id && g.cuota_completa ? "text-gray-400" : "text-gray-900"
+                          }`}>
+                            {g.concepto}
+                          </p>
+                          {g.cuota_grupo_id && g.cuota_nro && g.cuota_total && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                              g.cuota_completa ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
+                            }`}>
+                              Cuota {g.cuota_nro}/{g.cuota_total}
+                            </span>
+                          )}
+                        </div>
                         {g.liquidacion_id && (
                           <SalaryBreakdown row={g} />
                         )}
@@ -324,7 +341,12 @@ export function ExpensasTableClient({ gastos, periodoId }: Props) {
                           >
                             ✏️
                           </button>
-                          <form action={async () => { await deleteGasto(g.id, periodoId); window.location.reload(); }} onSubmit={(e) => { if (!confirm("¿Eliminar este gasto?")) e.preventDefault(); }}>
+                          <form action={async () => { await deleteGasto(g.id, periodoId); window.location.reload(); }} onSubmit={(e) => {
+                            const msg = g.cuota_grupo_id
+                              ? "Esta cuota volverá a la lista de cuotas pendientes. ¿Continuar?"
+                              : "¿Eliminar este gasto?";
+                            if (!confirm(msg)) e.preventDefault();
+                          }}>
                             <button
                               type="submit"
                               className="p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors"

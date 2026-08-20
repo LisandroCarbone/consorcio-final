@@ -69,10 +69,11 @@ async function getData(consorcioCuit: string, periodoId: number | null, periodoA
         estado_match: string;
         comprobante_ref: string | null;
         categoria_bancaria: string | null;
+        match_group_ids: number[] | null;
       }>(
         `SELECT id, extracto_id, fecha::text, descripcion, referencia, monto::text, es_credito,
                 cbu_origen, cuit_origen, nombre_origen, match_tipo, match_id, match_confianza::text,
-                estado_match, comprobante_ref, categoria_bancaria
+                estado_match, comprobante_ref, categoria_bancaria, match_group_ids
          FROM app.extracto_movimientos
          WHERE extracto_id = ANY($1::int[])
          ORDER BY fecha DESC, id DESC`,

@@ -12,7 +12,7 @@ import { ActionFeedback } from "@/components/ui/ActionFeedback";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { pool } from "@/lib/db";
-import { FileCheck, Clock, ShieldCheck, Wallet, CalendarDays, TrendingUp, UserMinus, Scale, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileCheck, Clock, ShieldCheck, Wallet, CalendarDays, TrendingUp, UserMinus, Scale, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 
 interface LiquidacionRow {
   id: number;
@@ -102,6 +102,7 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
     .reduce((s, l) => s + Number(l.neto_a_pagar), 0);
   const confirmadas = liquidaciones.filter((l) => l.estado === "confirmada").length;
   const borradores = liquidaciones.filter((l) => l.estado === "borrador").length;
+  const pendientesEscala = liquidaciones.filter((l) => l.estado === "requiere_revision").length;
 
   return (
     <div className="p-6 w-full">
@@ -141,6 +142,15 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
           </div>
           <p className="text-2xl font-bold text-gray-900">{borradores}</p>
         </div>
+        {pendientesEscala > 0 && (
+          <div className="card p-4 border-l-4 border-amber-400">
+            <div className="flex items-center gap-2 mb-1">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider">Escala pendiente</p>
+            </div>
+            <p className="text-2xl font-bold text-amber-700">{pendientesEscala}</p>
+          </div>
+        )}
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-1">
             <Wallet className="w-4 h-4 text-gray-400" />
@@ -185,6 +195,13 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
                 <RecalcularButton periodo={periodo} tipo={tipo} />
               </div>
             </div>
+
+            {pendientesEscala > 0 && (
+              <div className="mx-5 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                <strong>⚠ {pendientesEscala} liquidación{pendientesEscala > 1 ? "es" : ""} con escala de período anterior.</strong>{" "}
+                Cargá las escalas del período actual y recalculá para poder confirmar.
+              </div>
+            )}
 
             {liquidaciones.length === 0 ? (
               <div className="text-center py-16 text-gray-500 text-sm">

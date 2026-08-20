@@ -16,6 +16,8 @@ import { EstadoFinancieroSection } from "./EstadoFinancieroSection";
 import { BulkSendButton } from "./SendExpensasButtons";
 import { UfLiquidacionesTableClient } from "./UfLiquidacionesTableClient";
 import { PeriodoActionsMenu } from "./PeriodoActionsMenu";
+import { PendingCuotasSection } from "./PendingCuotasSection";
+import { getPendingCuotas } from "./actions";
 
 async function getData(activeCuit?: string) {
   const params: unknown[] = [];
@@ -58,6 +60,8 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
       liq_bruto: string | null; liq_descuentos: string | null; liq_neto: string | null; liq_tipo: string | null;
       conceptos: string | null;
       pct_a: number;
+      cuota_grupo_id: string | null; cuota_nro: number | null; cuota_total: number | null;
+      cuota_completa: boolean | null;
     }>(
       `SELECT g.id, g.descripcion AS concepto, g.monto::numeric, g.tipo, g.categoria,
               g.pct_a::numeric,
@@ -67,7 +71,11 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
               l.neto_a_pagar::numeric AS liq_neto,
               l.tipo AS liq_tipo,
               (SELECT json_agg(json_build_object('concepto', c.concepto, 'importe', c.importe::numeric, 'tipo', c.tipo) ORDER BY c.orden)
-               FROM app.conceptos_liquidacion c WHERE c.liquidacion_id = l.id) AS conceptos
+               FROM app.conceptos_liquidacion c WHERE c.liquidacion_id = l.id) AS conceptos,
+              g.cuota_grupo_id, g.cuota_nro, g.cuota_total,
+              CASE WHEN g.cuota_grupo_id IS NOT NULL THEN
+                (SELECT COUNT(*) FROM app.gastos_periodo g2 WHERE g2.cuota_grupo_id = g.cuota_grupo_id AND g2.periodo_id IS NOT NULL) = g.cuota_total
+              ELSE NULL END AS cuota_completa
        FROM app.gastos_periodo g
        LEFT JOIN app.liquidaciones_sueldo l ON l.id = g.liquidacion_id
        WHERE g.periodo_id = $1 AND g.es_provision = false
@@ -311,6 +319,8 @@ export default async function ExpensasPage({
   const estadoFinanciero = selected
     ? await getEstadoFinanciero(selected.id, selected.consorcio_id, selected.anio, selected.mes)
     : null;
+
+  const pendingCuotas = activeCuit ? await getPendingCuotas(activeCuit) : [];
 
   const resCuentaRows = selected
     ? await query<{
@@ -698,6 +708,9 @@ export default async function ExpensasPage({
                   unidades={detail?.unidades ?? []}
                 />
               </div>
+
+              {/* Cuotas pendientes */}
+              <PendingCuotasSection cuotas={pendingCuotas} periodoId={selected.id} />
 
               {/* Previsiones / Provisiones */}
               <ProvisionesSection

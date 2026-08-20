@@ -31,7 +31,7 @@ export function RegenerarCat1Button({ periodoId }: { periodoId: number }) {
           Regenerando...
         </span>
       ) : (
-        "⚡ Regenerar Cat. 1"
+        "⚡ Regenerar Sueldos y Cargas Sociales"
       )}
     </button>
   );

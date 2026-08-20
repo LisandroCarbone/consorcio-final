@@ -72,38 +72,21 @@ export async function addGasto(formData: FormData) {
   if (cuotas > 1) {
     const baseInstallment = round2(monto / cuotas);
     const lastInstallment = round2(monto - baseInstallment * (cuotas - 1));
+    const cuotaGrupoId = crypto.randomUUID();
 
     for (let c = 1; c <= cuotas; c++) {
       const currentMonto = c === cuotas ? lastInstallment : baseInstallment;
-
-      // Calculate year and month
-      let targetMonth = period.mes + (c - 1);
-      let targetYear = period.anio;
-      while (targetMonth > 12) {
-        targetMonth -= 12;
-        targetYear += 1;
-      }
-
-      // Check if target period exists
-      let targetPeriod = await queryOne<{ id: number }>(
-        "SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 AND anio = $2 AND mes = $3",
-        [period.consorcio_cuit, targetYear, targetMonth]
-      );
-
-      // If it doesn't exist, create it
-      if (!targetPeriod) {
-        targetPeriod = await queryOne<{ id: number }>(
-          `INSERT INTO app.periodos_expensas (consorcio_cuit, anio, mes, estado) 
-           VALUES ($1, $2, $3, 'abierto') RETURNING id`,
-          [period.consorcio_cuit, targetYear, targetMonth]
-        );
-      }
-
-      const targetPeriodId = targetPeriod ? targetPeriod.id : periodo_id;
+      // Cuota 1 goes into the current period; cuotas 2..N start as pending
+      // (periodo_id = NULL) until manually assigned to a period.
+      const targetPeriodId = c === 1 ? periodo_id : null;
 
       await queryOne(
-        `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id, orden, pct_a)
-         VALUES ($1, $2, $3, $4, $5, $6, COALESCE((SELECT MAX(orden) FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = $2), 0) + 1, $7)`,
+        `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id, orden, pct_a, cuota_grupo_id, cuota_nro, cuota_total, consorcio_cuit)
+         VALUES ($1, $2, $3, $4, $5, $6,
+           CASE WHEN $1 IS NULL THEN 0
+             ELSE COALESCE((SELECT MAX(orden) FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = $2), 0) + 1
+           END,
+           $7, $8, $9, $10, $11)`,
         [
           targetPeriodId,
           categoria,
@@ -112,6 +95,10 @@ export async function addGasto(formData: FormData) {
           tipo,
           unidad_id,
           pct_a,
+          cuotaGrupoId,
+          c,
+          cuotas,
+          period.consorcio_cuit,
         ]
       );
     }
@@ -127,7 +114,58 @@ export async function addGasto(formData: FormData) {
 }
 
 export async function deleteGasto(gastoId: number, periodoId: number) {
-  await query("DELETE FROM app.gastos_periodo WHERE id = $1", [gastoId]);
+  const gasto = await queryOne<{ cuota_grupo_id: string | null }>(
+    "SELECT cuota_grupo_id FROM app.gastos_periodo WHERE id = $1",
+    [gastoId]
+  );
+  if (gasto?.cuota_grupo_id) {
+    // Cuota-tracked gastos return to pending instead of being deleted.
+    await query("UPDATE app.gastos_periodo SET periodo_id = NULL WHERE id = $1", [gastoId]);
+  } else {
+    await query("DELETE FROM app.gastos_periodo WHERE id = $1", [gastoId]);
+  }
+  revalidatePath("/expensas");
+}
+
+// ── Cuotas pendientes ───────────────────────────────────────────────────────
+
+export async function getPendingCuotas(consorcioCuit: string): Promise<{
+  id: number;
+  concepto: string;
+  monto: string;
+  cuota_grupo_id: string;
+  cuota_nro: number;
+  cuota_total: number;
+  categoria: number;
+  tipo: string;
+}[]> {
+  return query<{
+    id: number;
+    concepto: string;
+    monto: string;
+    cuota_grupo_id: string;
+    cuota_nro: number;
+    cuota_total: number;
+    categoria: number;
+    tipo: string;
+  }>(
+    `SELECT DISTINCT ON (cuota_grupo_id)
+            id, descripcion AS concepto, monto::numeric, cuota_grupo_id, cuota_nro, cuota_total, categoria, tipo
+     FROM app.gastos_periodo
+     WHERE consorcio_cuit = $1 AND periodo_id IS NULL AND cuota_grupo_id IS NOT NULL
+     ORDER BY cuota_grupo_id, cuota_nro ASC`,
+    [consorcioCuit]
+  );
+}
+
+export async function assignPendingCuota(gastoId: number, periodoId: number) {
+  await query(
+    `UPDATE app.gastos_periodo
+     SET periodo_id = $2,
+         orden = COALESCE((SELECT MAX(orden) FROM app.gastos_periodo WHERE periodo_id = $2 AND categoria = (SELECT categoria FROM app.gastos_periodo WHERE id = $1)), 0) + 1
+     WHERE id = $1 AND periodo_id IS NULL`,
+    [gastoId, periodoId]
+  );
   revalidatePath("/expensas");
 }
 
@@ -209,6 +247,11 @@ export async function deletePeriodo(periodoId: number) {
   }
 
   await query("DELETE FROM app.res_cuenta_periodo WHERE periodo_id = $1", [periodoId]);
+  // Cuota-tracked gastos return to pending instead of being cascaded away.
+  await query(
+    "UPDATE app.gastos_periodo SET periodo_id = NULL WHERE periodo_id = $1 AND cuota_grupo_id IS NOT NULL",
+    [periodoId]
+  );
   await query("DELETE FROM app.gastos_periodo WHERE periodo_id = $1", [periodoId]);
   await query("DELETE FROM app.periodos_expensas WHERE id = $1", [periodoId]);
 
@@ -293,7 +336,7 @@ export async function getGastosAnteriores(periodoId: number): Promise<{
   const gastos = await query<{ id: number; descripcion: string; monto: string; categoria: number; tipo: string; pct_a: number }>(
     `SELECT id, descripcion, monto::numeric, categoria, tipo, pct_a::numeric
      FROM app.gastos_periodo
-     WHERE periodo_id = $1 AND categoria > 1 AND es_provision = false
+     WHERE periodo_id = $1 AND categoria > 1 AND es_provision = false AND cuota_grupo_id IS NULL
      ORDER BY categoria, descripcion`,
     [sourcePeriodo.id]
   );
@@ -304,7 +347,7 @@ export async function getGastosAnteriores(periodoId: number): Promise<{
 export async function copiarGastos(periodoId: number, gastoIds: number[]) {
   for (const gastoId of gastoIds) {
     const g = await queryOne<{ descripcion: string; monto: string; categoria: number; tipo: string; pct_a: number }>(
-      "SELECT descripcion, monto::numeric, categoria, tipo, pct_a::numeric FROM app.gastos_periodo WHERE id = $1",
+      "SELECT descripcion, monto::numeric, categoria, tipo, pct_a::numeric FROM app.gastos_periodo WHERE id = $1 AND cuota_grupo_id IS NULL",
       [gastoId]
     );
     if (!g) continue;

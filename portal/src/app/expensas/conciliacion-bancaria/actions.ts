@@ -683,7 +683,7 @@ export async function runAutoMatch(extractoId: number) {
         );
       }
     } else {
-      let matched: { gasto_id: number; confianza: number } | null = null;
+      let matched: { gasto_id: number; confianza: number; groupIds?: number[] } | null = null;
       const descNorm = normalizeName(mov.descripcion);
 
       for (const g of gastos) {
@@ -697,9 +697,26 @@ export async function runAutoMatch(extractoId: number) {
       }
 
       if (!matched) {
-        const candidates = gastos.filter((g) => Math.abs(Number(g.monto) - monto) < 0.01);
+        const movCuit = mov.descripcion.match(/\b(20|23|24|27|30)\d{9}\b/)?.[0];
+        if (movCuit) {
+          const cuitNorm = onlyDigits(movCuit);
+          const found = gastos.find((g) => {
+            const gastoCuit = g.descripcion.match(/\b(20|23|24|27|30)[\d-]{9,13}\b/)?.[0];
+            return gastoCuit && onlyDigits(gastoCuit) === cuitNorm;
+          });
+          if (found) matched = { gasto_id: found.id, confianza: 0.85 };
+        }
+      }
+
+      if (!matched) {
+        const candidates = gastos.filter((g) => Math.abs(Number(g.monto) - monto) < 0.02);
         if (candidates.length === 1) {
           matched = { gasto_id: candidates[0].id, confianza: 0.75 };
+        } else if (candidates.length > 1) {
+          const sameP = candidates.filter((g) => g.periodo_id === extracto.periodo_id);
+          if (sameP.length === 1) {
+            matched = { gasto_id: sameP[0].id, confianza: 0.75 };
+          }
         }
       }
 
@@ -724,14 +741,14 @@ export async function runAutoMatch(extractoId: number) {
           if (items.length > 1) {
             const sum = items.reduce((s, g) => s + Number(g.monto), 0);
             if (Math.abs(sum - monto) < 1.0) {
-              matched = { gasto_id: items[0].id, confianza: 0.85 };
+              matched = { gasto_id: items[0].id, confianza: 0.85, groupIds: items.map(g => g.id) };
               break;
             }
             const f931 = items.filter((g) => /F\.\s*931/i.test(g.descripcion));
             if (f931.length > 1) {
               const f931Sum = f931.reduce((s, g) => s + Number(g.monto), 0);
               if (Math.abs(f931Sum - monto) < 1.0) {
-                matched = { gasto_id: f931[0].id, confianza: 0.85 };
+                matched = { gasto_id: f931[0].id, confianza: 0.85, groupIds: f931.map(g => g.id) };
                 break;
               }
             }
@@ -742,9 +759,10 @@ export async function runAutoMatch(extractoId: number) {
       if (matched) {
         await query(
           `UPDATE app.extracto_movimientos
-           SET match_tipo = 'gasto', match_id = $1, match_confianza = $2, estado_match = 'sugerido'
+           SET match_tipo = 'gasto', match_id = $1, match_confianza = $2, estado_match = 'sugerido',
+               match_group_ids = $4
            WHERE id = $3`,
-          [matched.gasto_id, matched.confianza, mov.id]
+          [matched.gasto_id, matched.confianza, mov.id, matched.groupIds ?? null]
         );
       }
     }
@@ -774,8 +792,9 @@ export async function confirmarMatch(movimientoId: number) {
     cbu_origen: string | null;
     cuit_origen: string | null;
     nombre_origen: string | null;
+    descripcion: string;
   }>(
-    "SELECT extracto_id, match_tipo, match_id, cbu_origen, cuit_origen, nombre_origen FROM app.extracto_movimientos WHERE id = $1",
+    "SELECT extracto_id, match_tipo, match_id, cbu_origen, cuit_origen, nombre_origen, descripcion FROM app.extracto_movimientos WHERE id = $1",
     [movimientoId]
   );
   if (!mov) return;
@@ -787,7 +806,11 @@ export async function confirmarMatch(movimientoId: number) {
       "SELECT consorcio_cuit FROM app.extractos_bancarios WHERE id = $1",
       [mov.extracto_id]
     );
-    const key = onlyDigits(mov.cbu_origen) || onlyDigits(mov.cuit_origen);
+    let key = onlyDigits(mov.cbu_origen) || onlyDigits(mov.cuit_origen);
+    if (!key) {
+      const cuitMatch = mov.descripcion.match(/\b(20|23|24|27|30)\d{9}\b/);
+      if (cuitMatch) key = cuitMatch[0];
+    }
     if (extracto && key) {
       await query(
         `INSERT INTO app.cbu_unidad_map (consorcio_cuit, cbu_o_cuit, unidad_id, nombre_referencia, veces_matcheado, ultimo_match)
@@ -847,8 +870,9 @@ export async function asignarManual(movimientoId: number, tipo: "cobranza" | "ga
     cbu_origen: string | null;
     cuit_origen: string | null;
     nombre_origen: string | null;
+    descripcion: string;
   }>(
-    "SELECT extracto_id, cbu_origen, cuit_origen, nombre_origen FROM app.extracto_movimientos WHERE id = $1",
+    "SELECT extracto_id, cbu_origen, cuit_origen, nombre_origen, descripcion FROM app.extracto_movimientos WHERE id = $1",
     [movimientoId]
   );
   if (!mov) return;
@@ -865,7 +889,11 @@ export async function asignarManual(movimientoId: number, tipo: "cobranza" | "ga
       "SELECT consorcio_cuit FROM app.extractos_bancarios WHERE id = $1",
       [mov.extracto_id]
     );
-    const key = onlyDigits(mov.cbu_origen) || onlyDigits(mov.cuit_origen);
+    let key = onlyDigits(mov.cbu_origen) || onlyDigits(mov.cuit_origen);
+    if (!key) {
+      const cuitMatch = mov.descripcion.match(/\b(20|23|24|27|30)\d{9}\b/);
+      if (cuitMatch) key = cuitMatch[0];
+    }
     if (extracto && key) {
       await query(
         `INSERT INTO app.cbu_unidad_map (consorcio_cuit, cbu_o_cuit, unidad_id, nombre_referencia, veces_matcheado, ultimo_match)
@@ -1018,8 +1046,9 @@ export async function aplicarDebitos(extractoId: number): Promise<{ chargesCreat
     const { rows: matchedGastos } = await client.query<{
       id: number;
       match_id: number;
+      match_group_ids: number[] | null;
     }>(
-      `SELECT id, match_id
+      `SELECT id, match_id, match_group_ids
        FROM app.extracto_movimientos
        WHERE extracto_id = $1 AND estado_match = 'confirmado' AND es_credito = false
          AND match_tipo = 'gasto' AND match_id IS NOT NULL
@@ -1040,9 +1069,12 @@ export async function aplicarDebitos(extractoId: number): Promise<{ chargesCreat
     }
 
     for (const mov of matchedGastos) {
+      const allIds = mov.match_group_ids && mov.match_group_ids.length > 0
+        ? mov.match_group_ids
+        : [mov.match_id];
       const res = await client.query(
-        `UPDATE app.gastos_periodo SET debitado = true, extracto_movimiento_id = $1 WHERE id = $2`,
-        [mov.id, mov.match_id]
+        `UPDATE app.gastos_periodo SET debitado = true, extracto_movimiento_id = $1 WHERE id = ANY($2)`,
+        [mov.id, allIds]
       );
       gastosLinked += res.rowCount ?? 0;
     }
@@ -1093,6 +1125,12 @@ export async function getPendingDebits(periodoIds: number[]): Promise<PendingDeb
     `SELECT gp.id, gp.descripcion, gp.monto::text, gp.periodo_id
      FROM app.gastos_periodo gp
      WHERE gp.periodo_id = ANY($1::int[]) AND gp.debitado = false
+       AND NOT EXISTS (
+         SELECT 1 FROM app.extracto_movimientos em
+         WHERE em.estado_match IN ('confirmado', 'sugerido')
+           AND em.match_tipo = 'gasto'
+           AND (em.match_id = gp.id OR gp.id = ANY(COALESCE(em.match_group_ids, '{}')))
+       )
      ORDER BY gp.descripcion`,
     [periodoIds]
   );
@@ -1136,7 +1174,7 @@ export async function getReconciliacionSummary(
     `SELECT COALESCE(SUM(m.monto), 0)::text AS total
      FROM app.extracto_movimientos m
      JOIN app.extractos_bancarios e ON e.id = m.extracto_id
-     WHERE e.periodo_id = $1 AND m.categoria_bancaria IS NOT NULL`,
+     WHERE e.periodo_id = $1 AND m.categoria_bancaria IS NOT NULL AND m.estado_match != 'descartado'`,
     [periodoId]
   );
   const gastosBancarios = gastosBancariosRow ? Number(gastosBancariosRow.total) : 0;
@@ -1158,7 +1196,7 @@ export async function cargarGastosBancarios(periodoId: number) {
     `SELECT m.monto::text, m.descripcion
      FROM app.extracto_movimientos m
      JOIN app.extractos_bancarios e ON e.id = m.extracto_id
-     WHERE e.periodo_id = $1 AND m.categoria_bancaria IS NOT NULL`,
+     WHERE e.periodo_id = $1 AND m.categoria_bancaria IS NOT NULL AND m.estado_match != 'descartado'`,
     [periodoId]
   );
   if (movs.length === 0) throw new Error("No hay gastos bancarios para cargar");

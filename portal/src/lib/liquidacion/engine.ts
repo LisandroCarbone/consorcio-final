@@ -559,9 +559,10 @@ export async function calcularLiquidacion(
   // 17. Plus vacacional
   // ---------------------------------------------------------------------------
 
+  const baseVacacional = haberesFijos - adicionalRemEfectivo;
   const plusVacacional =
     novN.plus_vacaciones_dias > 0
-      ? baseHE * (1 / 25 - 1 / 30) * novN.plus_vacaciones_dias
+      ? baseVacacional * (1 / 25 - 1 / 30) * novN.plus_vacaciones_dias
       : 0;
 
   // ---------------------------------------------------------------------------
@@ -637,7 +638,7 @@ export async function calcularLiquidacion(
 
   const descVivienda = emp.tiene_vivienda ? adic("valor_vivienda", VALOR_VIVIENDA) : 0;
 
-  // Diferencia Obra Social Ley 26475: for part-time workers, OS must be based on the
+  // Diferencia Obra Social Ley 26474: for part-time workers, OS must be based on the
   // full-time equivalent salary. In SAC months (6/12), subtract the OS already paid
   // in the SAC liquidation so we don't double-charge.
   let difObraSocial = 0;
@@ -717,6 +718,8 @@ export async function calcularLiquidacion(
   // Persist: upsert liquidacion + rebuild conceptos
   // ---------------------------------------------------------------------------
 
+  const estadoLiq = escalaFallbackPeriodo ? "requiere_revision" : "borrador";
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -725,15 +728,15 @@ export async function calcularLiquidacion(
       `INSERT INTO app.liquidaciones_sueldo
          (empleado_cuil, periodo, tipo, remuneracion_bruta, total_descuentos_empleado,
           total_aportes_patronales, neto_a_pagar, estado)
-       VALUES ($1, $2, 'mensual', $3, $4, $5, $6, 'borrador')
+       VALUES ($1, $2, 'mensual', $3, $4, $5, $6, $7)
        ON CONFLICT (empleado_cuil, periodo, tipo) DO UPDATE SET
          remuneracion_bruta         = EXCLUDED.remuneracion_bruta,
          total_descuentos_empleado  = EXCLUDED.total_descuentos_empleado,
          total_aportes_patronales   = EXCLUDED.total_aportes_patronales,
          neto_a_pagar               = EXCLUDED.neto_a_pagar,
          estado                     = CASE
-           WHEN app.liquidaciones_sueldo.estado = 'confirmada' THEN 'confirmada'
-           ELSE 'borrador'
+           WHEN app.liquidaciones_sueldo.estado IN ('confirmada', 'anulada') THEN app.liquidaciones_sueldo.estado
+           ELSE EXCLUDED.estado
          END
        RETURNING id`,
       [
@@ -743,6 +746,7 @@ export async function calcularLiquidacion(
         safe(totalDescuentos),
         safe(totalPatronal),
         safe(netoAPagar),
+        estadoLiq,
       ]
     );
 
@@ -825,14 +829,14 @@ export async function calcularLiquidacion(
     }
 
     addHaber("2050", "Licencia por Enfermedad", licenciaEnfermedad, 20);
-    addHaber("2100", "Plus Vacacional", plusVacacional, 21);
+    addHaber("2100", novN.plus_vacaciones_dias > 0 ? `Plus Vacacional (${novN.plus_vacaciones_dias} días)` : "Plus Vacacional", plusVacacional, 21);
     addHaber("2200", "Diferencia SAC", diferenciaSAC, 22);
 
     // Descuentos empleado
     addDescuento("5000", "Jubilación", jubilacion, 30);
     addDescuento("5050", "PAMI", pami, 31);
     addDescuento("5100", "Obra Social", obraSocial, 32);
-    addDescuento("5150", "Diferencia Obra Social Ley 26475", difObraSocial, 33);
+    addDescuento("5150", "Diferencia Obra Social Ley 26474", difObraSocial, 33);
     addDescuento("5200", "SUTERH", suterh, 34);
     addDescuento("5250", "Caja Protección Familiar", cajaProtFlia, 35);
     addDescuento("5300", "FATERYH", fateryh, 36);
@@ -1014,7 +1018,7 @@ export async function liquidarSAC(
          total_descuentos_empleado = EXCLUDED.total_descuentos_empleado,
          total_aportes_patronales  = EXCLUDED.total_aportes_patronales,
          neto_a_pagar              = EXCLUDED.neto_a_pagar,
-         estado = CASE WHEN app.liquidaciones_sueldo.estado = 'confirmada' THEN 'confirmada' ELSE 'borrador' END
+         estado = CASE WHEN app.liquidaciones_sueldo.estado IN ('confirmada', 'anulada') THEN app.liquidaciones_sueldo.estado ELSE 'borrador' END
        RETURNING id`,
       [empleadoCuil, p.periodo, p.tipo, safe(p.sacBase + p.bonificacionSAC), safe(p.totalDescuentos), safe(p.totalPatronal), safe(p.netoAPagar)]
     );
@@ -1256,7 +1260,7 @@ export async function liquidarIndemnizacion(
          total_descuentos_empleado = EXCLUDED.total_descuentos_empleado,
          total_aportes_patronales  = EXCLUDED.total_aportes_patronales,
          neto_a_pagar              = EXCLUDED.neto_a_pagar,
-         estado = CASE WHEN app.liquidaciones_sueldo.estado = 'confirmada' THEN 'confirmada' ELSE 'borrador' END
+         estado = CASE WHEN app.liquidaciones_sueldo.estado IN ('confirmada', 'anulada') THEN app.liquidaciones_sueldo.estado ELSE 'borrador' END
        RETURNING id`,
       [empleadoCuil, p.periodo, safe(totalBruto), safe(p.descuentosSobreRem.total), safe(p.totalPatronal), safe(p.netoAPagar)]
     );
