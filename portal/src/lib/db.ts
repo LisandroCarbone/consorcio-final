@@ -7,6 +7,12 @@ declare global {
 }
 
 function createPool() {
+  if (process.env.DATABASE_URL) {
+    return new Pool({
+      connectionString: process.env.DATABASE_URL,
+      options: "-c search_path=app,public -c timezone=UTC",
+    });
+  }
   return new Pool({
     host: process.env.POSTGRES_HOST ?? "localhost",
     port: Number(process.env.POSTGRES_PORT ?? 5432),
