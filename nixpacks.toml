@@ -1,0 +1,14 @@
+[providers]
+name = "node"
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["cd portal && npm install"]
+
+[phases.build]
+cmds = ["cd portal && npm run build"]
+
+[start]
+cmd = "cd portal && npx next start -p $PORT"
