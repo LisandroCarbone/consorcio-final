@@ -52,13 +52,13 @@ function PieChart({
   }
 
   return (
-    <div className="flex items-center gap-6">
-      <svg width="140" height="140" viewBox="0 0 140 140" className="flex-shrink-0">
+    <div className="flex items-center gap-6 print:gap-3">
+      <svg width="140" height="140" viewBox="0 0 140 140" className="flex-shrink-0 print:w-[90px] print:h-[90px]">
         {paths.map((p, i) => (
           <path key={i} d={p.d} fill={p.color} stroke="white" strokeWidth="1.5" />
         ))}
       </svg>
-      <table className="text-xs w-full">
+      <table className="text-xs print:text-[9px] w-full">
         <tbody>
           {paths.map((p, i) => (
             <tr key={i}>
@@ -240,8 +240,8 @@ export default async function ReciboPage({
   const signingDate = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
 
   return (
-    <div className="bg-white min-h-screen print:text-[10px]">
-      <div className="max-w-4xl mx-auto p-6 print:p-2">
+    <div className="bg-white min-h-screen print:text-[9px]">
+      <div className="max-w-4xl mx-auto p-6 print:p-0">
 
         {/* Toolbar */}
         <div className="print:hidden mb-4">
@@ -273,7 +273,7 @@ export default async function ReciboPage({
         ══════════════════════════════════════════════════ */}
         <div className="border-2 border-gray-800 mb-0">
           {/* Title bar */}
-          <div className="bg-gray-800 text-white text-center py-1.5 text-sm font-bold tracking-wide">
+          <div className="bg-gray-800 text-white text-center py-1.5 print:py-0.5 text-sm font-bold tracking-wide">
             {tipoLiq === "sac_1" || tipoLiq === "sac_2"
               ? "RECIBO DE SUELDO ANUAL COMPLEMENTARIO"
               : tipoLiq === "indemnizacion"
@@ -284,18 +284,21 @@ export default async function ReciboPage({
           {/* Employer + employee grid */}
           <div className="grid grid-cols-2 divide-x divide-gray-300">
             {/* Left: employer */}
-            <div className="p-3 text-xs space-y-0.5">
-              <p className="font-bold text-sm text-gray-900">{liq.consorcio_nombre}</p>
+            <div className="p-3 print:p-1.5 text-xs print:text-[9px] space-y-0.5">
+              <p className="font-bold text-sm print:text-xs text-gray-900">{liq.consorcio_nombre}</p>
               {liq.consorcio_direccion && liq.consorcio_direccion !== "S/D" && (
                 <p className="text-gray-600">{liq.consorcio_direccion}</p>
               )}
               <p className="text-gray-600">CUIT: {formatCuit(liq.consorcio_cuit)}</p>
+              {liq.consorcio_categoria && (
+                <p className="text-gray-600">Categoría: {liq.consorcio_categoria}</p>
+              )}
               {liq.nro_cta_suterh && (
                 <p className="text-gray-600">N° Cuenta SUTERH: {liq.nro_cta_suterh}</p>
               )}
             </div>
             {/* Right: period + payment date */}
-            <div className="p-3 text-xs grid grid-cols-2 gap-2">
+            <div className="p-3 print:p-1.5 text-xs print:text-[9px] grid grid-cols-2 gap-2">
               <div>
                 <p className="text-gray-400 uppercase text-[10px] font-semibold">Período</p>
                 <p className="font-bold text-gray-900">{periodoLabelCap}</p>
@@ -308,40 +311,40 @@ export default async function ReciboPage({
           </div>
 
           {/* Employee row */}
-          <div className="border-t border-gray-300 grid grid-cols-4 divide-x divide-gray-300 text-xs">
-            <div className="p-2">
+          <div className="border-t border-gray-300 grid grid-cols-4 divide-x divide-gray-300 text-xs print:text-[9px]">
+            <div className="p-2 print:p-1">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Legajo</p>
               <p className="font-semibold">{liq.legajo ?? "—"}</p>
             </div>
-            <div className="p-2 col-span-1">
+            <div className="p-2 print:p-1 col-span-1">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Apellido y Nombre</p>
               <p className="font-semibold">{liq.empleado_nombre}</p>
             </div>
-            <div className="p-2">
+            <div className="p-2 print:p-1">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">CUIL</p>
               <p className="font-semibold">{formatCuit(liq.cuil)}</p>
             </div>
-            <div className="p-2">
+            <div className="p-2 print:p-1">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Categoría / Función</p>
               <p className="font-semibold">{liq.funcion}</p>
             </div>
           </div>
 
           {/* Ingreso / antigüedad / sueldo básico */}
-          <div className="border-t border-gray-300 grid grid-cols-4 divide-x divide-gray-300 text-xs">
-            <div className="p-2">
+          <div className="border-t border-gray-300 grid grid-cols-4 divide-x divide-gray-300 text-xs print:text-[9px]">
+            <div className="p-2 print:p-1">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Fecha de ingreso</p>
               <p className="font-semibold">{fechaIngreso}</p>
             </div>
-            <div className="p-2">
+            <div className="p-2 print:p-1">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Antigüedad</p>
               <p className="font-semibold">{liq.antiguedad_anios ?? "—"} años</p>
             </div>
-            <div className="p-2">
+            <div className="p-2 print:p-1">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Jornada</p>
               <p className="font-semibold">{liq.jornada}</p>
             </div>
-            <div className="p-2">
+            <div className="p-2 print:p-1">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Obra Social</p>
               <p className="font-semibold">{liq.obra_social ?? "—"}</p>
             </div>
@@ -354,40 +357,40 @@ export default async function ReciboPage({
         ══════════════════════════════════════════════════ */}
         <div className="border-x-2 border-t-2 border-gray-800 mt-0">
           {/* Header COSTO TOTAL EMPLEADOR con monto */}
-          <div className="flex justify-between items-center bg-gray-200 px-3 py-1.5 border-b border-gray-400">
+          <div className="flex justify-between items-center bg-gray-200 px-3 py-1.5 print:py-0.5 border-b border-gray-400">
             <span className="text-xs font-bold text-gray-800 uppercase tracking-wide">
               COSTO TOTAL EMPLEADOR
             </span>
             <span className="text-sm font-bold text-gray-900">${fmt(costoTotal)}</span>
           </div>
 
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs print:text-[9px] border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left p-2 font-semibold text-gray-600 w-[46%]">Concepto</th>
-                <th className="text-right p-2 font-semibold text-gray-600 w-[14%]">Unidad</th>
-                <th className="text-right p-2 font-semibold text-gray-600 w-[20%]">Base</th>
-                <th className="text-right p-2 font-semibold text-gray-600 w-[20%]">Monto</th>
+                <th className="text-left p-2 print:p-1 font-semibold text-gray-600 w-[46%]">Concepto</th>
+                <th className="text-right p-2 print:p-1 font-semibold text-gray-600 w-[14%]">Unidad</th>
+                <th className="text-right p-2 print:p-1 font-semibold text-gray-600 w-[20%]">Base</th>
+                <th className="text-right p-2 print:p-1 font-semibold text-gray-600 w-[20%]">Monto</th>
               </tr>
             </thead>
             <tbody>
               {patronalRows.map((r, i) => (
                 <tr key={i} className="border-b border-gray-100">
-                  <td className="p-1.5 pl-2 text-gray-800">{r.concepto}</td>
-                  <td className="p-1.5 text-right text-gray-500">
+                  <td className="p-1.5 print:p-0.5 pl-2 text-gray-800">{r.concepto}</td>
+                  <td className="p-1.5 print:p-0.5 text-right text-gray-500">
                     {r.alicuota != null ? fmtPct(r.alicuota) : "Fijo"}
                   </td>
-                  <td className="p-1.5 text-right text-gray-500">
+                  <td className="p-1.5 print:p-0.5 text-right text-gray-500">
                     {r.alicuota != null ? `$${fmt(bruto)}` : "—"}
                   </td>
-                  <td className="p-1.5 text-right font-medium text-gray-900">${fmt(r.importe)}</td>
+                  <td className="p-1.5 print:p-0.5 text-right font-medium text-gray-900">${fmt(r.importe)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           {/* SUB TOTAL CONTRIBUCIONES EMPLEADOR */}
-          <div className="flex justify-between items-center bg-gray-100 px-3 py-1.5 border-t border-gray-300">
+          <div className="flex justify-between items-center bg-gray-100 px-3 py-1.5 print:py-0.5 border-t border-gray-300">
             <span className="text-xs font-semibold text-gray-700 uppercase">
               SUB TOTAL CONTRIBUCIONES EMPLEADOR
             </span>
@@ -395,21 +398,21 @@ export default async function ReciboPage({
           </div>
 
           {/* SUELDO BRUTO header */}
-          <div className="flex justify-between items-center bg-gray-200 px-3 py-1.5 border-t border-gray-400">
+          <div className="flex justify-between items-center bg-gray-200 px-3 py-1.5 print:py-0.5 border-t border-gray-400">
             <span className="text-xs font-bold text-gray-800 uppercase tracking-wide">SUELDO BRUTO</span>
             <span className="text-sm font-bold text-gray-900">${fmt(bruto)}</span>
           </div>
 
           {/* Haberes y Descuentos */}
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs print:text-[9px] border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left p-2 font-semibold text-gray-600 w-[32%]">Concepto</th>
-                <th className="text-right p-2 font-semibold text-gray-600 w-[10%]">Unidad / Alíc.</th>
-                <th className="text-right p-2 font-semibold text-gray-600 w-[12%]">Valor Unit.</th>
-                <th className="text-right p-2 font-semibold text-gray-600 w-[14%]">Remunerativo</th>
-                <th className="text-right p-2 font-semibold text-gray-600 w-[14%]">No Remuner.</th>
-                <th className="text-right p-2 font-semibold text-gray-600 w-[14%]">Descuentos</th>
+                <th className="text-left p-2 print:p-1 font-semibold text-gray-600 w-[32%]">Concepto</th>
+                <th className="text-right p-2 print:p-1 font-semibold text-gray-600 w-[10%]">Unidad / Alíc.</th>
+                <th className="text-right p-2 print:p-1 font-semibold text-gray-600 w-[12%]">Valor Unit.</th>
+                <th className="text-right p-2 print:p-1 font-semibold text-gray-600 w-[14%]">Remunerativo</th>
+                <th className="text-right p-2 print:p-1 font-semibold text-gray-600 w-[14%]">No Remuner.</th>
+                <th className="text-right p-2 print:p-1 font-semibold text-gray-600 w-[14%]">Descuentos</th>
               </tr>
             </thead>
             <tbody>
@@ -420,16 +423,16 @@ export default async function ReciboPage({
                 const { unidad, valorUnit } = inferUnidadValor(h.concepto, Math.abs(val), { anios: liq.antiguedad_anios ?? 0 });
                 return (
                   <tr key={i} className="border-b border-gray-100">
-                    <td className="p-1.5 pl-2 text-gray-800">{h.concepto}</td>
-                    <td className="p-1.5 text-right text-gray-500">{unidad}</td>
-                    <td className="p-1.5 text-right text-gray-500">{valorUnit}</td>
-                    <td className={`p-1.5 text-right font-medium ${isNegative ? "text-red-700" : "text-gray-900"}`}>
+                    <td className="p-1.5 print:p-0.5 pl-2 text-gray-800">{h.concepto}</td>
+                    <td className="p-1.5 print:p-0.5 text-right text-gray-500">{unidad}</td>
+                    <td className="p-1.5 print:p-0.5 text-right text-gray-500">{valorUnit}</td>
+                    <td className={`p-1.5 print:p-0.5 text-right font-medium ${isNegative ? "text-red-700" : "text-gray-900"}`}>
                       {!esNoRem ? `${isNegative ? "-" : ""}$${fmt(Math.abs(val))}` : ""}
                     </td>
-                    <td className="p-1.5 text-right font-medium text-blue-700">
+                    <td className="p-1.5 print:p-0.5 text-right font-medium text-blue-700">
                       {esNoRem ? `$${fmt(Math.abs(val))}` : ""}
                     </td>
-                    <td className="p-1.5" />
+                    <td className="p-1.5 print:p-0.5" />
                   </tr>
                 );
               })}
@@ -437,35 +440,35 @@ export default async function ReciboPage({
                 const { unidad, valorUnit } = inferUnidadValor(d.concepto, Number(d.importe));
                 return (
                   <tr key={i} className="border-b border-gray-100">
-                    <td className="p-1.5 pl-2 text-gray-800">{d.concepto}</td>
-                    <td className="p-1.5 text-right text-gray-500">{unidad}</td>
-                    <td className="p-1.5 text-right text-gray-500">{valorUnit}</td>
-                    <td className="p-1.5" />
-                    <td className="p-1.5" />
-                    <td className="p-1.5 text-right font-medium text-red-700">${fmt(Number(d.importe))}</td>
+                    <td className="p-1.5 print:p-0.5 pl-2 text-gray-800">{d.concepto}</td>
+                    <td className="p-1.5 print:p-0.5 text-right text-gray-500">{unidad}</td>
+                    <td className="p-1.5 print:p-0.5 text-right text-gray-500">{valorUnit}</td>
+                    <td className="p-1.5 print:p-0.5" />
+                    <td className="p-1.5 print:p-0.5" />
+                    <td className="p-1.5 print:p-0.5 text-right font-medium text-red-700">${fmt(Number(d.importe))}</td>
                   </tr>
                 );
               })}
               {/* Redondeo — last row, after all descuentos */}
               {redondeo > 0.005 && (
                 <tr className="border-b border-gray-100 text-gray-400 italic">
-                  <td className="p-1.5 pl-2">Redondeo</td>
-                  <td className="p-1.5 text-right">—</td>
-                  <td className="p-1.5 text-right">—</td>
-                  <td className="p-1.5" />
-                  <td className="p-1.5 text-right font-medium text-blue-700">${fmt(redondeo)}</td>
-                  <td className="p-1.5" />
+                  <td className="p-1.5 print:p-0.5 pl-2">Redondeo</td>
+                  <td className="p-1.5 print:p-0.5 text-right">—</td>
+                  <td className="p-1.5 print:p-0.5 text-right">—</td>
+                  <td className="p-1.5 print:p-0.5" />
+                  <td className="p-1.5 print:p-0.5 text-right font-medium text-blue-700">${fmt(redondeo)}</td>
+                  <td className="p-1.5 print:p-0.5" />
                 </tr>
               )}
             </tbody>
             <tfoot>
               {/* COMPOSICION SALARIAL row */}
               <tr className="border-t border-gray-300 bg-gray-50 text-xs">
-                <td className="p-2 font-semibold text-gray-700" colSpan={3}>COMPOSICIÓN SALARIAL</td>
-                <td className="p-2 text-right text-gray-700">
+                <td className="p-2 print:p-1 font-semibold text-gray-700" colSpan={3}>COMPOSICIÓN SALARIAL</td>
+                <td className="p-2 print:p-1 text-right text-gray-700">
                   Rem.: ${fmt(haberes.filter((h: any) => !NO_REMUNERATIVOS.has(h.concepto)).reduce((s: number, h: any) => s + r2(Number(h.importe)), 0))}
                 </td>
-                <td className="p-2 text-right text-blue-700">
+                <td className="p-2 print:p-1 text-right text-blue-700">
                   {(() => {
                     const noRemTotal = haberes.filter((h: any) => NO_REMUNERATIVOS.has(h.concepto)).reduce((s: number, h: any) => s + r2(Number(h.importe)), 0);
                     const redondeoTotal = redondeo > 0.005 ? redondeo : 0;
@@ -473,7 +476,7 @@ export default async function ReciboPage({
                     return total > 0 ? `No Rem.: $${fmt(total)}` : "—";
                   })()}
                 </td>
-                <td className="p-2 text-right text-red-700">
+                <td className="p-2 print:p-1 text-right text-red-700">
                   Desc.: ${fmt(sumDescuentosDisp)}
                 </td>
               </tr>
@@ -484,7 +487,7 @@ export default async function ReciboPage({
         {/* ══════════════════════════════════════════════════
             BLOQUE 3 — NETO + TEXTO DE RECIBO
         ══════════════════════════════════════════════════ */}
-        <div className="border-2 border-gray-800 border-t-0 p-3 text-xs">
+        <div className="border-2 border-gray-800 border-t-0 p-3 print:p-1.5 text-xs print:text-[9px]">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <p className="italic text-gray-700">
@@ -503,7 +506,7 @@ export default async function ReciboPage({
             </div>
             <div className="text-right flex-shrink-0">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">SUELDO NETO $</p>
-              <p className="text-2xl font-bold text-gray-900">${fmt0(netoRedondeado)}</p>
+              <p className="text-2xl print:text-base font-bold text-gray-900">${fmt0(netoRedondeado)}</p>
             </div>
           </div>
         </div>
@@ -512,8 +515,8 @@ export default async function ReciboPage({
             BLOQUE 4 — GRÁFICO COSTO LABORAL
         ══════════════════════════════════════════════════ */}
         <div className="border-2 border-gray-800 border-t-0 mt-0">
-          <div className="border-t border-gray-200 p-4">
-            <p className="text-[10px] text-gray-400 uppercase font-semibold mb-3">
+          <div className="border-t border-gray-200 p-4 print:p-2">
+            <p className="text-[10px] text-gray-400 uppercase font-semibold mb-3 print:mb-1">
               Composición del costo laboral — Decreto 407/2026
             </p>
             <PieChart slices={pieSlices} />
@@ -521,14 +524,50 @@ export default async function ReciboPage({
         </div>
 
         {/* ══════════════════════════════════════════════════
+            BLOQUE 4B — ÚLTIMO DEPÓSITO DE APORTES Y CONTRIBUCIONES
+        ══════════════════════════════════════════════════ */}
+        {liq.ultimo_deposito_aportes && (
+          <div className="border-2 border-gray-800 border-t-0 p-3 print:p-1.5 text-xs print:text-[9px]">
+            <p className="text-gray-400 uppercase text-[10px] font-semibold mb-1">
+              Último depósito de aportes y contribuciones
+            </p>
+            <p className="text-gray-700">
+              <span className="font-semibold">
+                {liq.ultimo_deposito_aportes.archivo_nombre ?? liq.ultimo_deposito_aportes.descripcion ?? "—"}
+              </span>
+              {liq.ultimo_deposito_aportes.periodo_mes && liq.ultimo_deposito_aportes.periodo_anio && (
+                <>
+                  {" — Mes depositado: "}
+                  <span className="font-medium">
+                    {new Date(
+                      liq.ultimo_deposito_aportes.periodo_anio,
+                      liq.ultimo_deposito_aportes.periodo_mes - 1,
+                      1
+                    ).toLocaleDateString("es-AR", { month: "long", year: "numeric" })}
+                  </span>
+                </>
+              )}
+              {liq.ultimo_deposito_aportes.fecha && (
+                <>
+                  {" — Fecha: "}
+                  <span className="font-medium">
+                    {new Date(liq.ultimo_deposito_aportes.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════
             BLOQUE 5 — FIRMAS
         ══════════════════════════════════════════════════ */}
         <div className="border-2 border-gray-800 border-t-0 grid grid-cols-2 divide-x divide-gray-300">
           {/* Firma empleador */}
-          <div className="p-4 text-center">
-            <div className="h-12 flex items-end justify-center pb-1 mb-1">
+          <div className="p-4 print:p-1.5 text-center">
+            <div className="h-12 print:h-8 flex items-end justify-center pb-1 mb-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/firma-empleador.png" alt="" style={{ height: 44, maxWidth: 160, objectFit: "contain" }} />
+              <img src="/firma-empleador.png" alt="" className="print:!h-8" style={{ height: 44, maxWidth: 160, objectFit: "contain" }} />
             </div>
             <div className="border-t border-gray-400 pt-2 mt-1 text-xs">
               <p className="font-semibold text-gray-800">{liq.consorcio_nombre}</p>
@@ -539,8 +578,8 @@ export default async function ReciboPage({
           </div>
 
           {/* Firma empleado */}
-          <div className="p-4 text-center">
-            <div className="h-12 mb-1" />
+          <div className="p-4 print:p-1.5 text-center">
+            <div className="h-12 print:h-8 mb-1" />
             <div className="border-t border-gray-400 pt-2 mt-1 text-xs">
               <p className="font-semibold text-gray-800">{liq.empleado_nombre}</p>
               <p className="text-gray-500">CUIL: {formatCuit(liq.cuil)}</p>

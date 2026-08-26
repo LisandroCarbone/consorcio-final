@@ -22,6 +22,25 @@
   body { @apply bg-gray-50 text-gray-900; }
 }
 
+@page {
+  size: A4;
+  margin: 8mm;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 8mm;
+  }
+  /* Browsers control the URL/date header and page footer via print dialog
+     settings ("Headers and footers"), not via CSS. Minimizing the page
+     margin here reduces the visible whitespace those elements would occupy. */
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+}
+
 @layer components {
   .btn-primary {
     @apply inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors;

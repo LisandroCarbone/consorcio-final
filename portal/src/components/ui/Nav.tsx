@@ -9,6 +9,7 @@ const generalLinks = [
   { href: "/administracion", label: "Administración", icon: "⚙️" },
   { href: "/", label: "Dashboard", icon: "🏠" },
   { href: "/consorcios", label: "Consorcios", icon: "🏢" },
+  { href: "/ayuda", label: "Ayuda", icon: "❓" },
 ];
 
 const sueldosSublinks = [
@@ -17,13 +18,13 @@ const sueldosSublinks = [
   { href: "/sueldos/novedades", label: "Novedades" },
   { href: "/sueldos/liquidaciones", label: "Liquidaciones" },
   { href: "/sueldos/sac", label: "SAC" },
+  { href: "/configuracion/parametros", label: "Parámetros CCT" },
+  { href: "/configuracion/arca", label: "Credenciales ARCA" },
 ];
 
 const expensasSublinks = [
   { href: "/expensas", label: "Expensas" },
   { href: "/expensas/conciliacion-bancaria", label: "Conciliación Bancaria" },
-  { href: "/configuracion/parametros", label: "Parámetros" },
-  { href: "/configuracion/arca", label: "Credenciales ARCA" },
 ];
 
 const operationalLinks = [
@@ -36,14 +37,18 @@ const operationalLinks = [
 
 export function Nav() {
   const pathname = usePathname();
-  const [theme, setTheme] = useState<string>("default");
-  const inSueldos = pathname.startsWith("/sueldos");
-  const [sueldosOpen, setSueldosOpen] = useState(inSueldos);
-  const inExpensas =
-    pathname.startsWith("/expensas") ||
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const inSueldos =
+    pathname.startsWith("/sueldos") ||
     pathname.startsWith("/configuracion/parametros") ||
     pathname.startsWith("/configuracion/arca");
+  const [sueldosOpen, setSueldosOpen] = useState(inSueldos);
+  const inExpensas = pathname.startsWith("/expensas");
   const [expensasOpen, setExpensasOpen] = useState(inExpensas);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (inSueldos) setSueldosOpen(true);
@@ -52,18 +57,6 @@ export function Nav() {
   useEffect(() => {
     if (inExpensas) setExpensasOpen(true);
   }, [inExpensas]);
-
-  useEffect(() => {
-    // Leer el tema inicial del atributo del html
-    const currentTheme = document.documentElement.getAttribute("data-theme") || "default";
-    setTheme(currentTheme);
-  }, []);
-
-  const toggleTheme = (newTheme: string) => {
-    setTheme(newTheme);
-    document.documentElement.setAttribute("data-theme", newTheme);
-    document.cookie = `theme=${newTheme}; path=/; max-age=31536000`; // Persistir por 1 año
-  };
 
   const renderLink = (l: { href: string; label: string; icon: string }) => {
     const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
@@ -85,7 +78,30 @@ export function Nav() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-64 bg-brand-600 flex flex-col">
+    <>
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="fixed top-4 left-4 z-50 lg:hidden bg-brand-600 text-white p-2 rounded-lg shadow-lg print:hidden"
+        aria-label="Open menu"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {/* Overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+    <aside className={clsx(
+      "fixed inset-y-0 left-0 w-64 bg-brand-600 flex flex-col z-50 transition-transform duration-200 print:hidden",
+      mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+    )}>
       <div className="px-6 py-6 border-b border-brand-700">
         <h1 className="text-white font-extrabold text-xl leading-tight">
           Consorcio<br />
@@ -182,40 +198,8 @@ export function Nav() {
         </div>
       </nav>
 
-      {/* Footer del Sidebar con Toggle de Temas */}
-      <div className="p-5 border-t border-brand-700 mt-auto bg-brand-700/30">
-        <div className="flex items-center justify-between text-xs text-brand-200 mb-3">
-          <span>Tema Visual</span>
-          <span className="font-semibold text-white">
-            {theme === "default" ? "Original" : "Naranja"}
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-1.5 bg-brand-800/40 p-1 rounded-lg">
-          <button
-            onClick={() => toggleTheme("default")}
-            className={clsx(
-              "py-2 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1",
-              theme === "default"
-                ? "bg-white/20 text-white shadow-sm"
-                : "text-brand-100 hover:text-white"
-            )}
-          >
-            🔵 Azul
-          </button>
-          <button
-            onClick={() => toggleTheme("orange")}
-            className={clsx(
-              "py-2 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1",
-              theme === "orange"
-                ? "bg-white/20 text-white shadow-sm"
-                : "text-brand-100 hover:text-white"
-            )}
-          >
-            🟠 Naranja
-          </button>
-        </div>
-      </div>
     </aside>
+    </>
   );
 }
 

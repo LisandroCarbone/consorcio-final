@@ -104,9 +104,9 @@ export async function addGasto(formData: FormData) {
     }
   } else {
     await queryOne(
-      `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id, orden, pct_a)
-       VALUES ($1, $2, $3, $4, $5, $6, COALESCE((SELECT MAX(orden) FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = $2), 0) + 1, $7)`,
-      [periodo_id, categoria, concepto, monto, tipo, unidad_id, pct_a]
+      `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id, orden, pct_a, consorcio_cuit)
+       VALUES ($1, $2, $3, $4, $5, $6, COALESCE((SELECT MAX(orden) FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = $2), 0) + 1, $7, $8)`,
+      [periodo_id, categoria, concepto, monto, tipo, unidad_id, pct_a, period.consorcio_cuit]
     );
   }
 

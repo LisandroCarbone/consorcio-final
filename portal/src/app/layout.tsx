@@ -30,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="print:hidden">
           <Nav />
         </div>
-        <div className="ml-64 print:ml-0 flex flex-col min-h-screen">
+        <div className="lg:ml-64 print:ml-0 flex flex-col min-h-screen">
           <div className="print:hidden">
             <TopBar consorcios={consorcios} activeCuit={activeCuit} activePeriodo={activePeriodo} />
           </div>

@@ -95,28 +95,40 @@ export function AddGastoForm({
     setSuggestions([]);
   };
 
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const handleSubmit = (fd: FormData) => {
     startTransition(async () => {
-      if (tipo === "B" && ufsSel.length > 0) {
-        for (const uid of ufsSel) {
-          const u = unidades.find((x) => x.id === uid);
-          if (!u) continue;
-          const sfd = new FormData();
-          sfd.set("periodo_id", String(periodoId));
-          sfd.set("concepto", concepto);
-          sfd.set("monto", monto);
-          sfd.set("tipo", "B");
-          sfd.set("target_uf", String(u.uf));
-          sfd.set("categoria", categoria);
-          sfd.set("cuotas", fd.get("cuotas") as string);
-          sfd.set("pct_a", String(aperturar ? pctA : 0));
-          await addGasto(sfd);
+      setSubmitError(null);
+      try {
+        const rawMonto = fd.get("monto") as string;
+        if (!rawMonto || isNaN(Number(rawMonto)) || Number(rawMonto) === 0) {
+          setSubmitError("Ingrese un monto válido");
+          return;
         }
-      } else {
-        await addGasto(fd);
+        if (tipo === "B" && ufsSel.length > 0) {
+          for (const uid of ufsSel) {
+            const u = unidades.find((x) => x.id === uid);
+            if (!u) continue;
+            const sfd = new FormData();
+            sfd.set("periodo_id", String(periodoId));
+            sfd.set("concepto", concepto);
+            sfd.set("monto", rawMonto);
+            sfd.set("tipo", "B");
+            sfd.set("target_uf", String(u.uf));
+            sfd.set("categoria", categoria);
+            sfd.set("cuotas", fd.get("cuotas") as string);
+            sfd.set("pct_a", String(aperturar ? pctA : 0));
+            await addGasto(sfd);
+          }
+        } else {
+          await addGasto(fd);
+        }
+        resetForm();
+        window.location.reload();
+      } catch (e) {
+        setSubmitError(e instanceof Error ? e.message : "Error al guardar el gasto");
       }
-      resetForm();
-      window.location.reload();
     });
   };
 
@@ -352,6 +364,9 @@ export function AddGastoForm({
       </button>
 
       </div>{/* end row 2 */}
+      {submitError && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{submitError}</p>
+      )}
     </form>
   );
 }
