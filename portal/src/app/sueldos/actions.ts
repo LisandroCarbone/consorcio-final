@@ -4,6 +4,7 @@ import { pool, query, queryOne } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { calcularLiquidacion as engineCalcLiquidacion, calcularPeriodo } from "@/lib/liquidacion/engine";
 import { calculateEmployerObligations } from "@/lib/expenses/engine";
+import { env } from "@/lib/env";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -621,7 +622,7 @@ export async function upsertAdicionalRemuneratorio(periodo: string, valor: numbe
 
 export async function distribuirSueldo(liquidacionId: number) {
   const agentUrl = process.env.EXPENSAS_AGENT_URL ?? "http://localhost:3001";
-  const apiKey = process.env.AGENT_API_KEY ?? "changeme";
+  const apiKey = env.AGENT_API_KEY;
 
   const res = await fetch(`${agentUrl}/run-sueldo`, {
     method: "POST",

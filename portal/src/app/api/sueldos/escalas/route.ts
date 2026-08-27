@@ -25,7 +25,7 @@ function deriveConceptoKey(concepto: string): string | null {
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
-  const expectedApiKey = process.env.AGENT_API_KEY || "changeme";
+  const expectedApiKey = process.env.AGENT_API_KEY;
   if (apiKey !== expectedApiKey) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

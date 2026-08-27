@@ -2,14 +2,19 @@ import { Arca, AccessTicket } from "@arcasdk/core";
 import forge from "node-forge";
 import { createHash, createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { queryOne, query } from "./db";
+import { env } from "./env";
 
-// Key derivation (failsafe fallback to AGENT_API_KEY)
-const secret = process.env.ARCA_ENCRYPTION_KEY || process.env.AGENT_API_KEY || "consorcio_default_secret_key_32_bytes_long!!!";
-const AES_KEY = createHash("sha256").update(secret).digest();
+// Computed lazily (not at module scope) so importing this module during
+// `next build` page-data collection doesn't trigger env validation.
+let aesKeyCache: Buffer | undefined;
+function getAesKey(): Buffer {
+  if (!aesKeyCache) aesKeyCache = createHash("sha256").update(env.ARCA_ENCRYPTION_KEY).digest();
+  return aesKeyCache;
+}
 
 export function encrypt(plaintext: string): string {
   const iv = randomBytes(16);
-  const cipher = createCipheriv("aes-256-gcm", AES_KEY, iv);
+  const cipher = createCipheriv("aes-256-gcm", getAesKey(), iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return Buffer.concat([iv, tag, encrypted]).toString("hex");
@@ -20,7 +25,7 @@ export function decrypt(ciphertextHex: string): string {
   const iv = cipherBuf.subarray(0, 16);
   const tag = cipherBuf.subarray(16, 32);
   const data = cipherBuf.subarray(32);
-  const decipher = createDecipheriv("aes-256-gcm", AES_KEY, iv);
+  const decipher = createDecipheriv("aes-256-gcm", getAesKey(), iv);
   decipher.setAuthTag(tag);
   return decipher.update(data).toString("utf8") + decipher.final("utf8");
 }

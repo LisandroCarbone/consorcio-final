@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { AUTH_COOKIE_NAME, verifySessionToken } from "@/lib/auth";
+import { env } from "@/lib/env";
+
+function isValidApiKey(provided: string | null): boolean {
+  if (!provided) return false;
+  const expected = env.AGENT_API_KEY;
+  const providedBuf = Buffer.from(provided);
+  const expectedBuf = Buffer.from(expected);
+  if (providedBuf.length !== expectedBuf.length) return false;
+  return timingSafeEqual(providedBuf, expectedBuf);
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -20,9 +31,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Allow n8n webhook for SUTERH escalas if x-api-key header is present
-  if (pathname === "/api/sueldos/escalas" && request.headers.has("x-api-key")) {
-    return NextResponse.next();
+  // 2. Allow n8n webhook for SUTERH escalas only with a valid x-api-key
+  if (pathname === "/api/sueldos/escalas") {
+    if (isValidApiKey(request.headers.get("x-api-key"))) {
+      return NextResponse.next();
+    }
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // 3. Read and verify session cookie
@@ -61,6 +75,10 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   return response;
 }
+
+// Requires Node.js runtime (not Edge) — session-store/rate-limiter use ioredis,
+// and env.ts / crypto.timingSafeEqual are Node APIs. Supported since Next.js 15.2.
+export const runtime = "nodejs";
 
 export const config = {
   matcher: [

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { env } from "@/lib/env";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     const agentUrl = process.env.EXPENSAS_AGENT_URL ?? "http://localhost:3001";
-    const apiKey = process.env.AGENT_API_KEY ?? "changeme";
+    const apiKey = env.AGENT_API_KEY;
 
     const agentRes = await fetch(
       `${agentUrl}/reporte-anual?consorcio_cuit=${consorcioCuit}&anio=${anio}`,

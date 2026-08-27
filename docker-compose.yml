@@ -4,16 +4,14 @@ services:
     container_name: consorcio-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-consorcio}
-      POSTGRES_USER: ${POSTGRES_USER:-consorcio}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-consorcio_secret}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/migrations:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-consorcio}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,13 +20,11 @@ services:
     image: redis:7-alpine
     container_name: consorcio-redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_secret}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD:-redis_secret}", "ping"]
+      test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,15 +43,15 @@ services:
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
       DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-consorcio}
-      DB_POSTGRESDB_USER: ${POSTGRES_USER:-consorcio}
-      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-consorcio_secret}
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_POSTGRESDB_SCHEMA: n8n
       # Queue / Redis (disabled for local dev to run regular mode)
       EXECUTIONS_MODE: regular
       QUEUE_BULL_REDIS_HOST: redis
       QUEUE_BULL_REDIS_PORT: 6379
-      QUEUE_BULL_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      QUEUE_BULL_REDIS_PASSWORD: ${REDIS_PASSWORD}
       # Auth
       N8N_BASIC_AUTH_ACTIVE: "true"
       N8N_BASIC_AUTH_USER: ${N8N_USER:-admin}
@@ -67,7 +63,7 @@ services:
       WEBHOOK_URL: http://${N8N_HOST:-localhost}:5678/
       GENERIC_TIMEZONE: America/Argentina/Buenos_Aires
       # Encryption key (generate once and keep fixed)
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-changeme_generate_a_random_key}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
       N8N_SSRF_ALLOWED_IP_RANGES: 172.16.0.0/12,192.168.0.0/16,10.0.0.0/8
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
@@ -87,15 +83,25 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-consorcio}
-      POSTGRES_USER: ${POSTGRES_USER:-consorcio}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-consorcio_secret}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       COMMS_AGENT_URL: http://comms-agent:3002
       EXPENSAS_AGENT_URL: http://expensas-agent:3001
-      AGENT_API_KEY: ${AGENT_API_KEY:-changeme}
+      AGENT_API_KEY: ${AGENT_API_KEY}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_USER: ${AUTH_USER}
+      AUTH_PASSWORD: ${AUTH_PASSWORD}
+      ARCA_ENCRYPTION_KEY: ${ARCA_ENCRYPTION_KEY}
       N8N_BASE_URL: http://n8n:5678
       N8N_API_KEY: ${N8N_API_KEY:-}
       N8N_WORKFLOW_ID: ${N8N_WORKFLOW_ID:-}
@@ -114,9 +120,9 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-consorcio}
-      POSTGRES_USER: ${POSTGRES_USER:-consorcio}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-consorcio_secret}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       WA_PROVIDER: ${WA_PROVIDER:-twilio}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
@@ -125,7 +131,7 @@ services:
       META_WA_TOKEN: ${META_WA_TOKEN}
       META_WA_PHONE_NUMBER_ID: ${META_WA_PHONE_NUMBER_ID}
       META_WA_VERIFY_TOKEN: ${META_WA_VERIFY_TOKEN:-consorcio_verify}
-      AGENT_API_KEY: ${AGENT_API_KEY:-changeme}
+      AGENT_API_KEY: ${AGENT_API_KEY}
       ADMIN_WHATSAPP_PHONE: ${ADMIN_WHATSAPP_PHONE}
       COMMS_PORT: 3002
     ports:
@@ -143,16 +149,16 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-consorcio}
-      POSTGRES_USER: ${POSTGRES_USER:-consorcio}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-consorcio_secret}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASS: ${SMTP_PASS}
       SMTP_FROM: ${SMTP_FROM}
       AGENT_PORT: 3001
-      AGENT_API_KEY: ${AGENT_API_KEY:-changeme}
+      AGENT_API_KEY: ${AGENT_API_KEY}
       PDF_OUTPUT_DIR: /app/pdfs
     volumes:
       - agent_pdfs:/app/pdfs

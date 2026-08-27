@@ -1,140 +1,72 @@
-// Authentication utilities & Web Crypto token signing
+// Authentication utilities — JWT via `jose` + Redis-backed session revocation.
+
+import { SignJWT, jwtVerify } from "jose";
+import { randomUUID } from "crypto";
+import { env } from "./env";
+import { createSession, deleteSession, sessionExists } from "./session-store";
 
 export const AUTH_COOKIE_NAME = "consorcio_session";
 
-// Default credentials requested by the user
-const DEFAULT_USER = "Masoca";
-const DEFAULT_PASS = "Karina1605";
+export { checkRateLimit, recordFailedAttempt, clearFailedAttempts } from "./rate-limiter";
 
-// Secret for HMAC signing (uses env var if present)
-const SECRET_KEY = process.env.AUTH_SECRET || "consorcio_secret_key_session_sign_2026_secure";
-
-// Simple in-memory rate limiter for login attempts (15 min lockout after 5 failed attempts)
-interface RateLimitRecord {
-  attempts: number;
-  lockedUntil: number;
-}
-const loginAttempts = new Map<string, RateLimitRecord>();
-
-export function checkRateLimit(identifier: string): { allowed: boolean; waitMinutes?: number } {
-  const now = Date.now();
-  const record = loginAttempts.get(identifier);
-
-  if (!record) return { allowed: true };
-
-  if (record.lockedUntil > now) {
-    const waitMinutes = Math.ceil((record.lockedUntil - now) / 60000);
-    return { allowed: false, waitMinutes };
-  }
-
-  if (record.lockedUntil <= now && record.lockedUntil > 0) {
-    // Lock expired, reset
-    loginAttempts.delete(identifier);
-    return { allowed: true };
-  }
-
-  return { allowed: true };
-}
-
-export function recordFailedAttempt(identifier: string): { locked: boolean; waitMinutes?: number } {
-  const now = Date.now();
-  const record = loginAttempts.get(identifier) || { attempts: 0, lockedUntil: 0 };
-  record.attempts += 1;
-
-  if (record.attempts >= 5) {
-    record.lockedUntil = now + 15 * 60 * 1000; // 15 minutes lockout
-    loginAttempts.set(identifier, record);
-    return { locked: true, waitMinutes: 15 };
-  }
-
-  loginAttempts.set(identifier, record);
-  return { locked: false };
-}
-
-export function clearFailedAttempts(identifier: string): void {
-  loginAttempts.delete(identifier);
+// Computed lazily (not at module scope) so importing this module during
+// `next build` page-data collection doesn't trigger env validation.
+let secretKeyCache: Uint8Array | undefined;
+function getSecretKey(): Uint8Array {
+  if (!secretKeyCache) secretKeyCache = new TextEncoder().encode(env.AUTH_SECRET);
+  return secretKeyCache;
 }
 
 export function validateCredentials(user: string, pass: string): boolean {
-  const validUser = process.env.AUTH_USER || DEFAULT_USER;
-  const validPass = process.env.AUTH_PASSWORD || DEFAULT_PASS;
-  return user === validUser && pass === validPass;
+  return user === env.AUTH_USER && pass === env.AUTH_PASSWORD;
 }
 
-// Convert string to Uint8Array/BufferSource
-function stringToBuffer(str: string): BufferSource {
-  return new TextEncoder().encode(str) as unknown as BufferSource;
-}
-
-// Convert buffer to hex string
-function bufferToHex(buffer: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-// Sign data using HMAC-SHA256 via native Web Crypto (compatible with Edge and Node.js)
+// Signs a JWT (HS256) and creates the corresponding session record in Redis.
+// The token carries a random `sid` (session id) claim used to look up the
+// session record on every subsequent request, enabling server-side revocation.
 export async function createSessionToken(username: string, expiresInDays = 30): Promise<string> {
-  const header = { alg: "HS256", typ: "JWT" };
-  const exp = Math.floor(Date.now() / 1000) + expiresInDays * 24 * 60 * 60;
-  const payload = { sub: username, exp };
+  const sessionId = randomUUID();
+  await createSession(sessionId, username);
 
-  const encodedHeader = btoa(JSON.stringify(header));
-  const encodedPayload = btoa(JSON.stringify(payload));
-  const dataToSign = `${encodedHeader}.${encodedPayload}`;
+  const token = await new SignJWT({ sub: username, sid: sessionId })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuedAt()
+    .setExpirationTime(`${expiresInDays}d`)
+    .sign(getSecretKey());
 
-  const key = await crypto.subtle.importKey(
-    "raw",
-    stringToBuffer(SECRET_KEY),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign("HMAC", key, stringToBuffer(dataToSign));
-  const hexSignature = bufferToHex(signature);
-
-  return `${dataToSign}.${hexSignature}`;
+  return token;
 }
 
-// Verify token using Web Crypto
-export async function verifySessionToken(token: string | undefined): Promise<{ valid: boolean; username?: string }> {
+export async function verifySessionToken(
+  token: string | undefined
+): Promise<{ valid: boolean; username?: string; sessionId?: string }> {
   if (!token) return { valid: false };
 
-  const parts = token.split(".");
-  if (parts.length !== 3) return { valid: false };
-
-  const [encodedHeader, encodedPayload, hexSignature] = parts;
-  const dataToSign = `${encodedHeader}.${encodedPayload}`;
-
   try {
-    const key = await crypto.subtle.importKey(
-      "raw",
-      stringToBuffer(SECRET_KEY),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["verify"]
-    );
+    const { payload } = await jwtVerify(token, getSecretKey());
+    const username = typeof payload.sub === "string" ? payload.sub : undefined;
+    const sessionId = typeof payload.sid === "string" ? payload.sid : undefined;
 
-    // Convert hex signature back to Uint8Array
-    const sigBytes = new Uint8Array(
-      hexSignature.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
-    ) as unknown as BufferSource;
+    if (!username || !sessionId) return { valid: false };
 
-    const isValid = await crypto.subtle.verify("HMAC", key, sigBytes, stringToBuffer(dataToSign));
-    if (!isValid) return { valid: false };
+    const exists = await sessionExists(sessionId);
+    if (!exists) return { valid: false };
 
-    const payloadJson = atob(encodedPayload);
-    const payload = JSON.parse(payloadJson);
-
-    // Check expiration
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) {
-      return { valid: false };
-    }
-
-    return { valid: true, username: payload.sub };
+    return { valid: true, username, sessionId };
   } catch {
     return { valid: false };
+  }
+}
+
+// Revokes the session tied to the given token. Session records also carry a
+// 30-day Redis TTL matching JWT expiry, so this is best-effort cleanup on logout.
+export async function revokeSessionFromToken(token: string | undefined): Promise<void> {
+  if (!token) return;
+  try {
+    const { payload } = await jwtVerify(token, getSecretKey());
+    const sessionId = typeof payload.sid === "string" ? payload.sid : undefined;
+    if (sessionId) await deleteSession(sessionId);
+  } catch {
+    // Token is malformed/expired/unverifiable — nothing to revoke.
   }
 }

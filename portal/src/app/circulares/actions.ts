@@ -1,13 +1,14 @@
 "use server";
 
 import { query } from "@/lib/db";
+import { env } from "@/lib/env";
 
 export async function sendCircular(formData: FormData) {
   const consorcio_id = formData.get("consorcio_id") as string;
   const message = formData.get("message") as string;
 
   const commsUrl = process.env.COMMS_AGENT_URL ?? "http://localhost:3002";
-  const apiKey = process.env.AGENT_API_KEY ?? "changeme";
+  const apiKey = env.AGENT_API_KEY;
 
   const res = await fetch(`${commsUrl}/send-circular`, {
     method: "POST",

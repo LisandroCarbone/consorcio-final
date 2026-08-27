@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
     
     // 1. Check rate limit
-    const rateCheck = checkRateLimit(ip);
+    const rateCheck = await checkRateLimit(ip);
     if (!rateCheck.allowed) {
       return NextResponse.json(
         {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const isValid = validateCredentials(username.trim(), password);
 
     if (!isValid) {
-      const lockResult = recordFailedAttempt(ip);
+      const lockResult = await recordFailedAttempt(ip);
       if (lockResult.locked) {
         return NextResponse.json(
           {
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Clear failed attempts on success
-    clearFailedAttempts(ip);
+    await clearFailedAttempts(ip);
 
     // 4. Create signed session token (30 days validity)
     const token = await createSessionToken(username.trim(), 30);

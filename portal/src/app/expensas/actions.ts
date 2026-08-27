@@ -3,6 +3,7 @@
 import { query, queryOne, pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { runCalculateExpenses, calculateEmployerObligations, round2 } from "@/lib/expenses/engine";
+import { env } from "@/lib/env";
 
 export async function createPeriodo(formData: FormData): Promise<number | null> {
   const consorcio_cuit = formData.get("consorcio_id") as string;
@@ -648,7 +649,7 @@ export async function distribuirExpensasMasivo(periodoId: number) {
   if (!period) throw new Error("Período no encontrado");
 
   const agentUrl = process.env.EXPENSAS_AGENT_URL ?? "http://localhost:3001";
-  const apiKey = process.env.AGENT_API_KEY ?? "changeme";
+  const apiKey = env.AGENT_API_KEY;
 
   const res = await fetch(`${agentUrl}/run-expensas`, {
     method: "POST",
@@ -674,7 +675,7 @@ export async function distribuirExpensasMasivo(periodoId: number) {
 
 export async function distribuirExpensaIndividual(resCuentaId: number) {
   const agentUrl = process.env.EXPENSAS_AGENT_URL ?? "http://localhost:3001";
-  const apiKey = process.env.AGENT_API_KEY ?? "changeme";
+  const apiKey = env.AGENT_API_KEY;
 
   const res = await fetch(`${agentUrl}/send-expensa`, {
     method: "POST",
