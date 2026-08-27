@@ -16,7 +16,8 @@ type BankChargePattern = {
 export const BANK_CHARGE_PATTERNS: BankChargePattern[] = [
   { pattern: /LEY\s*NRO?\s*25\.?4/i, categoria: "ley_25413", label: "Imp. Ley 25.413" },
   { pattern: /IMPUESTO\s*LEY/i, categoria: "ley_25413", label: "Imp. Débito/Crédito" },
-  { pattern: /COMISION\s*(TRA|MOV|EXT)/i, categoria: "comision", label: "Comisión Bancaria" },
+  { pattern: /COMISION\s*(TRA|MOV|EXT|CHE)/i, categoria: "comision", label: "Comisión Bancaria" },
+  { pattern: /COM[\.\s]*TRANSF/i, categoria: "comision", label: "Comisión Bancaria" },
   { pattern: /IVA\s*TASA/i, categoria: "iva", label: "IVA s/Comisiones" },
   { pattern: /COM\s*MANT/i, categoria: "mantenimiento", label: "Comisión Mantenimiento" },
 ];
