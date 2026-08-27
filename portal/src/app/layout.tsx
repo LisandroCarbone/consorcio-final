@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Nav } from "@/components/ui/Nav";
-import { TopBar } from "@/components/ui/TopBar";
+import { AppShell } from "@/components/layout/AppShell";
 import { cookies } from "next/headers";
 import { query } from "@/lib/db";
 
@@ -20,22 +19,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const activePeriodo = activePeriodoRaw || defaultPeriod;
   const theme = cookieStore.get("theme")?.value || "default";
 
-  const consorcios = await query<{ cuit: string; nombre: string }>(
-    "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
-  );
+  let consorcios: Array<{ cuit: string; nombre: string }> = [];
+  try {
+    consorcios = await query<{ cuit: string; nombre: string }>(
+      "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
+    );
+  } catch {
+    consorcios = [];
+  }
 
   return (
     <html lang="es" data-theme={theme}>
       <body>
-        <div className="print:hidden">
-          <Nav />
-        </div>
-        <div className="lg:ml-64 print:ml-0 flex flex-col min-h-screen">
-          <div className="print:hidden">
-            <TopBar consorcios={consorcios} activeCuit={activeCuit} activePeriodo={activePeriodo} />
-          </div>
-          <main className="flex-1 p-8 print:p-0 bg-gray-50 print:bg-white">{children}</main>
-        </div>
+        <AppShell
+          consorcios={consorcios}
+          activeCuit={activeCuit}
+          activePeriodo={activePeriodo}
+        >
+          {children}
+        </AppShell>
       </body>
     </html>
   );

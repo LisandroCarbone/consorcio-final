@@ -194,6 +194,22 @@ export function Nav() {
               </div>
             )}
             {operationalLinks.map(renderLink)}
+
+            {/* Logout Button */}
+            <div className="pt-3 mt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={async () => {
+                  await fetch("/api/auth/logout", { method: "POST" });
+                  window.location.href = "/login";
+                }}
+                className="w-full flex items-center gap-4 rounded-xl px-4 py-2.5 text-sm font-semibold text-brand-200 hover:bg-red-500/20 hover:text-red-100 transition-colors"
+                title="Cerrar sesión actual"
+              >
+                <span className="text-lg select-none">🚪</span>
+                <span>Cerrar Sesión</span>
+              </button>
+            </div>
           </div>
         </div>
       </nav>
