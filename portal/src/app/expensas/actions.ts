@@ -434,7 +434,8 @@ export async function regenerarGastosFijos(periodoId: number) {
        AND (liquidacion_id IS NOT NULL
             OR descripcion LIKE 'ARCA AFIP F. 931:%'
             OR descripcion LIKE 'SUTERH %'
-            OR descripcion LIKE 'FATERYH %')`,
+            OR descripcion LIKE 'FATERYH %'
+            OR descripcion LIKE 'SERACARH %')`,
       [periodoId]
     );
 
@@ -507,7 +508,7 @@ export async function regenerarGastosFijos(periodoId: number) {
     const suterhPct = Number(cct?.pct_suterh || 0.045);
     const faterhPct = Number(cct?.pct_fateryh || 0.065);
     const seracarhPct = Number(cct?.pct_seracarh || 0.005);
-    const svFijo = Number(cct?.sv_costo_fijo || 430.62);
+    const svFijo = Number(cct?.sv_costo_fijo || 424.62);
     const pctAportesSS = Number(cct?.pct_aportes_ss || 0.1445);
     const pctAportesOS = Number(cct?.pct_aportes_os || 0.0255);
     const pctContribOS = Number(cct?.pct_contrib_os || 0.051);
@@ -620,7 +621,7 @@ export async function regenerarGastosFijos(periodoId: number) {
     await ins(`ARCA AFIP F. 931: SCVO ${pText}`, scvo);
     await ins(`SUTERH ${pText}`, suterh);
     await ins(`FATERYH ${pText}`, fateryh);
-    await ins(`FATERYH SERACARH ${pText}`, seracarh);
+    await ins(`SERACARH ${pText}`, seracarh);
 
     // Mark liquidaciones as gastos_generados
     if (currentLiqs.rows.length > 0) {

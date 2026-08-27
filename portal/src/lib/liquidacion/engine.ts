@@ -140,6 +140,7 @@ interface ContribPatronal {
   obraSocial: number;
   suterh: number;
   fateryh: number;
+  fateryh_fijo: number;
   seracarh: number;
   art: number;
   scvo: number;
@@ -164,16 +165,31 @@ function calcDescuentosEmpleado(
   return { jubilacion, pami, obraSocial, difObraSocial, suterh, cajaProtFlia, fateryh, seguroVital, fondoEducacion, total };
 }
 
-function calcContribPatronal(base: number, cons: Consorcio): ContribPatronal {
+function calcContribPatronal(
+  base: number,
+  cons: Consorcio,
+  jornada: string = "Completa",
+  horasTotalesSuplente: number = 0
+): ContribPatronal {
   const jubilacion  = base * Number(cons.pct_contrib_jubilacion ?? 0.18);
   const obraSocial  = base * Number(cons.pct_contrib_obra_social ?? 0.06);
   const suterh      = base * Number(cons.pct_cct_suterh ?? 0.015);
   const fateryh     = base * Number(cons.pct_cct_fateryh ?? 0.0475);
   const seracarh    = base * Number(cons.pct_cct_seracarh ?? 0.005);
   const art         = base * Number(cons.art_pct_variable ?? 0);
-  const scvo        = cons.sv_costo_fijo ? Number(cons.sv_costo_fijo) * (cons.sv_cant_cuiles ?? 1) : 0;
-  const total = jubilacion + obraSocial + suterh + fateryh + seracarh + art + scvo;
-  return { jubilacion, obraSocial, suterh, fateryh, seracarh, art, scvo, total };
+  const scvo        = cons.sv_costo_fijo ? Number(cons.sv_costo_fijo) : 0;
+
+  let fateryh_fijo = 0;
+  if (jornada === "Completa") {
+    fateryh_fijo = Number(cons.fateryh_fijo_completa ?? 0);
+  } else if (jornada === "Media") {
+    fateryh_fijo = Number(cons.fateryh_fijo_completa ?? 0) / 2;
+  } else if (jornada === "Suplente") {
+    fateryh_fijo = Number(cons.fateryh_fijo_suplente_hora ?? 0) * horasTotalesSuplente;
+  }
+
+  const total = jubilacion + obraSocial + suterh + fateryh + fateryh_fijo + seracarh + art + scvo;
+  return { jubilacion, obraSocial, suterh, fateryh, fateryh_fijo, seracarh, art, scvo, total };
 }
 
 // ---------------------------------------------------------------------------
@@ -686,7 +702,21 @@ export async function calcularLiquidacion(
   // 21. Contribuciones patronales
   // ---------------------------------------------------------------------------
 
-  const patron = calcContribPatronal(totalRemunerativoFinal, cons);
+  let basePatronal = totalRemunerativoFinal;
+  if (emp.jornada === "Media") {
+    // For media jornada, employer contributions are calculated on the full-time basic
+    const catKey2 = `cat_${emp.categoria_edificio}` as "cat_1" | "cat_2" | "cat_3" | "cat_4";
+    let funcionCompleta: string;
+    if (emp.funcion.includes("No Permanente Sin vivienda")) {
+      funcionCompleta = "Encargado Permanente sin vivienda";
+    } else if (emp.funcion.includes("No Permanente Con vivienda")) {
+      funcionCompleta = "Encargado Permanente con vivienda";
+    } else {
+      funcionCompleta = emp.funcion.replace(/No Permanente/i, "Permanente");
+    }
+    basePatronal = escalaMap[funcionCompleta]?.[catKey2] ?? totalRemunerativoFinal;
+  }
+  const patron = calcContribPatronal(basePatronal, cons, emp.jornada, horasTotalesSuplente);
   const totalPatronal = patron.total;
 
   // ---------------------------------------------------------------------------
@@ -727,12 +757,13 @@ export async function calcularLiquidacion(
     const upsertResult = await client.query<{ id: number }>(
       `INSERT INTO app.liquidaciones_sueldo
          (empleado_cuil, periodo, tipo, remuneracion_bruta, total_descuentos_empleado,
-          total_aportes_patronales, neto_a_pagar, estado)
-       VALUES ($1, $2, 'mensual', $3, $4, $5, $6, $7)
+          total_aportes_patronales, base_patronal, neto_a_pagar, estado)
+       VALUES ($1, $2, 'mensual', $3, $4, $5, $6, $7, $8)
        ON CONFLICT (empleado_cuil, periodo, tipo) DO UPDATE SET
          remuneracion_bruta         = EXCLUDED.remuneracion_bruta,
          total_descuentos_empleado  = EXCLUDED.total_descuentos_empleado,
          total_aportes_patronales   = EXCLUDED.total_aportes_patronales,
+         base_patronal              = EXCLUDED.base_patronal,
          neto_a_pagar               = EXCLUDED.neto_a_pagar,
          estado                     = CASE
            WHEN app.liquidaciones_sueldo.estado IN ('confirmada', 'anulada') THEN app.liquidaciones_sueldo.estado
@@ -745,6 +776,7 @@ export async function calcularLiquidacion(
         safe(totalRemunerativoFinal),
         safe(totalDescuentos),
         safe(totalPatronal),
+        safe(basePatronal),
         safe(netoAPagar),
         estadoLiq,
       ]
@@ -838,9 +870,9 @@ export async function calcularLiquidacion(
     addDescuento("5100", "Obra Social", obraSocial, 32);
     addDescuento("5150", "Diferencia Obra Social Ley 26474", difObraSocial, 33);
     addDescuento("5200", "SUTERH", suterh, 34);
-    addDescuento("5250", "Caja Protección Familiar", cajaProtFlia, 35);
+    addDescuento("5250", "SUTERH (Caja Protección Familiar)", cajaProtFlia, 35);
     addDescuento("5300", "FATERYH", fateryh, 36);
-    addDescuento("5350", "Seguro Vitalicio", seguroVital, 37);
+    addDescuento("5350", "FATERYH (Seguro Vitalicio)", seguroVital, 37);
     addDescuento("5360", "Fondo Educación y Comunicación Art. 19 bis", fondoEducacion, 38);
     addDescuento("5400", "Descuento Vivienda", descVivienda, 39);
 
@@ -973,7 +1005,30 @@ export async function calcularSACPreview(
   const desc = calcDescuentosEmpleado(totalBruto, esSuplente);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = desc;
   const totalDescuentos = desc.total;
-  const totalPatronal = cons ? calcContribPatronal(totalBruto, cons).total : 0;
+
+  let basePatronalSAC = totalBruto;
+  if (emp.jornada === "Media") {
+    let funcionCompleta: string;
+    if (emp.funcion.includes("No Permanente Sin vivienda")) {
+      funcionCompleta = "Encargado Permanente sin vivienda";
+    } else if (emp.funcion.includes("No Permanente Con vivienda")) {
+      funcionCompleta = "Encargado Permanente con vivienda";
+    } else {
+      funcionCompleta = emp.funcion.replace(/No Permanente/i, "Permanente");
+    }
+    const escalaCompletaRow = await pool.query<EscalaRow>(
+      `SELECT cat_1::numeric, cat_2::numeric, cat_3::numeric, cat_4::numeric
+       FROM app.escalas_suterh
+       WHERE funcion ILIKE $1 AND periodo <= $2
+       ORDER BY periodo DESC LIMIT 1`,
+      [funcionCompleta, periodoSAC]
+    );
+    if (escalaCompletaRow.rows.length > 0) {
+      const basicoCompleto = Number(escalaCompletaRow.rows[0][catKey]);
+      basePatronalSAC = (basicoCompleto / 2) * (mesesTrabajados / mesesTotales) + bonificacionSAC;
+    }
+  }
+  const totalPatronal = cons ? calcContribPatronal(basePatronalSAC, cons, emp.jornada).total : 0;
 
   return {
     empleadoNombre: emp.nombre,
@@ -1034,9 +1089,9 @@ export async function liquidarSAC(
     if (p.pami > 0)          conceptos.push([liqId, "5050", "descuento", "PAMI", safe(p.pami), 31]);
     if (p.obraSocial > 0)    conceptos.push([liqId, "5100", "descuento", "Obra Social", safe(p.obraSocial), 32]);
     if (p.suterh > 0)        conceptos.push([liqId, "5200", "descuento", "SUTERH", safe(p.suterh), 34]);
-    if (p.cajaProtFlia > 0)  conceptos.push([liqId, "5250", "descuento", "Caja Protección Familiar", safe(p.cajaProtFlia), 35]);
+    if (p.cajaProtFlia > 0)  conceptos.push([liqId, "5250", "descuento", "SUTERH (Caja Protección Familiar)", safe(p.cajaProtFlia), 35]);
     if (p.fateryh > 0)       conceptos.push([liqId, "5300", "descuento", "FATERYH", safe(p.fateryh), 36]);
-    if (p.seguroVital > 0)   conceptos.push([liqId, "5350", "descuento", "Seguro Vitalicio", safe(p.seguroVital), 37]);
+    if (p.seguroVital > 0)   conceptos.push([liqId, "5350", "descuento", "FATERYH (Seguro Vitalicio)", safe(p.seguroVital), 37]);
 
     const placeholders = conceptos
       .map((_, i) => `($${i * 6 + 1},$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6})`)
@@ -1213,7 +1268,7 @@ export async function calcularIndemnizacionPreview(
   const pctFateryh = Number(cons?.pct_cct_fateryh ?? 0.0475);
   const pctSeracarh = Number(cons?.pct_cct_seracarh ?? 0.005);
   const pctART = Number(cons?.art_pct_variable ?? 0);
-  const scvoFijo = cons?.sv_costo_fijo ? Number(cons.sv_costo_fijo) * (cons.sv_cant_cuiles ?? 1) : 0;
+  const scvoFijo = cons?.sv_costo_fijo ? Number(cons.sv_costo_fijo) : 0;
   const totalPatronal = totalRemunerativo * (pctJubilPatronal + pctOSPatronal + pctSuterh + pctFateryh + pctSeracarh + pctART) + scvoFijo;
 
   const periodo = `${egreso.getFullYear()}-${String(egreso.getMonth() + 1).padStart(2, "0")}-01`;
@@ -1285,9 +1340,9 @@ export async function liquidarIndemnizacion(
     if (d.pami > 0)         conceptos.push([liqId, "5050", "descuento", "PAMI", safe(d.pami), 31]);
     if (d.obraSocial > 0)   conceptos.push([liqId, "5100", "descuento", "Obra Social", safe(d.obraSocial), 32]);
     if (d.suterh > 0)       conceptos.push([liqId, "5200", "descuento", "SUTERH", safe(d.suterh), 34]);
-    if (d.cajaProtFlia > 0) conceptos.push([liqId, "5250", "descuento", "Caja Protección Familiar", safe(d.cajaProtFlia), 35]);
+    if (d.cajaProtFlia > 0) conceptos.push([liqId, "5250", "descuento", "SUTERH (Caja Protección Familiar)", safe(d.cajaProtFlia), 35]);
     if (d.fateryh > 0)      conceptos.push([liqId, "5300", "descuento", "FATERYH", safe(d.fateryh), 36]);
-    if (d.seguroVital > 0)  conceptos.push([liqId, "5350", "descuento", "Seguro Vitalicio", safe(d.seguroVital), 37]);
+    if (d.seguroVital > 0)  conceptos.push([liqId, "5350", "descuento", "FATERYH (Seguro Vitalicio)", safe(d.seguroVital), 37]);
 
     if (conceptos.length > 0) {
       const ph = conceptos.map((_, i) => `($${i * 6 + 1},$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6})`).join(",");

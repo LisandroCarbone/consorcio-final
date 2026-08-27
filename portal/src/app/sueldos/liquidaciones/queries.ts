@@ -4,7 +4,8 @@ export async function getLiquidacionDetalle(id: number) {
   const { rows } = await pool.query(
     `SELECT
        l.id, l.periodo::text AS periodo, l.tipo, l.estado,
-       l.remuneracion_bruta, l.total_descuentos_empleado, l.neto_a_pagar,
+       l.remuneracion_bruta, l.total_descuentos_empleado, l.total_aportes_patronales,
+       l.base_patronal, l.neto_a_pagar,
        e.cuil, e.nombre AS empleado_nombre, e.funcion, e.jornada,
        e.fecha_ingreso::text AS fecha_ingreso,
        DATE_PART('year', AGE(l.periodo, e.fecha_ingreso))::int AS antiguedad_anios,
@@ -16,10 +17,15 @@ export async function getLiquidacionDetalle(id: number) {
        c.pct_contrib_jubilacion, c.pct_contrib_obra_social,
        c.art_pct_variable, c.art_fijo,
        c.sv_costo_fijo, c.sv_cant_cuiles,
-       c.pct_cct_suterh, c.pct_cct_fateryh, c.pct_cct_seracarh
+       c.pct_cct_suterh, c.pct_cct_fateryh, c.pct_cct_seracarh,
+       c.fateryh_fijo_completa, c.fateryh_fijo_media, c.fateryh_fijo_suplente_hora,
+       n.horas_jornada::numeric AS novedad_horas_jornada,
+       n.dias_trabajados_suplente::numeric AS novedad_dias_trabajados_suplente,
+       n.suplencia_100_hs::numeric AS novedad_suplencia_100_hs
      FROM app.liquidaciones_sueldo l
      JOIN app.empleados e ON e.cuil = l.empleado_cuil
      JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
+     LEFT JOIN app.novedades_sueldo n ON n.empleado_cuil = e.cuil AND n.periodo = l.periodo
      WHERE l.id = $1`,
     [id]
   );
@@ -36,12 +42,25 @@ export async function getLiquidacionDetalle(id: number) {
   );
   liq.conceptos = conceptoRows;
 
-  liq.ultimo_deposito_aportes = await getUltimoDepositoAportes(liq.consorcio_cuit);
+  liq.ultimo_deposito_aportes = await getUltimoDepositoAportes(liq.consorcio_cuit, liq.periodo);
 
   return liq;
 }
 
-export async function getUltimoDepositoAportes(consorcioCuit: string) {
+// Aportes y contribuciones se depositan con un mes de atraso (F.931 del mes
+// anterior). Para el recibo de un período dado, se debe mostrar el depósito
+// correspondiente al período INMEDIATO ANTERIOR, no el más reciente sin más
+// (que podría ser del mismo mes del recibo si ya fue matcheado).
+export async function getUltimoDepositoAportes(consorcioCuit: string, reciboPeriodo?: string) {
+  const params: unknown[] = [consorcioCuit];
+  let periodoFilter = "";
+  if (reciboPeriodo) {
+    const d = new Date(reciboPeriodo);
+    const anio = d.getUTCFullYear();
+    const mes = d.getUTCMonth() + 1;
+    params.push(anio, mes);
+    periodoFilter = `AND (pe.anio < $2 OR (pe.anio = $2 AND pe.mes < $3))`;
+  }
   const { rows } = await pool.query(
     `SELECT eb.archivo_nombre, em.fecha::text AS fecha, em.descripcion,
             pe.anio AS periodo_anio, pe.mes AS periodo_mes
@@ -54,9 +73,10 @@ export async function getUltimoDepositoAportes(consorcioCuit: string) {
        AND em.match_tipo = 'gasto'
        AND em.es_credito = false
        AND gp.descripcion ILIKE '%F. 931%'
-     ORDER BY em.fecha DESC
+       ${periodoFilter}
+     ORDER BY pe.anio DESC, pe.mes DESC, em.fecha DESC
      LIMIT 1`,
-    [consorcioCuit]
+    params
   );
   return rows.length > 0 ? rows[0] : null;
 }

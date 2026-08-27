@@ -175,25 +175,44 @@ export default async function ReciboPage({
   const redondeo           = Math.abs(netoRedondeado - netoDesdeConceptos);
 
   // Contribuciones patronales — match engine values exactly (Art. 140 LCT / Decreto 407/2026)
+  // base_patronal is the correct base for employer contributions (full-time basic for media jornada)
+  const basePatronal = Number(liq.base_patronal ?? bruto);
   const pctJubilacion = Number(liq.pct_contrib_jubilacion ?? 0.18);
   const pctObraSocial = Number(liq.pct_contrib_obra_social ?? 0.06);
   const pctART = Number(liq.art_pct_variable ?? 0);
   const artFijo = Number(liq.art_fijo ?? 0);
-  const scvo = Number(liq.sv_costo_fijo ?? 0) * Number(liq.sv_cant_cuiles ?? 1);
+  const scvo = Number(liq.sv_costo_fijo ?? 0);
   const pctSuterh = Number(liq.pct_cct_suterh ?? 0.015);
   const pctFateryh = Number(liq.pct_cct_fateryh ?? 0.0475);
   const pctSeracarh = Number(liq.pct_cct_seracarh ?? 0.005);
 
+  // FATERYH (Fijo) — fixed employer contribution, varies by jornada
+  const fateryhFijoCompleta = Number(liq.fateryh_fijo_completa ?? 0);
+  const fateryhFijoSuplenteHora = Number(liq.fateryh_fijo_suplente_hora ?? 0);
+  let fateryhFijo = 0;
+  if (liq.jornada === "Completa") {
+    fateryhFijo = fateryhFijoCompleta;
+  } else if (liq.jornada === "Media") {
+    fateryhFijo = fateryhFijoCompleta / 2;
+  } else if (liq.jornada === "Suplente") {
+    const horasJornada = liq.novedad_horas_jornada != null ? Number(liq.novedad_horas_jornada) : 8;
+    const diasSuplente = Number(liq.novedad_dias_trabajados_suplente ?? 0);
+    const suplencia100Hs = Number(liq.novedad_suplencia_100_hs ?? 0);
+    const horasTotalesSuplente = diasSuplente * Math.min(horasJornada, 18) + suplencia100Hs;
+    fateryhFijo = fateryhFijoSuplenteHora * horasTotalesSuplente;
+  }
+
   const patronalRows = [
-    { concepto: "Contribución patronal jubilación (SIPA)", alicuota: pctJubilacion, importe: bruto * pctJubilacion },
-    { concepto: "Contribución patronal obra social", alicuota: pctObraSocial, importe: bruto * pctObraSocial },
-    ...(pctART > 0 || artFijo > 0 ? [{ concepto: "LRT – ART (Riesgos del Trabajo)", alicuota: pctART > 0 ? pctART : null, importe: bruto * pctART + artFijo }] : []),
+    { concepto: "Contribución patronal jubilación (SIPA)", alicuota: pctJubilacion, importe: basePatronal * pctJubilacion },
+    { concepto: "Contribución patronal obra social", alicuota: pctObraSocial, importe: basePatronal * pctObraSocial },
+    ...(pctART > 0 || artFijo > 0 ? [{ concepto: "LRT – ART (Riesgos del Trabajo)", alicuota: pctART > 0 ? pctART : null, importe: basePatronal * pctART + artFijo }] : []),
     ...(scvo > 0 ? [{ concepto: "SCVO (Seguro Colectivo de Vida Obligatorio)", alicuota: null, importe: scvo }] : []),
-    { concepto: "SUTERH (contribución patronal)", alicuota: pctSuterh, importe: bruto * pctSuterh },
-    { concepto: "FATERYH (contribución patronal)", alicuota: pctFateryh, importe: bruto * pctFateryh },
-    { concepto: "SERACARH (Servicio Conciliación)", alicuota: pctSeracarh, importe: bruto * pctSeracarh },
+    { concepto: "SUTERH (contribución patronal)", alicuota: pctSuterh, importe: basePatronal * pctSuterh },
+    { concepto: "FATERYH (contribución patronal)", alicuota: pctFateryh, importe: basePatronal * pctFateryh },
+    ...(fateryhFijo > 0 ? [{ concepto: "FATERYH (Fijo)", alicuota: null, importe: fateryhFijo }] : []),
+    { concepto: "SERACARH (Servicio Conciliación)", alicuota: pctSeracarh, importe: basePatronal * pctSeracarh },
   ];
-  const totalPatronal = patronalRows.reduce((s, r) => s + r.importe, 0);
+  const totalPatronal = Number(liq.total_aportes_patronales) || patronalRows.reduce((s, r) => s + r.importe, 0);
   const costoTotal = bruto + totalPatronal;
 
   // Pie slices
@@ -201,10 +220,10 @@ export default async function ReciboPage({
   const pieSlices = [
     { label: "Neto empleado", value: neto, color: PIE_COLORS[0] },
     { label: "Descuentos empleado", value: totalDesc, color: PIE_COLORS[1] },
-    { label: "Jubilación patronal", value: bruto * pctJubilacion, color: PIE_COLORS[2] },
-    { label: "Obra Social patronal", value: bruto * pctObraSocial, color: PIE_COLORS[3] },
-    { label: "ART / SCVO", value: bruto * pctART + artFijo + scvo, color: PIE_COLORS[4] },
-    { label: "Sindical/Convencional", value: bruto * (pctSuterh + pctFateryh + pctSeracarh), color: PIE_COLORS[5] },
+    { label: "Jubilación patronal", value: basePatronal * pctJubilacion, color: PIE_COLORS[2] },
+    { label: "Obra Social patronal", value: basePatronal * pctObraSocial, color: PIE_COLORS[3] },
+    { label: "ART / SCVO", value: basePatronal * pctART + artFijo + scvo, color: PIE_COLORS[4] },
+    { label: "Sindical/Convencional", value: basePatronal * (pctSuterh + pctFateryh + pctSeracarh), color: PIE_COLORS[5] },
   ];
 
   const periodoDate = new Date(liq.periodo);
@@ -565,9 +584,9 @@ export default async function ReciboPage({
         <div className="border-2 border-gray-800 border-t-0 grid grid-cols-2 divide-x divide-gray-300">
           {/* Firma empleador */}
           <div className="p-4 print:p-1.5 text-center">
-            <div className="h-12 print:h-8 flex items-end justify-center pb-1 mb-1">
+            <div className="h-20 print:h-14 flex items-end justify-center pb-1 mb-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/firma-empleador.png" alt="" className="print:!h-8" style={{ height: 44, maxWidth: 160, objectFit: "contain" }} />
+              <img src="/firma-empleador.png" alt="" className="print:!h-14" style={{ height: 76, maxWidth: 260, objectFit: "contain" }} />
             </div>
             <div className="border-t border-gray-400 pt-2 mt-1 text-xs">
               <p className="font-semibold text-gray-800">{liq.consorcio_nombre}</p>
@@ -579,7 +598,7 @@ export default async function ReciboPage({
 
           {/* Firma empleado */}
           <div className="p-4 print:p-1.5 text-center">
-            <div className="h-12 print:h-8 mb-1" />
+            <div className="h-20 print:h-14 mb-1" />
             <div className="border-t border-gray-400 pt-2 mt-1 text-xs">
               <p className="font-semibold text-gray-800">{liq.empleado_nombre}</p>
               <p className="text-gray-500">CUIL: {formatCuit(liq.cuil)}</p>

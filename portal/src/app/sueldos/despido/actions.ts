@@ -14,4 +14,8 @@ export async function accionLiquidarDespido(formData: FormData) {
 
   await liquidarIndemnizacion(empleadoCuil, fechaEgreso, tipoEgreso);
   revalidatePath("/sueldos/despido");
+  revalidatePath("/sueldos");
+  revalidatePath("/sueldos/empleados");
+  revalidatePath("/sueldos/novedades");
+  revalidatePath("/sueldos/liquidaciones");
 }
