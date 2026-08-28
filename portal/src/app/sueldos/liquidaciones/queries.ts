@@ -60,7 +60,7 @@ export async function getUltimoDepositoAportes(consorcioCuit: string, reciboPeri
     const anio = d.getUTCFullYear();
     const mes = d.getUTCMonth() + 1;
     params.push(anio, mes);
-    periodoFilter = `AND (pe.anio < $2 OR (pe.anio = $2 AND pe.mes < $3))`;
+    periodoFilter = `AND (pe.anio < $2 OR (pe.anio = $2 AND pe.mes <= $3))`;
   }
   const { rows } = await pool.query(
     `SELECT eb.archivo_nombre, em.fecha::text AS fecha, em.descripcion,
