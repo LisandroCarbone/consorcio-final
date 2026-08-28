@@ -308,8 +308,11 @@ export async function calcularLiquidacion(
       muerte: null,
     } as Novedades);
 
+  // Detect suplente from jornada OR funcion
+  const esSuplente = emp.jornada === "Suplente" || /suplente/i.test(emp.funcion ?? "");
+
   // Skip suplentes with no days worked — delete any stale liquidación and return
-  if (emp.jornada === "Suplente" && !Number(nov.dias_trabajados_suplente ?? 0) && !Number(nov.suplencia_100_hs ?? 0)) {
+  if (esSuplente && !Number(nov.dias_trabajados_suplente ?? 0) && !Number(nov.suplencia_100_hs ?? 0)) {
     await pool.query(
       `DELETE FROM app.liquidaciones_sueldo WHERE empleado_cuil = $1 AND periodo = $2 AND tipo = 'mensual' AND estado != 'confirmada'`,
       [empleadoCuil, periodo]
@@ -377,7 +380,7 @@ export async function calcularLiquidacion(
   const valorEscala = Number(valorEscalaRaw);
 
   let sueldoBasico = 0;
-  if (emp.jornada === "Suplente") {
+  if (esSuplente) {
     // Art. 7 inc. P: máximo 18 horas por jornada para suplentes y personal jornalizado
     const hs = Math.min(novN.horas_jornada ?? 8, 18);
     sueldoBasico = (valorEscala / 8) * hs * novN.dias_trabajados_suplente;
@@ -400,7 +403,7 @@ export async function calcularLiquidacion(
   const plusAntig2pct = adic("plus_antig_2pct", PLUS_ANTIG_2PCT_NO_SUPLENTE);
 
   let plusAntig = 0;
-  if (emp.jornada === "Suplente") {
+  if (esSuplente) {
     plusAntig = plusAntig1pct * aniosAntig * (horasTotalesSuplente / 200);
   } else {
     plusAntig = plusAntig2pct * aniosAntig;
@@ -498,7 +501,7 @@ export async function calcularLiquidacion(
   const adicRemBase = adicionalesByKey["adicional_remuneratorio_mensual"] ?? adicionales["Adicional Remuneratorio Mensual"] ?? 0;
 
   let adicionalRemEfectivo = 0;
-  if (emp.jornada === "Suplente") {
+  if (esSuplente) {
     const base = (emp.adicional_remuneratorio !== null && emp.adicional_remuneratorio !== undefined)
       ? Number(emp.adicional_remuneratorio)
       : adicRemBase;
@@ -516,7 +519,7 @@ export async function calcularLiquidacion(
   // ---------------------------------------------------------------------------
 
   const empAdicionalVoluntario =
-    emp.jornada === "Suplente" && horasTotalesSuplente === 0
+    esSuplente && horasTotalesSuplente === 0
       ? 0
       : Number(emp.adicional_voluntario ?? 0);
   const adicionalVoluntario = novN.adicional_voluntario ?? empAdicionalVoluntario;
@@ -526,7 +529,7 @@ export async function calcularLiquidacion(
   // ---------------------------------------------------------------------------
 
   const suplencia100 =
-    emp.jornada === "Suplente"
+    esSuplente
       ? (valorEscala / 8) * 2 * novN.suplencia_100_hs
       : 0;
 
@@ -563,7 +566,7 @@ export async function calcularLiquidacion(
   const baseHE = haberesFijos - adicionalRemEfectivo - adicionalViaticos;
 
   let valorHora: number;
-  if (emp.jornada === "Suplente") {
+  if (esSuplente) {
     valorHora = valorEscala / 8;
   } else if (esVigilNocturna) {
     valorHora = baseHE / 175;
@@ -704,7 +707,7 @@ export async function calcularLiquidacion(
     difObraSocial = Math.max(0, baseOSCompleta * 0.03 - totalRemunerativoFinal * 0.03 - osSACPagada);
   }
 
-  const esSuplente = emp.jornada === "Suplente";
+
   const embargo = novN.embargo;
   const anticipo = novN.anticipo;
 
@@ -852,12 +855,12 @@ export async function calcularLiquidacion(
     };
 
     // Haberes
-    addHaber("1000", emp.jornada === "Suplente" ? `Suplencia (${horasTotalesSuplente}hs)` : "Sueldo Básico", sueldoBasico, 1);
+    addHaber("1000", esSuplente ? `Suplencia (${horasTotalesSuplente}hs)` : "Sueldo Básico", sueldoBasico, 1);
     addHaber("1050", "Suplencia al 100%", suplencia100, 2);
     addHaber("1100", "Retiro de Residuos", retiroResiduos, 3);
     addHaber("1150", "Clasificación de Residuos", clasifResiduos, 4);
     addHaber("1200", "Valor Vivienda", valorVivienda, 5);
-    addHaber(emp.jornada === "Suplente" ? "1250" : "1300", "Plus Antigüedad", plusAntig, 6);
+    addHaber(esSuplente ? "1250" : "1300", "Plus Antigüedad", plusAntig, 6);
     addHaber("1350", "Plus Cocheras", plusCocheras, 7);
     addHaber("1400", "Plus Movimiento de Coches", plusMovCoches, 8);
     addHaber("1450", "Plus Jardín", plusJardin, 9);
@@ -1000,6 +1003,7 @@ export async function calcularSACPreview(
   if (liqRows.rows.length === 0) throw new Error(`Sin liquidaciones mensuales para SAC ${semestre}° ${anio}`);
 
   const emp = empRow.rows[0];
+  const esSuplente = emp.jornada === "Suplente" || /suplente/i.test(emp.funcion ?? "");
   const cons = consRows.rows[0];
   const mejorBruto = Number(liqRows.rows[0].remuneracion_bruta);
   const mesesTrabajados = liqRows.rows.length;
@@ -1024,7 +1028,7 @@ export async function calcularSACPreview(
   }
 
   const totalBruto = sacBase + bonificacionSAC;
-  const esSuplente = emp.jornada === "Suplente";
+
   const desc = calcDescuentosEmpleado(totalBruto, esSuplente);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = desc;
   const totalDescuentos = desc.total;
@@ -1213,6 +1217,7 @@ export async function calcularIndemnizacionPreview(
 
   if (empRow.rows.length === 0) throw new Error(`Empleado con CUIL ${empleadoCuil} no encontrado`);
   const emp = empRow.rows[0];
+  const esSuplente = emp.jornada === "Suplente" || /suplente/i.test(emp.funcion ?? "");
   const cons = consRows.rows[0];
 
   const aniosServicio = calcAniosAntigüedad(emp.fecha_ingreso, fechaEgreso);
@@ -1295,7 +1300,7 @@ export async function calcularIndemnizacionPreview(
   const totalRemunerativo = conceptos.filter((c) => c.remunerativo).reduce((s, c) => s + c.importe, 0);
   const totalNoRemunerativo = conceptos.filter((c) => !c.remunerativo).reduce((s, c) => s + c.importe, 0);
 
-  const esSuplente = emp.jornada === "Suplente";
+
   const descResult = calcDescuentosEmpleado(totalRemunerativo, esSuplente);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = descResult;
   const totalDesc = descResult.total;

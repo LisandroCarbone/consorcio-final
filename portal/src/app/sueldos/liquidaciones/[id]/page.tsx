@@ -190,17 +190,18 @@ export default async function ReciboPage({
 
   // FATERYH contrib solidaria — fixed employer contribution from parametros_cct
   const fateryhArt19bis = Number(liq.fateryh_art19bis ?? 0);
+  const esSuplente = liq.jornada === "Suplente" || /suplente/i.test(liq.funcion ?? "");
   let fateryhFijo = 0;
-  if (liq.jornada === "Completa") {
-    fateryhFijo = fateryhArt19bis;
-  } else if (liq.jornada === "Media") {
-    fateryhFijo = fateryhArt19bis * 0.5;
-  } else if (liq.jornada === "Suplente") {
+  if (esSuplente) {
     const horasJornada = liq.novedad_horas_jornada != null ? Number(liq.novedad_horas_jornada) : 8;
     const diasSuplente = Number(liq.novedad_dias_trabajados_suplente ?? 0);
     const suplencia100Hs = Number(liq.novedad_suplencia_100_hs ?? 0);
     const horasTotalesSuplente = diasSuplente * Math.min(horasJornada, 18) + suplencia100Hs;
     fateryhFijo = fateryhArt19bis * (horasTotalesSuplente / 200);
+  } else if (liq.jornada === "Completa") {
+    fateryhFijo = fateryhArt19bis;
+  } else {
+    fateryhFijo = fateryhArt19bis * 0.5;
   }
 
   const patronalRows = [

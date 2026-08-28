@@ -27,14 +27,6 @@ export async function register() {
       // Non-fatal
     }
 
-    // One-shot fix: reset liquidación 1526 to borrador so it can be recalculated
-    try {
-      const { pool } = await import("@/lib/db");
-      await pool.query(
-        "UPDATE app.liquidaciones_sueldo SET estado = 'borrador' WHERE id = 1526 AND estado = 'confirmada'"
-      );
-    } catch { }
-
     // Auto-migrate: create append-only audit_log table if missing
     try {
       const { pool } = await import("@/lib/db");
