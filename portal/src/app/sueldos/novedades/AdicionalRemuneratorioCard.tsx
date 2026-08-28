@@ -125,7 +125,7 @@ export function AdicionalRemuneratorioCard({
 
       {/* Fondo Educación */}
       <div className="flex items-center gap-3 mb-5 pb-5 border-b border-gray-100">
-        <label className="text-sm text-gray-600 w-56 shrink-0">Fondo Educación y Comunicación Art. 19 bis (2%):</label>
+        <label className="text-sm text-gray-600 w-56 shrink-0">Fondo Educación y Comunicación (2%):</label>
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"

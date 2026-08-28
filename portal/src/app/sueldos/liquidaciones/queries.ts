@@ -63,12 +63,13 @@ export async function getUltimoDepositoAportes(consorcioCuit: string, reciboPeri
     periodoFilter = `AND (pe.anio < $2 OR (pe.anio = $2 AND pe.mes <= $3))`;
   }
   const { rows } = await pool.query(
-    `SELECT eb.archivo_nombre, em.fecha::text AS fecha, em.descripcion,
+    `SELECT c.banco, em.fecha::text AS fecha, em.descripcion,
             pe.anio AS periodo_anio, pe.mes AS periodo_mes
      FROM app.extracto_movimientos em
      JOIN app.extractos_bancarios eb ON eb.id = em.extracto_id
      JOIN app.gastos_periodo gp ON gp.id = em.match_id
      JOIN app.periodos_expensas pe ON pe.id = gp.periodo_id
+     JOIN app.consorcios c ON c.cuit = eb.consorcio_cuit
      WHERE eb.consorcio_cuit = $1
        AND em.estado_match = 'confirmado'
        AND em.match_tipo = 'gasto'
@@ -80,29 +81,5 @@ export async function getUltimoDepositoAportes(consorcioCuit: string, reciboPeri
     params
   );
   if (rows.length === 0) return null;
-  const row = rows[0];
-  row.banco = inferBancoFromArchivo(row.archivo_nombre);
-  return row;
-}
-
-const BANCOS_CONOCIDOS = [
-  "Galicia", "Santander", "BBVA", "Nación", "Provincia", "Ciudad",
-  "Macro", "ICBC", "HSBC", "Credicoop", "Comafi", "Patagonia",
-  "Supervielle", "Hipotecario", "Itaú", "Piano",
-];
-
-function inferBancoFromArchivo(archivoNombre: string | null | undefined): string | null {
-  if (!archivoNombre) return null;
-  const normalizado = archivoNombre
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
-  for (const banco of BANCOS_CONOCIDOS) {
-    const bancoNormalizado = banco
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .toLowerCase();
-    if (normalizado.includes(bancoNormalizado)) return banco;
-  }
-  return null;
+  return rows[0];
 }

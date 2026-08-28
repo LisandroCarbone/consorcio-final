@@ -535,7 +535,7 @@ export async function upsertFondoEducacion(periodo: string, activo: boolean): Pr
   if (activo) {
     await query(
       `INSERT INTO app.adicionales_suterh (periodo, concepto, concepto_key, valor, fuente_url)
-       VALUES ($1, 'Fondo Educación y Comunicación Art. 19 bis', 'fondo_educacion', 1, 'manual')
+       VALUES ($1, 'Fondo Educación y Comunicación', 'fondo_educacion', 1, 'manual')
        ON CONFLICT (periodo, concepto) DO UPDATE SET concepto_key = EXCLUDED.concepto_key, valor = EXCLUDED.valor`,
       [periodo]
     );

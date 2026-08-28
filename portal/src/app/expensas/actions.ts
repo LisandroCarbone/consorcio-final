@@ -593,7 +593,7 @@ export async function regenerarGastosFijos(periodoId: number) {
       f931 += ob.f931; art += ob.art; scvo += ob.scvo;
       suterh += ob.suterh; fateryh += ob.fateryh; seracarh += ob.seracarh;
 
-      // Art.19bis: media jornada ×0.5, suplente ×(horas_trabajadas/200), completa ×1
+      // FATERYH contrib solidaria: media jornada ×0.5, suplente ×(horas_trabajadas/200), completa ×1
       let art19bisFactor = 1;
       const jornada = String(liq.jornada || "");
       if (jornada === "Media") {

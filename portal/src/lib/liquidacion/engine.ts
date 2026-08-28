@@ -607,7 +607,7 @@ export async function calcularLiquidacion(
     .filter(r => r.tipo === "descuento" && !r.es_porcentaje)
     .reduce((s, r) => s + Number(r.importe), 0);
 
-  // Fondo Educación y Comunicación Art. 19 bis — only when explicitly set for this period
+  // Fondo Educación y Comunicación — only when explicitly set for this period
   const aplicarFondoEducacion = !!(adicionalesByKey["fondo_educacion"] ?? adicionales["fondo_educacion"]);
 
   const totalRemunerativo =
@@ -896,7 +896,7 @@ export async function calcularLiquidacion(
     addDescuento("5250", "SUTERH (Caja Protección Familiar)", cajaProtFlia, 35);
     addDescuento("5300", "FATERYH", fateryh, 36);
     addDescuento("5350", "FATERYH (Seguro Vitalicio)", seguroVital, 37);
-    addDescuento("5360", "Fondo Educación y Comunicación Art. 19 bis", fondoEducacion, 38);
+    addDescuento("5360", "Fondo Educación y Comunicación", fondoEducacion, 38);
     addDescuento("5400", "Descuento Vivienda", descVivienda, 39);
 
     // Custom period adicionales

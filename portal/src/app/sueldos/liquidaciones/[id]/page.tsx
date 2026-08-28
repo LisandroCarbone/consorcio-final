@@ -188,7 +188,7 @@ export default async function ReciboPage({
   const pctFateryh = Number(liq.pct_cct_fateryh ?? 0.0475);
   const pctSeracarh = Number(liq.pct_cct_seracarh ?? 0.005);
 
-  // FATERYH Art. 19 bis — fixed employer contribution from parametros_cct
+  // FATERYH contrib solidaria — fixed employer contribution from parametros_cct
   const fateryhArt19bis = Number(liq.fateryh_art19bis ?? 0);
   let fateryhFijo = 0;
   if (liq.jornada === "Completa") {
@@ -210,7 +210,7 @@ export default async function ReciboPage({
     ...(scvo > 0 ? [{ concepto: "SCVO (Seguro Colectivo de Vida Obligatorio)", alicuota: null, base: 0, importe: scvo }] : []),
     { concepto: "SUTERH (contribución patronal)", alicuota: pctSuterh, base: baseOtras, importe: baseOtras * pctSuterh },
     { concepto: "FATERYH (contribución patronal)", alicuota: pctFateryh, base: baseOtras, importe: baseOtras * pctFateryh },
-    ...(fateryhFijo > 0 ? [{ concepto: "FATERYH contribución solidaria a obras sociales (Art. 19 bis)", alicuota: null, base: 0, importe: fateryhFijo }] : []),
+    ...(fateryhFijo > 0 ? [{ concepto: "FATERYH contribución solidaria a obras sociales", alicuota: null, base: 0, importe: fateryhFijo }] : []),
     { concepto: "SERACARH (Servicio Conciliación)", alicuota: pctSeracarh, base: baseOtras, importe: baseOtras * pctSeracarh },
   ];
   const totalPatronal = Number(liq.total_aportes_patronales) || patronalRows.reduce((s, r) => s + r.importe, 0);
@@ -603,26 +603,26 @@ export default async function ReciboPage({
         ══════════════════════════════════════════════════ */}
         <div className="border-2 border-gray-800 border-t-0 grid grid-cols-2 divide-x divide-gray-300">
           {/* Firma empleador */}
-          <div className="p-4 print:p-0.5 text-center">
-            <div className="h-20 print:h-6 flex items-end justify-center pb-1 mb-1 print:mb-0 print:pb-0">
+          <div className="p-3 print:px-1 print:py-0.5 text-center">
+            <div className="h-16 print:h-4 flex items-end justify-center pb-1 print:pb-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/firma-empleador.png" alt="" className="print:!h-6" style={{ height: 76, maxWidth: 260, objectFit: "contain" }} />
+              <img src="/firma-empleador.png" alt="" className="print:!h-4" style={{ height: 60, maxWidth: 240, objectFit: "contain" }} />
             </div>
-            <div className="border-t border-gray-400 pt-2 mt-1 print:pt-0.5 print:mt-0 text-xs print:text-[7px]">
+            <div className="border-t border-gray-400 pt-1 print:pt-0 text-xs print:text-[7px] print:leading-tight">
               <p className="font-semibold text-gray-800">{liq.consorcio_nombre}</p>
               <p className="text-gray-500">CUIT: {formatCuit(liq.consorcio_cuit)}</p>
-              <p className="text-gray-400 text-[10px] print:text-[6px] mt-0.5 print:mt-0">Firma y Sello del Empleador</p>
+              <p className="text-gray-400 text-[10px] print:text-[6px]">Firma y Sello del Empleador</p>
               <p className="text-gray-400 text-[10px] print:text-[6px]">{signingDate}</p>
             </div>
           </div>
 
           {/* Firma empleado */}
-          <div className="p-4 print:p-0.5 text-center">
-            <div className="h-20 print:h-6 mb-1 print:mb-0" />
-            <div className="border-t border-gray-400 pt-2 mt-1 print:pt-0.5 print:mt-0 text-xs print:text-[7px]">
+          <div className="p-3 print:px-1 print:py-0.5 text-center">
+            <div className="h-16 print:h-4" />
+            <div className="border-t border-gray-400 pt-1 print:pt-0 text-xs print:text-[7px] print:leading-tight">
               <p className="font-semibold text-gray-800">{liq.empleado_nombre}</p>
               <p className="text-gray-500">CUIL: {formatCuit(liq.cuil)}</p>
-              <p className="text-gray-400 text-[10px] print:text-[6px] mt-0.5 print:mt-0">Aclaración y Firma del Trabajador</p>
+              <p className="text-gray-400 text-[10px] print:text-[6px]">Aclaración y Firma del Trabajador</p>
               <p className="text-gray-400 text-[10px] print:text-[6px]">&nbsp;</p>
             </div>
           </div>

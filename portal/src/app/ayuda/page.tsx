@@ -127,10 +127,10 @@ export default function AyudaPage() {
         </p>
       </Section>
 
-      <Section icon="" title="Fondo Educación y Comunicación Art. 19 bis">
+      <Section icon="" title="Fondo Educación y Comunicación">
         <p>
           Checkbox en &quot;Adicionales del período&quot; que activa/desactiva el descuento
-          del <strong>2% por Fondo de Educación</strong> (Art. 19 bis CCT 589/10).
+          del <strong>2% por Fondo de Educación</strong> (CCT 589/10).
           Se aplica una vez al año, solo a empleados permanentes.
         </p>
         <Tip>
