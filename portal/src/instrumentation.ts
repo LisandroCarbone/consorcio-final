@@ -185,8 +185,8 @@ export async function register() {
       await pool.query(
         "CREATE INDEX IF NOT EXISTS idx_liquidaciones_empleado_id ON app.liquidaciones_sueldo(empleado_id)"
       );
-    } catch {
-      // Non-fatal — DB not ready yet. Migration retries on next startup.
+    } catch (err) {
+      console.error("[instrumentation] empleado surrogate-id migration failed:", err);
     }
   }
 }
