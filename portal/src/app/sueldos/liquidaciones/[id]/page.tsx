@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { getLiquidacionDetalle } from "../queries";
 import { notFound } from "next/navigation";
 import { PrintButton } from "./PrintButton";
+import { FechaPagoEditor } from "./FechaPagoEditor";
 import { numberToWords, formatCuit, formatCbu } from "@/lib/format";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -245,21 +246,30 @@ export default async function ReciboPage({
     ? new Date(liq.fecha_ingreso).toLocaleDateString("es-AR", { timeZone: "UTC" })
     : "—";
 
-  // Payment date: SAC 1 = 30/6, SAC 2 = 18/12, others = last day of month
+  // Payment date: stored fecha_pago if set, otherwise default by tipo:
+  // SAC 1 = 30/6, SAC 2 = 18/12, others = last day of month
   let fechaPago: string;
-  if (tipoLiq === "sac_1") {
+  let fechaPagoISO: string;
+  if (liq.fecha_pago) {
+    const [y, m, d] = liq.fecha_pago.split("-");
+    fechaPago = `${d}/${m}/${y}`;
+    fechaPagoISO = liq.fecha_pago;
+  } else if (tipoLiq === "sac_1") {
     fechaPago = new Date(periodoYear, 5, 30).toLocaleDateString("es-AR");
+    fechaPagoISO = `${periodoYear}-06-30`;
   } else if (tipoLiq === "sac_2") {
     fechaPago = new Date(periodoYear, 11, 18).toLocaleDateString("es-AR");
+    fechaPagoISO = `${periodoYear}-12-18`;
   } else {
     const lastDay = new Date(periodoDate.getUTCFullYear(), periodoDate.getUTCMonth() + 1, 0);
     fechaPago = lastDay.toLocaleDateString("es-AR");
+    fechaPagoISO = lastDay.toISOString().split("T")[0];
   }
 
   const signingDate = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
 
   return (
-    <div className="bg-white min-h-screen print:text-[8px]">
+    <div className="bg-white min-h-screen print:min-h-0 print:text-[8px]">
       <div className="max-w-4xl mx-auto p-6 print:p-0 print:space-y-0">
 
         {/* Toolbar */}
@@ -324,7 +334,7 @@ export default async function ReciboPage({
               </div>
               <div>
                 <p className="text-gray-400 uppercase text-[10px] font-semibold">Fecha de pago</p>
-                <p className="font-bold text-gray-900">{fechaPago}</p>
+                <FechaPagoEditor liquidacionId={liq.id} fechaPago={fechaPago} fechaPagoISO={fechaPagoISO} />
               </div>
             </div>
           </div>
@@ -533,13 +543,22 @@ export default async function ReciboPage({
         {/* ══════════════════════════════════════════════════
             BLOQUE 4 — GRÁFICO COSTO LABORAL
         ══════════════════════════════════════════════════ */}
-        <div className="border-2 border-gray-800 border-t-0 mt-0">
-          <div className="border-t border-gray-200 p-4 print:p-1">
-            <p className="text-[10px] text-gray-400 uppercase font-semibold mb-3 print:mb-0.5 print:text-[7px]">
+        <div className="border-2 border-gray-800 border-t-0 mt-0 print:hidden">
+          <div className="border-t border-gray-200 p-4">
+            <p className="text-[10px] text-gray-400 uppercase font-semibold mb-3">
               Composición del costo laboral — Decreto 407/2026
             </p>
             <PieChart slices={pieSlices} />
           </div>
+        </div>
+        {/* Print-only compact cost composition */}
+        <div className="hidden print:block border-2 border-gray-800 border-t-0 px-2 py-0.5 text-[7px]">
+          <span className="text-gray-400 uppercase font-semibold">Composición costo laboral: </span>
+          {pieSlices.filter(s => s.value > 0).map((s, i) => (
+            <span key={i} className="text-gray-700">
+              {i > 0 && " · "}{s.label} {((s.value / costoTotal) * 100).toFixed(1)}%
+            </span>
+          ))}
         </div>
 
         {/* ══════════════════════════════════════════════════
@@ -584,27 +603,27 @@ export default async function ReciboPage({
         ══════════════════════════════════════════════════ */}
         <div className="border-2 border-gray-800 border-t-0 grid grid-cols-2 divide-x divide-gray-300">
           {/* Firma empleador */}
-          <div className="p-4 print:p-1 text-center">
-            <div className="h-20 print:h-8 flex items-end justify-center pb-1 mb-1">
+          <div className="p-4 print:p-0.5 text-center">
+            <div className="h-20 print:h-6 flex items-end justify-center pb-1 mb-1 print:mb-0 print:pb-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/firma-empleador.png" alt="" className="print:!h-8" style={{ height: 76, maxWidth: 260, objectFit: "contain" }} />
+              <img src="/firma-empleador.png" alt="" className="print:!h-6" style={{ height: 76, maxWidth: 260, objectFit: "contain" }} />
             </div>
-            <div className="border-t border-gray-400 pt-2 mt-1 text-xs">
+            <div className="border-t border-gray-400 pt-2 mt-1 print:pt-0.5 print:mt-0 text-xs print:text-[7px]">
               <p className="font-semibold text-gray-800">{liq.consorcio_nombre}</p>
               <p className="text-gray-500">CUIT: {formatCuit(liq.consorcio_cuit)}</p>
-              <p className="text-gray-400 text-[10px] mt-0.5">Firma y Sello del Empleador</p>
-              <p className="text-gray-400 text-[10px]">{signingDate}</p>
+              <p className="text-gray-400 text-[10px] print:text-[6px] mt-0.5 print:mt-0">Firma y Sello del Empleador</p>
+              <p className="text-gray-400 text-[10px] print:text-[6px]">{signingDate}</p>
             </div>
           </div>
 
           {/* Firma empleado */}
-          <div className="p-4 print:p-1 text-center">
-            <div className="h-20 print:h-8 mb-1" />
-            <div className="border-t border-gray-400 pt-2 mt-1 text-xs">
+          <div className="p-4 print:p-0.5 text-center">
+            <div className="h-20 print:h-6 mb-1 print:mb-0" />
+            <div className="border-t border-gray-400 pt-2 mt-1 print:pt-0.5 print:mt-0 text-xs print:text-[7px]">
               <p className="font-semibold text-gray-800">{liq.empleado_nombre}</p>
               <p className="text-gray-500">CUIL: {formatCuit(liq.cuil)}</p>
-              <p className="text-gray-400 text-[10px] mt-0.5">Aclaración y Firma del Trabajador</p>
-              <p className="text-gray-400 text-[10px]">&nbsp;</p>
+              <p className="text-gray-400 text-[10px] print:text-[6px] mt-0.5 print:mt-0">Aclaración y Firma del Trabajador</p>
+              <p className="text-gray-400 text-[10px] print:text-[6px]">&nbsp;</p>
             </div>
           </div>
         </div>

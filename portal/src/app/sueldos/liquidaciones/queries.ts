@@ -5,7 +5,7 @@ export async function getLiquidacionDetalle(id: number) {
     `SELECT
        l.id, l.periodo::text AS periodo, l.tipo, l.estado,
        l.remuneracion_bruta, l.total_descuentos_empleado, l.total_aportes_patronales,
-       l.base_patronal, l.neto_a_pagar,
+       l.base_patronal, l.neto_a_pagar, l.fecha_pago::text,
        e.cuil, e.nombre AS empleado_nombre, e.funcion, e.jornada,
        e.fecha_ingreso::text AS fecha_ingreso,
        DATE_PART('year', AGE(l.periodo, e.fecha_ingreso))::int AS antiguedad_anios,

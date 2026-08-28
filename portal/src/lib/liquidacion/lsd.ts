@@ -149,7 +149,7 @@ export async function generateLsdTxt(periodo: string, tipo: string, consorcioCui
 
   // 1. Fetch confirmed liquidaciones for the given period and CUIT
   const { rows: liqRows } = await db.query(
-    `SELECT l.*, e.cuil, e.nombre AS empleado_nombre, e.legajo, e.jornada, e.funcion, e.cod_obra_social, e.cbu,
+    `SELECT l.*, l.fecha_pago::text AS fecha_pago, e.cuil, e.nombre AS empleado_nombre, e.legajo, e.jornada, e.funcion, e.cod_obra_social, e.cbu,
             EXTRACT(YEAR FROM AGE(l.periodo::date, e.fecha_ingreso))::int AS antiguedad_anios
      FROM app.liquidaciones_sueldo l
      JOIN app.empleados e ON e.cuil = l.empleado_cuil
@@ -203,9 +203,11 @@ export async function generateLsdTxt(periodo: string, tipo: string, consorcioCui
     const cbu = liq.cbu || "";
     const formaPago = cbu && cbu.length === 22 ? "3" : "1"; // 3=CBU, 1=Cash
 
-    // Determine payment date
+    // Determine payment date: stored fecha_pago takes precedence over defaults
     let fechaPago = "";
-    if (tipo === "sac_1") {
+    if (liq.fecha_pago) {
+      fechaPago = String(liq.fecha_pago).replace(/-/g, "");
+    } else if (tipo === "sac_1") {
       fechaPago = `${y}0630`;
     } else if (tipo === "sac_2") {
       fechaPago = `${y}1218`;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { formatMoney, formatDate } from "@/lib/format";
 import { bankChargeLabel } from "@/lib/conciliacion/categorizeBankCharge";
@@ -104,6 +105,7 @@ export function ConciliacionClient({
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
   const [assignOpenFor, setAssignOpenFor] = useState<number | null>(null);
   const assignTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const router = useRouter();
 
   const unidadMap = useMemo(() => {
     const m = new Map<number, Unidad>();
@@ -188,6 +190,8 @@ export function ConciliacionClient({
       });
       if (updater) {
         setLocalMovimientos((prev) => prev.map((m) => (m.id === id ? updater(m) : m)));
+      } else {
+        router.refresh();
       }
     } catch (e) {
       setPendingIds((prev) => {

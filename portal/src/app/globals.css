@@ -39,6 +39,15 @@
     margin: 0;
     padding: 0;
   }
+  * {
+    page-break-inside: avoid;
+  }
+  table, thead, tbody {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+  }
 }
 
 @layer components {

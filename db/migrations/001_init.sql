@@ -263,6 +263,7 @@ CREATE TABLE IF NOT EXISTS app.liquidaciones_sueldo (
     -- NUEVO: vínculo con expensas — se completa cuando se confirma
     -- y se generan los gastos categoría 1 automáticamente
     gastos_generados            BOOLEAN DEFAULT false NOT NULL,
+    fecha_pago                  DATE,
 
     created_at                  TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at                  TIMESTAMPTZ DEFAULT now() NOT NULL,

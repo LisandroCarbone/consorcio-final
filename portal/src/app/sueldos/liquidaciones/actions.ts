@@ -29,3 +29,11 @@ export async function confirmarLiquidacionAction(formData: FormData) {
   await confirmarLiquidacion(id);
   revalidatePath("/sueldos/liquidaciones");
 }
+
+export async function updateFechaPago(liquidacionId: number, fecha: string) {
+  await pool.query(
+    "UPDATE app.liquidaciones_sueldo SET fecha_pago = $1, updated_at = now() WHERE id = $2",
+    [fecha, liquidacionId]
+  );
+  revalidatePath(`/sueldos/liquidaciones/${liquidacionId}`);
+}

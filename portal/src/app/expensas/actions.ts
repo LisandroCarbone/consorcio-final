@@ -439,6 +439,7 @@ export async function regenerarGastosFijos(periodoId: number) {
     // 1. Delete auto-generated Category 1 expenses (keep manually added ones)
     await client.query(
       `DELETE FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = 1
+       AND debitado IS NOT TRUE
        AND (liquidacion_id IS NOT NULL
             OR descripcion LIKE 'ARCA AFIP F. 931:%'
             OR descripcion LIKE 'SUTERH %'

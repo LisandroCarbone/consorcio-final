@@ -498,19 +498,17 @@ export async function calcularLiquidacion(
   const adicRemBase = adicionalesByKey["adicional_remuneratorio_mensual"] ?? adicionales["Adicional Remuneratorio Mensual"] ?? 0;
 
   let adicionalRemEfectivo = 0;
-  if (emp.adicional_remuneratorio !== null && emp.adicional_remuneratorio !== undefined) {
-    adicionalRemEfectivo = emp.jornada === "Suplente" && horasTotalesSuplente === 0
-      ? 0
-      : Number(emp.adicional_remuneratorio);
+  if (emp.jornada === "Suplente") {
+    const base = (emp.adicional_remuneratorio !== null && emp.adicional_remuneratorio !== undefined)
+      ? Number(emp.adicional_remuneratorio)
+      : adicRemBase;
+    adicionalRemEfectivo = horasTotalesSuplente === 0 ? 0 : (base / 200) * horasTotalesSuplente;
+  } else if (emp.adicional_remuneratorio !== null && emp.adicional_remuneratorio !== undefined) {
+    adicionalRemEfectivo = Number(emp.adicional_remuneratorio);
+  } else if (emp.jornada === "Completa") {
+    adicionalRemEfectivo = adicRemBase;
   } else {
-    if (emp.jornada === "Completa") {
-      adicionalRemEfectivo = adicRemBase;
-    } else if (emp.jornada === "Media") {
-      adicionalRemEfectivo = adicRemBase * 0.5;
-    } else {
-      // Suplente: proportional to total hours worked (including suplencia_100_hs)
-      adicionalRemEfectivo = (adicRemBase / 200) * horasTotalesSuplente;
-    }
+    adicionalRemEfectivo = adicRemBase * 0.5;
   }
 
   // ---------------------------------------------------------------------------
@@ -854,7 +852,7 @@ export async function calcularLiquidacion(
     };
 
     // Haberes
-    addHaber("1000", emp.jornada === "Suplente" ? "Suplencia" : "Sueldo Básico", sueldoBasico, 1);
+    addHaber("1000", emp.jornada === "Suplente" ? `Suplencia (${horasTotalesSuplente}hs)` : "Sueldo Básico", sueldoBasico, 1);
     addHaber("1050", "Suplencia al 100%", suplencia100, 2);
     addHaber("1100", "Retiro de Residuos", retiroResiduos, 3);
     addHaber("1150", "Clasificación de Residuos", clasifResiduos, 4);
