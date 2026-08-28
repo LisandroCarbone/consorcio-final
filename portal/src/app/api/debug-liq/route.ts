@@ -14,7 +14,7 @@ export async function GET() {
   );
 
   const { rows: emp } = await pool.query(
-    "SELECT cuil, jornada, funcion, adicional_remuneratorio FROM app.empleados WHERE cuil = $1",
+    "SELECT cuil, jornada, funcion FROM app.empleados WHERE cuil = $1",
     [cuil]
   );
 
