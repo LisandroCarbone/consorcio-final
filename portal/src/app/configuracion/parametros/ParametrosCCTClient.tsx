@@ -238,7 +238,7 @@ export function ParametrosCCTClient({
                 </div>
               </div>
               <div>
-                <label className="label">Art.19bis (fijo mensual)</label>
+                <label className="label">FATERYH contribución solidaria a obras sociales (Art. 19 bis)</label>
                 <MaskedInput preset="money" name="fateryh_art19bis" required placeholder="145272"
                   className="input text-sm" defaultValue={formDefaults?.fateryh_art19bis} />
                 <p className="text-[10px] text-gray-400 mt-0.5">Por empleado permanente. ×1.5 en SAC.</p>

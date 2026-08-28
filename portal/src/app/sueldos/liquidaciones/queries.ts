@@ -9,7 +9,7 @@ export async function getLiquidacionDetalle(id: number) {
        e.cuil, e.nombre AS empleado_nombre, e.funcion, e.jornada,
        e.fecha_ingreso::text AS fecha_ingreso,
        DATE_PART('year', AGE(l.periodo, e.fecha_ingreso))::int AS antiguedad_anios,
-       e.obra_social, e.cbu, e.banco, e.legajo,
+       e.obra_social, e.cbu, e.banco, e.legajo, e.email, e.whatsapp,
        c.nombre AS consorcio_nombre, c.cuit AS consorcio_cuit,
        c.direccion AS consorcio_direccion,
        c.categoria_edificio AS consorcio_categoria,
@@ -79,5 +79,30 @@ export async function getUltimoDepositoAportes(consorcioCuit: string, reciboPeri
      LIMIT 1`,
     params
   );
-  return rows.length > 0 ? rows[0] : null;
+  if (rows.length === 0) return null;
+  const row = rows[0];
+  row.banco = inferBancoFromArchivo(row.archivo_nombre);
+  return row;
+}
+
+const BANCOS_CONOCIDOS = [
+  "Galicia", "Santander", "BBVA", "Nación", "Provincia", "Ciudad",
+  "Macro", "ICBC", "HSBC", "Credicoop", "Comafi", "Patagonia",
+  "Supervielle", "Hipotecario", "Itaú", "Piano",
+];
+
+function inferBancoFromArchivo(archivoNombre: string | null | undefined): string | null {
+  if (!archivoNombre) return null;
+  const normalizado = archivoNombre
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  for (const banco of BANCOS_CONOCIDOS) {
+    const bancoNormalizado = banco
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase();
+    if (normalizado.includes(bancoNormalizado)) return banco;
+  }
+  return null;
 }
