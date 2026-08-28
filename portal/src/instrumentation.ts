@@ -113,6 +113,10 @@ export async function register() {
         "ALTER TABLE app.liquidaciones_sueldo ADD COLUMN IF NOT EXISTS empleado_id INTEGER"
       );
 
+      // Make old empleado_cuil columns nullable (code no longer populates them)
+      await pool.query("ALTER TABLE app.novedades_sueldo ALTER COLUMN empleado_cuil DROP NOT NULL");
+      await pool.query("ALTER TABLE app.liquidaciones_sueldo ALTER COLUMN empleado_cuil DROP NOT NULL");
+
       await pool.query(`
         UPDATE app.novedades_sueldo n
         SET empleado_id = e.id

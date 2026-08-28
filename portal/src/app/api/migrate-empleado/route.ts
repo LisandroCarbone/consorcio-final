@@ -55,9 +55,11 @@ export async function GET() {
     `);
     log.push("OK");
 
-    log.push("Step 5: ADD empleado_id to child tables");
+    log.push("Step 5: ADD empleado_id to child tables + make empleado_cuil nullable");
     await pool.query("ALTER TABLE app.novedades_sueldo ADD COLUMN IF NOT EXISTS empleado_id INTEGER");
     await pool.query("ALTER TABLE app.liquidaciones_sueldo ADD COLUMN IF NOT EXISTS empleado_id INTEGER");
+    await pool.query("ALTER TABLE app.novedades_sueldo ALTER COLUMN empleado_cuil DROP NOT NULL");
+    await pool.query("ALTER TABLE app.liquidaciones_sueldo ALTER COLUMN empleado_cuil DROP NOT NULL");
     log.push("OK");
 
     log.push("Step 6: Backfill empleado_id");
