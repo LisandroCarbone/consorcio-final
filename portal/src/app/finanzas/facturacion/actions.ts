@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { emitirFacturaC } from "@/lib/arca";
+import { logAudit } from "@/lib/audit";
 
 export async function emitirFacturaAction(params: {
   cuitConsorcio: string;
@@ -18,6 +19,13 @@ export async function emitirFacturaAction(params: {
   try {
     const res = await emitirFacturaC(params);
     revalidatePath("/finanzas/facturacion");
+    logAudit(
+      "create",
+      "factura",
+      params.cuitReceptor,
+      { after: { monto: params.monto, descripcion: params.descripcion } },
+      params.cuitConsorcio
+    );
     return { success: true, ...res };
   } catch (err: any) {
     console.error("Fallo al emitir factura:", err);

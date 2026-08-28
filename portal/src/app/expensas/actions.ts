@@ -4,6 +4,7 @@ import { query, queryOne, pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { runCalculateExpenses, calculateEmployerObligations, round2 } from "@/lib/expenses/engine";
 import { env } from "@/lib/env";
+import { logAudit } from "@/lib/audit";
 
 export async function createPeriodo(formData: FormData): Promise<number | null> {
   const consorcio_cuit = formData.get("consorcio_id") as string;
@@ -28,6 +29,9 @@ export async function createPeriodo(formData: FormData): Promise<number | null> 
   }
 
   revalidatePath("/expensas");
+  if (row?.id) {
+    logAudit("create", "periodo_expensas", row.id, { after: { anio, mes } }, consorcio_cuit);
+  }
   return row?.id ?? null;
 }
 
@@ -112,6 +116,7 @@ export async function addGasto(formData: FormData) {
   }
 
   revalidatePath("/expensas");
+  logAudit("create", "gasto_periodo", periodo_id, { after: { concepto, monto, tipo } });
 }
 
 export async function deleteGasto(gastoId: number, periodoId: number) {
@@ -126,6 +131,7 @@ export async function deleteGasto(gastoId: number, periodoId: number) {
     await query("DELETE FROM app.gastos_periodo WHERE id = $1", [gastoId]);
   }
   revalidatePath("/expensas");
+  logAudit("delete", "gasto_periodo", gastoId, { before: { periodoId } });
 }
 
 // ── Cuotas pendientes ───────────────────────────────────────────────────────
@@ -207,6 +213,7 @@ export async function updateGasto(formData: FormData) {
     ]
   );
   revalidatePath("/expensas");
+  logAudit("update", "gasto_periodo", id, { after: { periodoId } });
 }
 
 export async function updatePeriodoVencimiento(periodoId: number, fechaVencimiento: string | null) {
@@ -258,6 +265,7 @@ export async function deletePeriodo(periodoId: number) {
 
   revalidatePath("/expensas");
   revalidatePath("/finanzas/cuenta-corriente");
+  logAudit("delete", "periodo_expensas", periodoId, { before: periodo });
 }
 
 // ── Previsiones / Provisiones ──────────────────────────────────────────────

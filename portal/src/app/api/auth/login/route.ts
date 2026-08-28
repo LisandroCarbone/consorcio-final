@@ -7,6 +7,7 @@ import {
   recordFailedAttempt,
   validateCredentials,
 } from "@/lib/auth";
+import { logAuditDirect } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,6 +39,10 @@ export async function POST(req: NextRequest) {
 
     if (!isValid) {
       const lockResult = await recordFailedAttempt(ip);
+      logAuditDirect(username.trim(), ip, "login_failed", "auth", null, {
+        success: false,
+        username: username.trim(),
+      });
       if (lockResult.locked) {
         return NextResponse.json(
           {
@@ -57,6 +62,10 @@ export async function POST(req: NextRequest) {
 
     // 4. Create signed session token (30 days validity)
     const token = await createSessionToken(username.trim(), 30);
+    logAuditDirect(username.trim(), ip, "login", "auth", null, {
+      success: true,
+      username: username.trim(),
+    });
 
     // 5. Build response and set secure HttpOnly cookie
     const response = NextResponse.json({ success: true, user: username.trim() });

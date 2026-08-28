@@ -3,6 +3,7 @@
 import { queryOne, query } from "@/lib/db";
 import { generarCSR, encrypt, decrypt } from "@/lib/arca";
 import forge from "node-forge";
+import { logAudit } from "@/lib/audit";
 
 export async function generarCSROnServer(cuit: string, razonSocial: string) {
   try {
@@ -41,6 +42,7 @@ export async function guardarCredenciales(
       [cuit, encryptedCert, encryptedKey, Number(puntoVenta), ambiente]
     );
 
+    logAudit("update", "arca_credentials", cuit, { action: "update", puntoVenta, ambiente });
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || "Error al guardar credenciales" };
@@ -48,6 +50,7 @@ export async function guardarCredenciales(
 }
 
 export async function obtenerDetallesARCA(cuit: string) {
+  logAudit("access", "arca_credentials", cuit, { action: "access" });
   try {
     const row = await queryOne<{ cert_pem: string; punto_venta: number; ambiente: string; updated_at: Date }>(
       "SELECT cert_pem, punto_venta, ambiente, updated_at FROM app.arca_credentials WHERE cuit = $1",
@@ -90,6 +93,7 @@ export async function eliminarCredenciales(cuit: string) {
   try {
     await query("DELETE FROM app.arca_credentials WHERE cuit = $1", [cuit]);
     await query("DELETE FROM app.arca_tokens WHERE cuit = $1", [cuit]);
+    logAudit("delete", "arca_credentials", cuit, {});
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || "Error al eliminar credenciales" };

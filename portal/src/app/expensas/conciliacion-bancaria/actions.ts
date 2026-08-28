@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import * as XLSX from "xlsx";
 import { categorizeBankCharge } from "@/lib/conciliacion/categorizeBankCharge";
 import { runCalculateExpenses } from "@/lib/expenses/engine";
+import { logAudit } from "@/lib/audit";
 
 const BASE_PATH = "/expensas/conciliacion-bancaria";
 const RUBRO_GASTOS_BANCARIOS = 6;
@@ -491,6 +492,7 @@ export async function uploadExtracto(formData: FormData) {
 
   await runAutoMatch(extractoId);
   revalidatePath(BASE_PATH);
+  logAudit("create", "extracto_bancario", extractoId, { after: { movimientos: movimientos.length } }, consorcioCuit);
   return extractoId;
 }
 
@@ -1000,6 +1002,7 @@ export async function aplicarCreditos(extractoId: number) {
   revalidatePath(BASE_PATH);
   revalidatePath("/expensas");
   revalidatePath("/finanzas/cuenta-corriente");
+  logAudit("confirm", "extracto_bancario", extractoId, { after: { pagosAplicados: count } }, extracto.consorcio_cuit);
   return count;
 }
 
@@ -1105,6 +1108,7 @@ export async function aplicarDebitos(extractoId: number): Promise<{ chargesCreat
 
   revalidatePath(BASE_PATH);
   revalidatePath("/expensas");
+  logAudit("confirm", "extracto_bancario", extractoId, { after: { chargesCreated, gastosLinked } }, extracto.consorcio_cuit);
   return { chargesCreated, gastosLinked };
 }
 

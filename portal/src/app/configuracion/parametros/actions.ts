@@ -2,6 +2,7 @@
 
 import { query } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 
 // Converts a human-entered percentage (e.g. "4.5") into a decimal fraction (0.045)
 function pctToDecimal(formData: FormData, field: string): number {
@@ -64,6 +65,7 @@ export async function agregarParametroCCT(formData: FormData) {
   );
 
   revalidatePath("/configuracion/parametros");
+  logAudit("update", "parametro_cct", fecha_desde, { after: { fecha_desde, detraccion, sv_costo_fijo } });
 }
 
 export async function eliminarParametroCCT(id: number) {

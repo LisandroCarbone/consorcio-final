@@ -2,6 +2,7 @@
 
 import { liquidarIndemnizacion } from "@/lib/liquidacion/engine";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 
 export async function accionLiquidarDespido(formData: FormData) {
   const empleadoCuil = String(formData.get("empleado_cuil") || formData.get("empleado_id") || "");
@@ -18,4 +19,5 @@ export async function accionLiquidarDespido(formData: FormData) {
   revalidatePath("/sueldos/empleados");
   revalidatePath("/sueldos/novedades");
   revalidatePath("/sueldos/liquidaciones");
+  logAudit("create", "liquidacion_indemnizacion", empleadoCuil, { after: { fechaEgreso, tipoEgreso } });
 }

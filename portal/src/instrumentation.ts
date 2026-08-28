@@ -16,5 +16,34 @@ export async function register() {
     } catch {
       // Non-fatal — column may already exist or DB not ready yet
     }
+
+    // Auto-migrate: create append-only audit_log table if missing
+    try {
+      const { pool } = await import("@/lib/db");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS app.audit_log (
+          id          BIGSERIAL PRIMARY KEY,
+          timestamp   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          username    TEXT NOT NULL,
+          action      TEXT NOT NULL,
+          entity_type TEXT NOT NULL,
+          entity_id   TEXT NOT NULL DEFAULT '',
+          consorcio_cuit TEXT,
+          details     JSONB NOT NULL DEFAULT '{}',
+          ip_address  INET
+        )
+      `);
+      await pool.query(
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON app.audit_log (entity_type, entity_id)"
+      );
+      await pool.query(
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON app.audit_log (timestamp DESC)"
+      );
+      await pool.query(
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_consorcio ON app.audit_log (consorcio_cuit) WHERE consorcio_cuit IS NOT NULL"
+      );
+    } catch {
+      // Non-fatal — table may already exist or DB not ready yet
+    }
   }
 }

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { runCalculateExpenses } from "@/lib/expenses/engine";
+import { logAudit } from "@/lib/audit";
 
 // Motor de Intereses Real: registrarPago/editarPago/eliminarPago no longer
 // write app.res_cuenta_periodo.estado directly. `estado` (and the whole
@@ -74,6 +75,7 @@ export async function registrarPago(formData: FormData) {
   });
 
   revalidatePath("/finanzas/cuenta-corriente");
+  logAudit("create", "pago", unidad_id, { after: { monto, medio_pago, fecha } }, consorcio_cuit);
 }
 
 export async function editarPago(formData: FormData) {
@@ -134,6 +136,7 @@ export async function editarPago(formData: FormData) {
   });
 
   revalidatePath("/finanzas/cuenta-corriente");
+  logAudit("update", "pago", pagoId, { after: { monto, medio_pago, fecha } });
 }
 
 // Motor de Intereses Real — Phase 6: Rate Management.
@@ -236,6 +239,7 @@ export async function eliminarPago(formData: FormData) {
   });
 
   revalidatePath("/finanzas/cuenta-corriente");
+  logAudit("delete", "pago", pagoId, {});
 }
 
 // Cuenta corriente history redesign — manual (historico) period entries.

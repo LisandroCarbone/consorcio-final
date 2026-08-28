@@ -72,7 +72,7 @@ export async function getUltimoDepositoAportes(consorcioCuit: string, reciboPeri
        AND em.estado_match = 'confirmado'
        AND em.match_tipo = 'gasto'
        AND em.es_credito = false
-       AND gp.descripcion ILIKE '%F. 931%'
+       AND (gp.descripcion ILIKE '%F. 931%' OR gp.descripcion ILIKE '%F.931%' OR gp.descripcion ILIKE '%AFIP%VEP%' OR gp.descripcion ILIKE '%ARCA%931%')
        ${periodoFilter}
      ORDER BY pe.anio DESC, pe.mes DESC, em.fecha DESC
      LIMIT 1`,

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { calcularLiquidacion as engineCalcLiquidacion, calcularPeriodo } from "@/lib/liquidacion/engine";
 import { calculateEmployerObligations } from "@/lib/expenses/engine";
 import { env } from "@/lib/env";
+import { logAudit } from "@/lib/audit";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -510,6 +511,7 @@ export async function confirmarLiquidacion(liquidacionId: number) {
 
   revalidatePath("/sueldos/liquidaciones");
   revalidatePath("/expensas");
+  logAudit("confirm", "liquidacion", liquidacionId, {});
 }
 
 // ─── Calcular todas las liquidaciones de un período ──────────────────────────
@@ -517,6 +519,7 @@ export async function confirmarLiquidacion(liquidacionId: number) {
 export async function calcularLiquidacionesPeriodo(periodo: string) {
   const result = await calcularPeriodo(periodo);
   revalidatePath("/sueldos/liquidaciones");
+  logAudit("create", "liquidacion", null, { after: { periodo, ok: result.ok, errores: result.errores.length } });
   return result;
 }
 

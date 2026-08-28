@@ -2,6 +2,7 @@
 
 import { liquidarSAC } from "@/lib/liquidacion/engine";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit";
 
 export async function accionLiquidarSAC(formData: FormData): Promise<{ error?: string }> {
   const empleadoCuil = String(formData.get("empleado_cuil") || formData.get("empleado_id") || "");
@@ -21,5 +22,6 @@ export async function accionLiquidarSAC(formData: FormData): Promise<{ error?: s
     return { error: msg };
   }
   revalidatePath("/sueldos/sac");
+  logAudit("create", "liquidacion_sac", empleadoCuil, { after: { anio, semestre } });
   return {};
 }
