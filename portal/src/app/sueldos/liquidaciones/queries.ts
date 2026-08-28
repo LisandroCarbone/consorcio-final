@@ -18,10 +18,11 @@ export async function getLiquidacionDetalle(id: number) {
        c.art_pct_variable, c.art_fijo,
        c.sv_costo_fijo, c.sv_cant_cuiles,
        c.pct_cct_suterh, c.pct_cct_fateryh, c.pct_cct_seracarh,
-       c.fateryh_fijo_completa, c.fateryh_fijo_media, c.fateryh_fijo_suplente_hora,
        n.horas_jornada::numeric AS novedad_horas_jornada,
        n.dias_trabajados_suplente::numeric AS novedad_dias_trabajados_suplente,
-       n.suplencia_100_hs::numeric AS novedad_suplencia_100_hs
+       n.suplencia_100_hs::numeric AS novedad_suplencia_100_hs,
+       (SELECT p.fateryh_art19bis::numeric FROM app.parametros_cct p WHERE p.fecha_desde <= l.periodo ORDER BY p.fecha_desde DESC LIMIT 1) AS fateryh_art19bis,
+       (SELECT p.sv_costo_fijo::numeric FROM app.parametros_cct p WHERE p.fecha_desde <= l.periodo ORDER BY p.fecha_desde DESC LIMIT 1) AS parametros_sv_costo_fijo
      FROM app.liquidaciones_sueldo l
      JOIN app.empleados e ON e.cuil = l.empleado_cuil
      JOIN app.consorcios c ON c.cuit = e.consorcio_cuit

@@ -174,43 +174,43 @@ export default async function ReciboPage({
   const netoDesdeConceptos = (sumHaberesCents - sumDescuentosCents) / 100;
   const redondeo           = Math.abs(netoRedondeado - netoDesdeConceptos);
 
-  // Contribuciones patronales — match engine values exactly (Art. 140 LCT / Decreto 407/2026)
-  // base_patronal is the correct base for employer contributions (full-time basic for media jornada)
+  // Contribuciones patronales — match engine: OS uses full-time base, rest uses bruto
   const basePatronal = Number(liq.base_patronal ?? bruto);
+  const baseOS = liq.jornada === "Media" ? basePatronal : bruto;
+  const baseOtras = bruto;
   const pctJubilacion = Number(liq.pct_contrib_jubilacion ?? 0.18);
   const pctObraSocial = Number(liq.pct_contrib_obra_social ?? 0.06);
   const pctART = Number(liq.art_pct_variable ?? 0);
   const artFijo = Number(liq.art_fijo ?? 0);
-  const scvo = Number(liq.sv_costo_fijo ?? 0);
+  const scvo = Number(liq.parametros_sv_costo_fijo ?? liq.sv_costo_fijo ?? 0);
   const pctSuterh = Number(liq.pct_cct_suterh ?? 0.015);
   const pctFateryh = Number(liq.pct_cct_fateryh ?? 0.0475);
   const pctSeracarh = Number(liq.pct_cct_seracarh ?? 0.005);
 
-  // FATERYH (Fijo) — fixed employer contribution, varies by jornada
-  const fateryhFijoCompleta = Number(liq.fateryh_fijo_completa ?? 0);
-  const fateryhFijoSuplenteHora = Number(liq.fateryh_fijo_suplente_hora ?? 0);
+  // FATERYH Art. 19 bis — fixed employer contribution from parametros_cct
+  const fateryhArt19bis = Number(liq.fateryh_art19bis ?? 0);
   let fateryhFijo = 0;
   if (liq.jornada === "Completa") {
-    fateryhFijo = fateryhFijoCompleta;
+    fateryhFijo = fateryhArt19bis;
   } else if (liq.jornada === "Media") {
-    fateryhFijo = fateryhFijoCompleta / 2;
+    fateryhFijo = fateryhArt19bis * 0.5;
   } else if (liq.jornada === "Suplente") {
     const horasJornada = liq.novedad_horas_jornada != null ? Number(liq.novedad_horas_jornada) : 8;
     const diasSuplente = Number(liq.novedad_dias_trabajados_suplente ?? 0);
     const suplencia100Hs = Number(liq.novedad_suplencia_100_hs ?? 0);
     const horasTotalesSuplente = diasSuplente * Math.min(horasJornada, 18) + suplencia100Hs;
-    fateryhFijo = fateryhFijoSuplenteHora * horasTotalesSuplente;
+    fateryhFijo = fateryhArt19bis * (horasTotalesSuplente / 200);
   }
 
   const patronalRows = [
-    { concepto: "Contribución patronal jubilación (SIPA)", alicuota: pctJubilacion, importe: basePatronal * pctJubilacion },
-    { concepto: "Contribución patronal obra social", alicuota: pctObraSocial, importe: basePatronal * pctObraSocial },
-    ...(pctART > 0 || artFijo > 0 ? [{ concepto: "LRT – ART (Riesgos del Trabajo)", alicuota: pctART > 0 ? pctART : null, importe: basePatronal * pctART + artFijo }] : []),
-    ...(scvo > 0 ? [{ concepto: "SCVO (Seguro Colectivo de Vida Obligatorio)", alicuota: null, importe: scvo }] : []),
-    { concepto: "SUTERH (contribución patronal)", alicuota: pctSuterh, importe: basePatronal * pctSuterh },
-    { concepto: "FATERYH (contribución patronal)", alicuota: pctFateryh, importe: basePatronal * pctFateryh },
-    ...(fateryhFijo > 0 ? [{ concepto: "FATERYH (Fijo)", alicuota: null, importe: fateryhFijo }] : []),
-    { concepto: "SERACARH (Servicio Conciliación)", alicuota: pctSeracarh, importe: basePatronal * pctSeracarh },
+    { concepto: "Contribución patronal jubilación (SIPA)", alicuota: pctJubilacion, base: baseOtras, importe: baseOtras * pctJubilacion },
+    { concepto: "Contribución patronal obra social", alicuota: pctObraSocial, base: baseOS, importe: baseOS * pctObraSocial },
+    ...(pctART > 0 || artFijo > 0 ? [{ concepto: "LRT – ART (Riesgos del Trabajo)", alicuota: pctART > 0 ? pctART : null, base: baseOtras, importe: baseOtras * pctART + artFijo }] : []),
+    ...(scvo > 0 ? [{ concepto: "SCVO (Seguro Colectivo de Vida Obligatorio)", alicuota: null, base: 0, importe: scvo }] : []),
+    { concepto: "SUTERH (contribución patronal)", alicuota: pctSuterh, base: baseOtras, importe: baseOtras * pctSuterh },
+    { concepto: "FATERYH (contribución patronal)", alicuota: pctFateryh, base: baseOtras, importe: baseOtras * pctFateryh },
+    ...(fateryhFijo > 0 ? [{ concepto: "FATERYH contribución solidaria a obras sociales (Art. 19 bis)", alicuota: null, base: 0, importe: fateryhFijo }] : []),
+    { concepto: "SERACARH (Servicio Conciliación)", alicuota: pctSeracarh, base: baseOtras, importe: baseOtras * pctSeracarh },
   ];
   const totalPatronal = Number(liq.total_aportes_patronales) || patronalRows.reduce((s, r) => s + r.importe, 0);
   const costoTotal = bruto + totalPatronal;
@@ -220,10 +220,10 @@ export default async function ReciboPage({
   const pieSlices = [
     { label: "Neto empleado", value: neto, color: PIE_COLORS[0] },
     { label: "Descuentos empleado", value: totalDesc, color: PIE_COLORS[1] },
-    { label: "Jubilación patronal", value: basePatronal * pctJubilacion, color: PIE_COLORS[2] },
-    { label: "Obra Social patronal", value: basePatronal * pctObraSocial, color: PIE_COLORS[3] },
-    { label: "ART / SCVO", value: basePatronal * pctART + artFijo + scvo, color: PIE_COLORS[4] },
-    { label: "Sindical/Convencional", value: basePatronal * (pctSuterh + pctFateryh + pctSeracarh), color: PIE_COLORS[5] },
+    { label: "Jubilación patronal", value: baseOtras * pctJubilacion, color: PIE_COLORS[2] },
+    { label: "Obra Social patronal", value: baseOS * pctObraSocial, color: PIE_COLORS[3] },
+    { label: "ART / SCVO", value: baseOtras * pctART + artFijo + scvo, color: PIE_COLORS[4] },
+    { label: "Sindical/Convencional", value: baseOtras * (pctSuterh + pctFateryh + pctSeracarh), color: PIE_COLORS[5] },
   ];
 
   const periodoDate = new Date(liq.periodo);
@@ -400,7 +400,7 @@ export default async function ReciboPage({
                     {r.alicuota != null ? fmtPct(r.alicuota) : "Fijo"}
                   </td>
                   <td className="p-1.5 print:p-0.5 text-right text-gray-500">
-                    {r.alicuota != null ? `$${fmt(bruto)}` : "—"}
+                    {r.alicuota != null ? `$${fmt(r.base)}` : "—"}
                   </td>
                   <td className="p-1.5 print:p-0.5 text-right font-medium text-gray-900">${fmt(r.importe)}</td>
                 </tr>

@@ -167,25 +167,30 @@ function calcDescuentosEmpleado(
 
 function calcContribPatronal(
   base: number,
+  baseOS: number,
   cons: Consorcio,
   jornada: string = "Completa",
-  horasTotalesSuplente: number = 0
+  horasTotalesSuplente: number = 0,
+  fateryh_art19bis: number = 0,
+  scvoOverride: number | null = null
 ): ContribPatronal {
   const jubilacion  = base * Number(cons.pct_contrib_jubilacion ?? 0.18);
-  const obraSocial  = base * Number(cons.pct_contrib_obra_social ?? 0.06);
+  const obraSocial  = baseOS * Number(cons.pct_contrib_obra_social ?? 0.06);
   const suterh      = base * Number(cons.pct_cct_suterh ?? 0.015);
   const fateryh     = base * Number(cons.pct_cct_fateryh ?? 0.0475);
   const seracarh    = base * Number(cons.pct_cct_seracarh ?? 0.005);
   const art         = base * Number(cons.art_pct_variable ?? 0);
-  const scvo        = cons.sv_costo_fijo ? Number(cons.sv_costo_fijo) : 0;
+  const scvo        = scvoOverride != null
+    ? scvoOverride
+    : (cons.sv_costo_fijo ? Number(cons.sv_costo_fijo) : 0);
 
   let fateryh_fijo = 0;
   if (jornada === "Completa") {
-    fateryh_fijo = Number(cons.fateryh_fijo_completa ?? 0);
+    fateryh_fijo = fateryh_art19bis;
   } else if (jornada === "Media") {
-    fateryh_fijo = Number(cons.fateryh_fijo_completa ?? 0) / 2;
+    fateryh_fijo = fateryh_art19bis * 0.5;
   } else if (jornada === "Suplente") {
-    fateryh_fijo = Number(cons.fateryh_fijo_suplente_hora ?? 0) * horasTotalesSuplente;
+    fateryh_fijo = fateryh_art19bis * (horasTotalesSuplente / 200);
   }
 
   const total = jubilacion + obraSocial + suterh + fateryh + fateryh_fijo + seracarh + art + scvo;
@@ -223,8 +228,8 @@ export async function calcularLiquidacion(
 
   const emp = empRows.rows[0];
 
-  // Load consorcio, escalas and custom period adicionales in parallel
-  const [consRow, escalaRows, customAdicionalesRows] = await Promise.all([
+  // Load consorcio, escalas, custom period adicionales and parametros_cct in parallel
+  const [consRow, escalaRows, customAdicionalesRows, parametrosCctRow] = await Promise.all([
     pool.query<Consorcio>(
       `SELECT * FROM app.consorcios WHERE cuit = $1`,
       [emp.consorcio_cuit]
@@ -240,6 +245,13 @@ export async function calcularLiquidacion(
        WHERE periodo = $1 AND consorcio_cuit = $2`,
       [periodo, emp.consorcio_cuit]
     ),
+    pool.query<{ fateryh_art19bis: string; sv_costo_fijo: string }>(
+      `SELECT fateryh_art19bis::numeric, sv_costo_fijo::numeric
+       FROM app.parametros_cct
+       WHERE fecha_desde <= $1
+       ORDER BY fecha_desde DESC LIMIT 1`,
+      [periodo]
+    ),
   ]);
 
   if (consRow.rows.length === 0) {
@@ -247,6 +259,10 @@ export async function calcularLiquidacion(
   }
 
   const cons = consRow.rows[0];
+  const fateryh_art19bis = Number(parametrosCctRow.rows[0]?.fateryh_art19bis ?? 0);
+  const scvoFromParametros = parametrosCctRow.rows[0]?.sv_costo_fijo != null
+    ? Number(parametrosCctRow.rows[0].sv_costo_fijo)
+    : null;
 
   // Build lookup maps: by concepto_key (stable) and by concepto name (legacy fallback)
   const adicionales: Record<string, number> = {};
@@ -702,9 +718,10 @@ export async function calcularLiquidacion(
   // 21. Contribuciones patronales
   // ---------------------------------------------------------------------------
 
-  let basePatronal = totalRemunerativoFinal;
+  const basePatronal = totalRemunerativoFinal;
+  let basePatronalOS = totalRemunerativoFinal;
   if (emp.jornada === "Media") {
-    // For media jornada, employer contributions are calculated on the full-time basic
+    // Only the obra social contribution uses the full-time equivalent basic for media jornada
     const catKey2 = `cat_${emp.categoria_edificio}` as "cat_1" | "cat_2" | "cat_3" | "cat_4";
     let funcionCompleta: string;
     if (emp.funcion.includes("No Permanente Sin vivienda")) {
@@ -714,9 +731,17 @@ export async function calcularLiquidacion(
     } else {
       funcionCompleta = emp.funcion.replace(/No Permanente/i, "Permanente");
     }
-    basePatronal = escalaMap[funcionCompleta]?.[catKey2] ?? totalRemunerativoFinal;
+    basePatronalOS = escalaMap[funcionCompleta]?.[catKey2] ?? totalRemunerativoFinal;
   }
-  const patron = calcContribPatronal(basePatronal, cons, emp.jornada, horasTotalesSuplente);
+  const patron = calcContribPatronal(
+    basePatronal,
+    basePatronalOS,
+    cons,
+    emp.jornada,
+    horasTotalesSuplente,
+    fateryh_art19bis,
+    scvoFromParametros
+  );
   const totalPatronal = patron.total;
 
   // ---------------------------------------------------------------------------
@@ -1006,7 +1031,7 @@ export async function calcularSACPreview(
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = desc;
   const totalDescuentos = desc.total;
 
-  let basePatronalSAC = totalBruto;
+  let basePatronalSACOS = totalBruto;
   if (emp.jornada === "Media") {
     let funcionCompleta: string;
     if (emp.funcion.includes("No Permanente Sin vivienda")) {
@@ -1025,10 +1050,25 @@ export async function calcularSACPreview(
     );
     if (escalaCompletaRow.rows.length > 0) {
       const basicoCompleto = Number(escalaCompletaRow.rows[0][catKey]);
-      basePatronalSAC = (basicoCompleto / 2) * (mesesTrabajados / mesesTotales) + bonificacionSAC;
+      basePatronalSACOS = (basicoCompleto / 2) * (mesesTrabajados / mesesTotales) + bonificacionSAC;
     }
   }
-  const totalPatronal = cons ? calcContribPatronal(basePatronalSAC, cons, emp.jornada).total : 0;
+  let fateryhArt19bisSAC = 0;
+  let scvoSAC: number | null = null;
+  if (cons) {
+    const parametrosCctRow = await pool.query<{ fateryh_art19bis: string; sv_costo_fijo: string }>(
+      `SELECT fateryh_art19bis::numeric, sv_costo_fijo::numeric
+       FROM app.parametros_cct
+       WHERE fecha_desde <= $1
+       ORDER BY fecha_desde DESC LIMIT 1`,
+      [periodoSAC]
+    );
+    fateryhArt19bisSAC = Number(parametrosCctRow.rows[0]?.fateryh_art19bis ?? 0);
+    scvoSAC = parametrosCctRow.rows[0]?.sv_costo_fijo != null ? Number(parametrosCctRow.rows[0].sv_costo_fijo) : null;
+  }
+  const totalPatronal = cons
+    ? calcContribPatronal(totalBruto, basePatronalSACOS, cons, emp.jornada, 0, fateryhArt19bisSAC, scvoSAC).total
+    : 0;
 
   return {
     empleadoNombre: emp.nombre,
