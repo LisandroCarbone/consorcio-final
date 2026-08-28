@@ -13,6 +13,7 @@ const TIPOS_EGRESO = [
   { value: "mutuo_acuerdo", label: "Mutuo acuerdo (LCT 241)" },
   { value: "muerte", label: "Fallecimiento" },
   { value: "jubilacion", label: "Jubilación" },
+  { value: "baja_otras_causales", label: "Baja otras causales" },
 ];
 
 export default async function DespidoPage({

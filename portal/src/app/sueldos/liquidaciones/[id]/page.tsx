@@ -605,9 +605,9 @@ export default async function ReciboPage({
         <div className="border-2 border-gray-800 border-t-0 grid grid-cols-2 divide-x divide-gray-300">
           {/* Firma empleador */}
           <div className="p-3 print:px-1 print:py-0.5 text-center">
-            <div className="h-16 print:h-4 flex items-end justify-center pb-1 print:pb-0">
+            <div className="h-16 print:h-10 flex items-end justify-center pb-1 print:pb-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/firma-empleador.png" alt="" className="print:!h-4" style={{ height: 60, maxWidth: 240, objectFit: "contain" }} />
+              <img src="/firma-empleador.png" alt="" className="print:!h-8" style={{ height: 60, maxWidth: 240, objectFit: "contain" }} />
             </div>
             <div className="border-t border-gray-400 pt-1 print:pt-0 text-xs print:text-[7px] print:leading-tight">
               <p className="font-semibold text-gray-800">{liq.consorcio_nombre}</p>
@@ -619,7 +619,7 @@ export default async function ReciboPage({
 
           {/* Firma empleado */}
           <div className="p-3 print:px-1 print:py-0.5 text-center">
-            <div className="h-16 print:h-4" />
+            <div className="h-16 print:h-10" />
             <div className="border-t border-gray-400 pt-1 print:pt-0 text-xs print:text-[7px] print:leading-tight">
               <p className="font-semibold text-gray-800">{liq.empleado_nombre}</p>
               <p className="text-gray-500">CUIL: {formatCuit(liq.cuil)}</p>
