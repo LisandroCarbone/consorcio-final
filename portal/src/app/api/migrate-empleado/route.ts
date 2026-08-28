@@ -20,6 +20,11 @@ export async function GET() {
     `);
     log.push("Current PK: " + JSON.stringify(pkCheck.rows));
 
+    log.push("Step 2b: Drop old FKs referencing empleados(cuil)");
+    await pool.query("ALTER TABLE app.liquidaciones_sueldo DROP CONSTRAINT IF EXISTS liquidaciones_sueldo_empleado_cuil_fkey");
+    await pool.query("ALTER TABLE app.novedades_sueldo DROP CONSTRAINT IF EXISTS novedades_sueldo_empleado_cuil_fkey");
+    log.push("OK");
+
     log.push("Step 3: Switch PK to id (if cuil-based)");
     await pool.query(`
       DO $$

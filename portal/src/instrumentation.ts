@@ -66,6 +66,10 @@ export async function register() {
         "ALTER TABLE app.empleados ADD COLUMN IF NOT EXISTS id SERIAL"
       );
 
+      // Drop old FKs that reference empleados(cuil) before changing PK
+      await pool.query("ALTER TABLE app.liquidaciones_sueldo DROP CONSTRAINT IF EXISTS liquidaciones_sueldo_empleado_cuil_fkey");
+      await pool.query("ALTER TABLE app.novedades_sueldo DROP CONSTRAINT IF EXISTS novedades_sueldo_empleado_cuil_fkey");
+
       await pool.query(`
         DO $$
         BEGIN
