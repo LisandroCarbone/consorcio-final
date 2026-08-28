@@ -82,7 +82,7 @@ export default function NovedadesForm({ empleado, periodo, novedades }: Props) {
       {open && (
         <form onSubmit={handleSubmit} className="mt-4 border-t pt-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {empleado.jornada === "Suplente" && (
+            {(empleado.jornada === "Suplente" || /suplente/i.test(empleado.funcion)) && (
               <>
                 <Field label="Días trabajados" name="dias_trabajados_suplente" defaultValue={def("dias_trabajados_suplente")} step="0.5" max={31} />
                 <Field label="Hs por jornada (máx. 18 — Art. 7 inc. P)" name="horas_jornada" defaultValue={def("horas_jornada", 8)} step="0.5" max={18} />
