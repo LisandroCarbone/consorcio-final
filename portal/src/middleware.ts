@@ -31,6 +31,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // TEMP debug
+  if (pathname === "/api/debug-liq") return NextResponse.next();
+
   // 2. Allow n8n webhook for SUTERH escalas only with a valid x-api-key
   if (pathname === "/api/sueldos/escalas") {
     if (isValidApiKey(request.headers.get("x-api-key"))) {
