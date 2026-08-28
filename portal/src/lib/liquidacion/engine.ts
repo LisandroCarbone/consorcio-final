@@ -488,7 +488,7 @@ export async function calcularLiquidacion(
 
   const esJornalizado = emp.funcion.toLowerCase().includes("jornalizado");
   const tieneViaticos =
-    esEncargado && !emp.tiene_vivienda && !esJornalizado &&
+    !emp.tiene_vivienda && !esJornalizado && !esSuplente &&
     (emp.jornada === "Completa" || emp.jornada === "Media");
   const adicionalViaticos = tieneViaticos
     ? adic("adicional_viaticos", 0)
@@ -880,13 +880,13 @@ export async function calcularLiquidacion(
         liquidacionId,
         "2000",
         "haber",
-        "Días No Trabajados",
+        novN.dias_no_trabajados > 0 ? `Días No Trabajados (${novN.dias_no_trabajados} días)` : "Días No Trabajados",
         descuentoDias, // negative value
         19,
       ]);
     }
 
-    addHaber("2050", "Licencia por Enfermedad", licenciaEnfermedad, 20);
+    addHaber("2050", novN.licencia_enfermedad > 0 ? `Licencia por Enfermedad (${novN.licencia_enfermedad} días)` : "Licencia por Enfermedad", licenciaEnfermedad, 20);
     addHaber("2100", novN.plus_vacaciones_dias > 0 ? `Plus Vacacional (${novN.plus_vacaciones_dias} días)` : "Plus Vacacional", plusVacacional, 21);
     addHaber("2200", "Diferencia SAC", diferenciaSAC, 22);
 
