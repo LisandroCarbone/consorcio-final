@@ -17,6 +17,16 @@ export async function register() {
       // Non-fatal — column may already exist or DB not ready yet
     }
 
+    // Auto-migrate: add fecha_pago column if missing
+    try {
+      const { pool } = await import("@/lib/db");
+      await pool.query(
+        "ALTER TABLE app.liquidaciones_sueldo ADD COLUMN IF NOT EXISTS fecha_pago DATE"
+      );
+    } catch {
+      // Non-fatal
+    }
+
     // Auto-migrate: create append-only audit_log table if missing
     try {
       const { pool } = await import("@/lib/db");
