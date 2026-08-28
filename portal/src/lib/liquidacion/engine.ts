@@ -801,7 +801,7 @@ export async function calcularLiquidacion(
         safe(totalRemunerativoFinal),
         safe(totalDescuentos),
         safe(totalPatronal),
-        safe(basePatronal),
+        safe(basePatronalOS),
         safe(netoAPagar),
         estadoLiq,
       ]
