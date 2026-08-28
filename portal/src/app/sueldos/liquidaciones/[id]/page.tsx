@@ -153,7 +153,7 @@ export default async function ReciboPage({
     // Percentage-based descuentos
     const pctMap: Record<string, number> = {
       jubilación: 11, pami: 3, "obra social": 3,
-      suterh: 2, "caja protección": 1, fateryh: 1, "seguro vitalicio": 0.75,
+      suterh: 2, "caja protección": 1, fateryh: 1, "seguro colectivo de vida": 0.75,
     };
     for (const [key, pct] of Object.entries(pctMap)) {
       if (c.includes(key) && !c.includes("diferencia")) return { unidad: `${pct}%`, valorUnit: "—" };

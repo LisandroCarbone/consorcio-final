@@ -24,9 +24,9 @@ export async function getLiquidacionDetalle(id: number) {
        (SELECT p.fateryh_art19bis::numeric FROM app.parametros_cct p WHERE p.fecha_desde <= l.periodo ORDER BY p.fecha_desde DESC LIMIT 1) AS fateryh_art19bis,
        (SELECT p.sv_costo_fijo::numeric FROM app.parametros_cct p WHERE p.fecha_desde <= l.periodo ORDER BY p.fecha_desde DESC LIMIT 1) AS parametros_sv_costo_fijo
      FROM app.liquidaciones_sueldo l
-     JOIN app.empleados e ON e.cuil = l.empleado_cuil
+     JOIN app.empleados e ON e.id = l.empleado_id
      JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
-     LEFT JOIN app.novedades_sueldo n ON n.empleado_cuil = e.cuil AND n.periodo = l.periodo
+     LEFT JOIN app.novedades_sueldo n ON n.empleado_id = e.id AND n.periodo = l.periodo
      WHERE l.id = $1`,
     [id]
   );

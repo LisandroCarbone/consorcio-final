@@ -4,11 +4,11 @@ import { useState } from "react";
 import { accionLiquidarSAC } from "./actions";
 
 export function ConfirmarSACButton({
-  empleadoCuil,
+  empleadoId,
   anio,
   semestre,
 }: {
-  empleadoCuil: string;
+  empleadoId: number;
   anio: number;
   semestre: number;
 }) {
@@ -18,15 +18,15 @@ export function ConfirmarSACButton({
     e.preventDefault();
     setLoading(true);
     const fd = new FormData();
-    fd.set("empleado_cuil", empleadoCuil);
+    fd.set("empleado_id", String(empleadoId));
     fd.set("anio", String(anio));
     fd.set("semestre", String(semestre));
     const result = await accionLiquidarSAC(fd);
     if (result?.error) {
-      window.location.href = `/sueldos/sac?empleado_cuil=${empleadoCuil}&anio=${anio}&semestre=${semestre}&error=${encodeURIComponent(result.error)}`;
+      window.location.href = `/sueldos/sac?empleado_id=${empleadoId}&anio=${anio}&semestre=${semestre}&error=${encodeURIComponent(result.error)}`;
       return;
     }
-    window.location.href = `/sueldos/sac?empleado_cuil=${empleadoCuil}&anio=${anio}&semestre=${semestre}&liquidado=1`;
+    window.location.href = `/sueldos/sac?empleado_id=${empleadoId}&anio=${anio}&semestre=${semestre}&liquidado=1`;
   }
 
   return (

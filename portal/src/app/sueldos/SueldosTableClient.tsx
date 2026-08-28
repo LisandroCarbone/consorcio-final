@@ -7,6 +7,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import { formatCuit } from "@/lib/format";
 
 export interface EmpleadoRow {
+  id: number;
   cuil: string;
   nombre: string;
   legajo: string | null;
@@ -129,7 +130,7 @@ const columns: ColumnDef<EmpleadoRow>[] = [
     cell: ({ row }) => (
       <div className="text-right pr-4">
         <Link
-          href={`/sueldos/empleados/${row.original.cuil}/editar`}
+          href={`/sueldos/empleados/${row.original.id}/editar`}
           className="text-brand-600 hover:underline text-xs font-semibold"
         >
           Editar

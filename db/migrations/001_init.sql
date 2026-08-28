@@ -138,10 +138,14 @@ CREATE INDEX IF NOT EXISTS idx_ocupantes_unidad_activo ON app.ocupantes(unidad_i
 
 -- ============================================================
 -- EMPLEADOS (modelo Nacho — normalizado, soporta egresos)
--- PK = CUIL para alinear con AFIP/Libro de Sueldos (de Lisandro)
+-- PK = id SERIAL (surrogate). CUIL is NOT the PK: the same person can be
+-- employed by multiple consorcios simultaneously (see migration 021).
+-- UNIQUE(cuil, consorcio_cuit) enforces "no duplicate employment within
+-- the same consorcio" while allowing the same CUIL across consorcios.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS app.empleados (
-    cuil                    VARCHAR(20) PRIMARY KEY,
+    id                      SERIAL PRIMARY KEY,
+    cuil                    VARCHAR(20) NOT NULL,
     nombre                  VARCHAR(255) NOT NULL,
     legajo                  VARCHAR(20),
     fecha_nacimiento        DATE,
@@ -177,7 +181,8 @@ CREATE TABLE IF NOT EXISTS app.empleados (
         CHECK (estado IN ('activo','inactivo')),
 
     created_at              TIMESTAMPTZ DEFAULT now() NOT NULL,
-    updated_at              TIMESTAMPTZ DEFAULT now() NOT NULL
+    updated_at              TIMESTAMPTZ DEFAULT now() NOT NULL,
+    UNIQUE (cuil, consorcio_cuit)
 );
 
 DROP TRIGGER IF EXISTS trg_empleados_updated_at ON app.empleados;
@@ -218,7 +223,8 @@ CREATE TABLE IF NOT EXISTS app.adicionales_suterh (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS app.novedades_sueldo (
     id                       SERIAL PRIMARY KEY,
-    empleado_cuil            VARCHAR(20) NOT NULL REFERENCES app.empleados(cuil) ON DELETE CASCADE,
+    empleado_id              INTEGER NOT NULL REFERENCES app.empleados(id) ON DELETE CASCADE,
+    empleado_cuil            VARCHAR(20), -- deprecated, kept for rollback (see migration 021)
     periodo                  DATE NOT NULL,
     dias_trabajados_suplente NUMERIC(5,2) DEFAULT 0 NOT NULL,
     horas_jornada            NUMERIC(5,2),
@@ -236,7 +242,7 @@ CREATE TABLE IF NOT EXISTS app.novedades_sueldo (
     observaciones            TEXT,
     created_at               TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at               TIMESTAMPTZ DEFAULT now() NOT NULL,
-    UNIQUE (empleado_cuil, periodo)
+    UNIQUE (empleado_id, periodo)
 );
 
 DROP TRIGGER IF EXISTS trg_novedades_updated_at ON app.novedades_sueldo;
@@ -248,7 +254,8 @@ CREATE TRIGGER trg_novedades_updated_at BEFORE UPDATE ON app.novedades_sueldo
 -- ============================================================
 CREATE TABLE IF NOT EXISTS app.liquidaciones_sueldo (
     id                          SERIAL PRIMARY KEY,
-    empleado_cuil               VARCHAR(20) NOT NULL REFERENCES app.empleados(cuil) ON DELETE CASCADE,
+    empleado_id                 INTEGER NOT NULL REFERENCES app.empleados(id) ON DELETE CASCADE,
+    empleado_cuil                VARCHAR(20), -- deprecated, kept for rollback (see migration 021)
     periodo                     DATE NOT NULL,
     tipo                        VARCHAR(20) NOT NULL DEFAULT 'mensual'
         CHECK (tipo IN ('mensual','sac_1','sac_2','indemnizacion')),
@@ -267,14 +274,14 @@ CREATE TABLE IF NOT EXISTS app.liquidaciones_sueldo (
 
     created_at                  TIMESTAMPTZ DEFAULT now() NOT NULL,
     updated_at                  TIMESTAMPTZ DEFAULT now() NOT NULL,
-    UNIQUE (empleado_cuil, periodo, tipo)
+    UNIQUE (empleado_id, periodo, tipo)
 );
 
 DROP TRIGGER IF EXISTS trg_liquidaciones_updated_at ON app.liquidaciones_sueldo;
 CREATE TRIGGER trg_liquidaciones_updated_at BEFORE UPDATE ON app.liquidaciones_sueldo
     FOR EACH ROW EXECUTE FUNCTION app.set_updated_at();
 
-CREATE INDEX IF NOT EXISTS idx_liquidaciones_empleado ON app.liquidaciones_sueldo(empleado_cuil);
+CREATE INDEX IF NOT EXISTS idx_liquidaciones_empleado ON app.liquidaciones_sueldo(empleado_id);
 CREATE INDEX IF NOT EXISTS idx_liquidaciones_periodo ON app.liquidaciones_sueldo(periodo);
 
 -- ============================================================

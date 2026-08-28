@@ -451,9 +451,9 @@ export async function regenerarGastosFijos(periodoId: number) {
     // 2. Fetch confirmed liquidaciones of this period
     const periodDate = `${anio}-${String(mes).padStart(2, "0")}-01`;
     const currentLiqs = await client.query(
-      `SELECT l.id, l.empleado_cuil, l.tipo, l.neto_a_pagar::numeric AS neto_a_pagar, e.nombre
+      `SELECT l.id, l.empleado_id, e.cuil AS empleado_cuil, l.tipo, l.neto_a_pagar::numeric AS neto_a_pagar, e.nombre
        FROM app.liquidaciones_sueldo l
-       JOIN app.empleados e ON e.cuil = l.empleado_cuil
+       JOIN app.empleados e ON e.id = l.empleado_id
        WHERE e.consorcio_cuit = $1 AND l.periodo = $2 AND l.estado = 'confirmada'`,
       [consorcio_cuit, periodDate]
     );
@@ -482,18 +482,18 @@ export async function regenerarGastosFijos(periodoId: number) {
     const prevPeriodStr = `${prevAnio}-${String(prevMes).padStart(2, "0")}-01`;
 
     let obligLiqs = await client.query(
-      `SELECT l.id, l.empleado_cuil, l.remuneracion_bruta::numeric AS remuneracion_bruta, e.funcion, e.jornada
+      `SELECT l.id, l.empleado_id, l.remuneracion_bruta::numeric AS remuneracion_bruta, e.funcion, e.jornada
        FROM app.liquidaciones_sueldo l
-       JOIN app.empleados e ON e.cuil = l.empleado_cuil
+       JOIN app.empleados e ON e.id = l.empleado_id
        WHERE e.consorcio_cuit = $1 AND l.periodo = $2 AND l.estado = 'confirmada' AND l.tipo = 'mensual'`,
       [consorcio_cuit, prevPeriodStr]
     );
     const usedPeriodStr = obligLiqs.rows.length > 0 ? prevPeriodStr : periodDate;
     if (obligLiqs.rows.length === 0) {
       obligLiqs = await client.query(
-        `SELECT l.id, l.empleado_cuil, l.remuneracion_bruta::numeric AS remuneracion_bruta, e.funcion, e.jornada
+        `SELECT l.id, l.empleado_id, l.remuneracion_bruta::numeric AS remuneracion_bruta, e.funcion, e.jornada
          FROM app.liquidaciones_sueldo l
-         JOIN app.empleados e ON e.cuil = l.empleado_cuil
+         JOIN app.empleados e ON e.id = l.empleado_id
          WHERE e.consorcio_cuit = $1 AND l.periodo = $2 AND l.estado = 'confirmada' AND l.tipo = 'mensual'`,
         [consorcio_cuit, periodDate]
       );
@@ -554,14 +554,14 @@ export async function regenerarGastosFijos(periodoId: number) {
     if (isSacPeriod) {
       const sacTipo = usedMes === 6 ? "sac_1" : "sac_2";
       const sacLiqs = await client.query(
-        `SELECT l.empleado_cuil, l.remuneracion_bruta::numeric AS remuneracion_bruta
+        `SELECT l.empleado_id, l.remuneracion_bruta::numeric AS remuneracion_bruta
          FROM app.liquidaciones_sueldo l
-         JOIN app.empleados e ON e.cuil = l.empleado_cuil
+         JOIN app.empleados e ON e.id = l.empleado_id
          WHERE e.consorcio_cuit = $1 AND l.periodo = $2 AND l.estado = 'confirmada' AND l.tipo = $3`,
         [consorcio_cuit, usedPeriodStr, sacTipo]
       );
       for (const s of sacLiqs.rows) {
-        sacBrutoMap.set(s.empleado_cuil, Number(s.remuneracion_bruta || 0));
+        sacBrutoMap.set(s.empleado_id, Number(s.remuneracion_bruta || 0));
       }
     }
 
@@ -571,11 +571,11 @@ export async function regenerarGastosFijos(periodoId: number) {
 
     for (const liq of obligLiqs.rows) {
       const brutoMensual = Number(liq.remuneracion_bruta || 0);
-      const brutoSac = sacBrutoMap.get(liq.empleado_cuil) || 0;
+      const brutoSac = sacBrutoMap.get(liq.empleado_id) || 0;
       const bruto = brutoMensual + brutoSac;
       const novRes = await client.query(
-        "SELECT dias_trabajados_suplente::numeric, horas_jornada::numeric FROM app.novedades_sueldo WHERE empleado_cuil = $1 AND periodo = $2 LIMIT 1",
-        [liq.empleado_cuil, usedPeriodStr]
+        "SELECT dias_trabajados_suplente::numeric, horas_jornada::numeric FROM app.novedades_sueldo WHERE empleado_id = $1 AND periodo = $2 LIMIT 1",
+        [liq.empleado_id, usedPeriodStr]
       );
       const diasSuplente = novRes.rows.length > 0 ? Number(novRes.rows[0].dias_trabajados_suplente) : 30;
       const horasJornada = novRes.rows.length > 0 && novRes.rows[0].horas_jornada != null ? Number(novRes.rows[0].horas_jornada) : 8;

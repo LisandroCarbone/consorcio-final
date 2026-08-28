@@ -48,8 +48,8 @@ async function crearEmpleado(formData: FormData): Promise<{ error?: string }> {
       ]
     );
   } catch (err: unknown) {
-    const pg = err as { code?: string };
-    if (pg.code === '23505') {
+    const pg = err as { code?: string; constraint?: string };
+    if (pg.code === '23505' && pg.constraint === 'uq_empleados_cuil_consorcio') {
       return { error: 'cuil_duplicado' };
     }
     throw err;
@@ -82,7 +82,7 @@ export default async function NuevoEmpleadoPage({
 
       {error === 'cuil_duplicado' && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-          Ya existe un empleado con ese CUIL.
+          Este CUIL ya existe en este consorcio.
         </div>
       )}
 

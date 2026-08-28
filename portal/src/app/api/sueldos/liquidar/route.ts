@@ -9,14 +9,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { periodo?: string; empleadoCuil?: string };
+  let body: { periodo?: string; empleadoId?: number };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { periodo, empleadoCuil } = body;
+  const { periodo, empleadoId } = body;
 
   if (!periodo || typeof periodo !== "string") {
     return NextResponse.json(
@@ -37,17 +37,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (empleadoCuil !== undefined) {
+  if (empleadoId !== undefined) {
     // Single employee
-    if (typeof empleadoCuil !== "string" || !empleadoCuil.trim()) {
+    if (typeof empleadoId !== "number" || !Number.isFinite(empleadoId) || empleadoId <= 0) {
       return NextResponse.json(
-        { error: "empleadoCuil debe ser un string no vacío" },
+        { error: "empleadoId debe ser un número entero positivo" },
         { status: 400 }
       );
     }
 
     try {
-      await calcularLiquidacion(empleadoCuil, periodoNorm);
+      await calcularLiquidacion(empleadoId, periodoNorm);
       return NextResponse.json({ ok: 1, errores: [] });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

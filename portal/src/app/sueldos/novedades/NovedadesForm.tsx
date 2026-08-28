@@ -5,6 +5,7 @@ import { upsertNovedades } from "../actions";
 
 interface Props {
   empleado: {
+    id: number;
     cuil: string;
     nombre: string;
     funcion: string;
@@ -31,7 +32,7 @@ export default function NovedadesForm({ empleado, periodo, novedades }: Props) {
     const n = (k: string) => Number(fd.get(k) ?? 0);
     try {
       await upsertNovedades({
-        empleado_cuil: empleado.cuil,
+        empleado_id: empleado.id,
         periodo,
         dias_trabajados_suplente: n("dias_trabajados_suplente"),
         horas_jornada: n("horas_jornada") || undefined,

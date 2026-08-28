@@ -191,8 +191,8 @@ async function getPeriodoChecklist(periodoId: number, consorcioCuit: string, ani
   const [gastosRes, liqsRes, expensasRes, pagosRes, empRes] = await Promise.all([
     query<{ count: string }>("SELECT COUNT(*) FROM app.gastos_periodo WHERE periodo_id = $1", [periodoId]),
     query<{ count: string }>(
-      `SELECT COUNT(*) FROM app.liquidaciones_sueldo l 
-       JOIN app.empleados e ON e.cuil = l.empleado_cuil 
+      `SELECT COUNT(*) FROM app.liquidaciones_sueldo l
+       JOIN app.empleados e ON e.id = l.empleado_id
        WHERE e.consorcio_cuit = $1 AND l.periodo = $2`,
       [consorcioCuit, periodStr]
     ),

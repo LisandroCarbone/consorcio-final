@@ -36,7 +36,7 @@ export interface EmpleadoForm {
 }
 
 export interface NovedadesForm {
-  empleado_cuil: string;
+  empleado_id: number;
   periodo: string; // YYYY-MM-01
   dias_trabajados_suplente: number;
   horas_jornada?: number;
@@ -57,6 +57,7 @@ export interface NovedadesForm {
 // ─── Empleados ────────────────────────────────────────────────────────────────
 
 export interface EmpleadoRow {
+  id: number;
   cuil: string;
   nombre: string;
   legajo: string | null;
@@ -120,7 +121,7 @@ export async function getNovedadesPeriodo(periodo: string) {
     `SELECT n.*, e.nombre AS empleado_nombre, e.funcion,
             c.nombre AS consorcio_nombre
      FROM app.novedades_sueldo n
-     JOIN app.empleados e ON e.cuil = n.empleado_cuil
+     JOIN app.empleados e ON e.id = n.empleado_id
      JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
      WHERE n.periodo = $1
      ORDER BY c.nombre, e.nombre`,
@@ -132,13 +133,13 @@ export async function upsertNovedades(data: NovedadesForm) {
   const db = pool;
   await db.query(
     `INSERT INTO app.novedades_sueldo
-       (empleado_cuil, periodo, dias_trabajados_suplente, horas_jornada,
+       (empleado_id, periodo, dias_trabajados_suplente, horas_jornada,
         horas_extras_50, horas_extras_100, feriados_trabajados_hs,
         suplencia_100_hs, plus_vacaciones_dias, dias_no_trabajados,
         licencia_enfermedad, adicional_voluntario, embargo, anticipo,
         muerte, observaciones)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-     ON CONFLICT (empleado_cuil, periodo)
+     ON CONFLICT (empleado_id, periodo)
      DO UPDATE SET
        dias_trabajados_suplente = EXCLUDED.dias_trabajados_suplente,
        horas_jornada            = EXCLUDED.horas_jornada,
@@ -156,7 +157,7 @@ export async function upsertNovedades(data: NovedadesForm) {
        observaciones            = EXCLUDED.observaciones,
        updated_at               = now()`,
     [
-      data.empleado_cuil, data.periodo, data.dias_trabajados_suplente,
+      data.empleado_id, data.periodo, data.dias_trabajados_suplente,
       data.horas_jornada ?? null, data.horas_extras_50, data.horas_extras_100,
       data.feriados_trabajados_hs, data.suplencia_100_hs, data.plus_vacaciones_dias,
       data.dias_no_trabajados, data.licencia_enfermedad, data.adicional_voluntario,
@@ -184,8 +185,8 @@ export async function getUltimaEscala() {
   return row?.periodo ?? null;
 }
 
-export async function calcularLiquidacion(empleadoCuil: string, periodo: string) {
-  const result = await engineCalcLiquidacion(empleadoCuil, periodo);
+export async function calcularLiquidacion(empleadoId: number, periodo: string) {
+  const result = await engineCalcLiquidacion(empleadoId, periodo);
   revalidatePath("/sueldos/liquidaciones");
   return result;
 }
@@ -197,7 +198,7 @@ export async function getLiquidacionesPeriodo(periodo: string, tipo = "mensual",
       `SELECT l.*, e.nombre AS empleado_nombre, e.funcion, e.jornada,
               c.nombre AS consorcio_nombre
        FROM app.liquidaciones_sueldo l
-       JOIN app.empleados e ON e.cuil = l.empleado_cuil
+       JOIN app.empleados e ON e.id = l.empleado_id
        JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
        WHERE l.periodo = $1 AND l.tipo = $2 AND e.consorcio_cuit = $3
        ORDER BY c.nombre, e.nombre`,
@@ -209,7 +210,7 @@ export async function getLiquidacionesPeriodo(periodo: string, tipo = "mensual",
     `SELECT l.*, e.nombre AS empleado_nombre, e.funcion, e.jornada,
             c.nombre AS consorcio_nombre
      FROM app.liquidaciones_sueldo l
-     JOIN app.empleados e ON e.cuil = l.empleado_cuil
+     JOIN app.empleados e ON e.id = l.empleado_id
      JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
      WHERE l.periodo = $1 AND l.tipo = $2
      ORDER BY c.nombre, e.nombre`,
@@ -231,7 +232,7 @@ export async function getLiquidacionDetalle(liquidacionId: number) {
             c.pct_cct_suterh, c.pct_cct_seracarh,
             c.pct_contrib_jubilacion, c.pct_contrib_obra_social, c.pct_cct_fateryh
      FROM app.liquidaciones_sueldo l
-     JOIN app.empleados e ON e.cuil = l.empleado_cuil
+     JOIN app.empleados e ON e.id = l.empleado_id
      JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
      WHERE l.id = $1`,
     [liquidacionId]
@@ -278,10 +279,10 @@ async function regenerateCategory1Expenses(
   // 3. Fetch all confirmed liquidaciones of this period for this consorcio
   const periodDate = `${anio}-${String(mes).padStart(2, '0')}-01`;
   const currentLiqsRes = await client.query(`
-    SELECT l.id, l.empleado_cuil, l.tipo, l.neto_a_pagar::numeric AS neto_a_pagar,
+    SELECT l.id, l.empleado_id, e.cuil AS empleado_cuil, l.tipo, l.neto_a_pagar::numeric AS neto_a_pagar,
            e.nombre
     FROM app.liquidaciones_sueldo l
-    JOIN app.empleados e ON e.cuil = l.empleado_cuil
+    JOIN app.empleados e ON e.id = l.empleado_id
     WHERE e.consorcio_cuit = $1 AND l.periodo = $2 AND l.estado = 'confirmada'
   `, [consorcioCuit, periodDate]);
 
@@ -317,10 +318,10 @@ async function regenerateCategory1Expenses(
 
   // Fetch previous confirmed mensual liquidaciones
   let obligationsLiqsRes = await client.query(`
-    SELECT l.id, l.empleado_cuil, l.remuneracion_bruta::numeric AS remuneracion_bruta,
+    SELECT l.id, l.empleado_id, l.remuneracion_bruta::numeric AS remuneracion_bruta,
            e.nombre, e.funcion, e.jornada
     FROM app.liquidaciones_sueldo l
-    JOIN app.empleados e ON e.cuil = l.empleado_cuil
+    JOIN app.empleados e ON e.id = l.empleado_id
     WHERE e.consorcio_cuit = $1 AND l.periodo = $2 AND l.estado = 'confirmada' AND l.tipo = 'mensual'
   `, [consorcioCuit, prevPeriodStr]);
 
@@ -329,10 +330,10 @@ async function regenerateCategory1Expenses(
   // Fallback: if previous period has no confirmed mensual liquidaciones, try current period
   if (obligationsLiqsRes.rows.length === 0) {
     obligationsLiqsRes = await client.query(`
-      SELECT l.id, l.empleado_cuil, l.remuneracion_bruta::numeric AS remuneracion_bruta,
+      SELECT l.id, l.empleado_id, l.remuneracion_bruta::numeric AS remuneracion_bruta,
              e.nombre, e.funcion, e.jornada
       FROM app.liquidaciones_sueldo l
-      JOIN app.empleados e ON e.cuil = l.empleado_cuil
+      JOIN app.empleados e ON e.id = l.empleado_id
       WHERE e.consorcio_cuit = $1 AND l.periodo = $2 AND l.estado = 'confirmada' AND l.tipo = 'mensual'
     `, [consorcioCuit, periodDate]);
     usedPeriodStr = periodDate;
@@ -383,9 +384,9 @@ async function regenerateCategory1Expenses(
     const novRes = await client.query(`
       SELECT dias_trabajados_suplente::numeric AS dias_trabajados_suplente
       FROM app.novedades_sueldo
-      WHERE empleado_cuil = $1 AND periodo = $2
+      WHERE empleado_id = $1 AND periodo = $2
       LIMIT 1
-    `, [liq.empleado_cuil, usedPeriodStr]);
+    `, [liq.empleado_id, usedPeriodStr]);
     const diasSuplente = novRes.rows.length > 0 ? Number(novRes.rows[0].dias_trabajados_suplente) : 30;
 
     // Query concept '5150' or Difference OS Ley 26475 for this liquidación
@@ -485,7 +486,7 @@ export async function confirmarLiquidacion(liquidacionId: number) {
     const liqRes = await client.query(`
       SELECT l.periodo::text, e.consorcio_cuit
       FROM app.liquidaciones_sueldo l
-      JOIN app.empleados e ON e.cuil = l.empleado_cuil
+      JOIN app.empleados e ON e.id = l.empleado_id
       WHERE l.id = $1
     `, [liquidacionId]);
 

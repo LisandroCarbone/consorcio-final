@@ -49,7 +49,7 @@ export default async function NovedadesPage({ searchParams }: Props) {
 
   const novedadesMap = Object.fromEntries(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    novedades.map((n: any) => [n.empleado_cuil, n])
+    novedades.map((n: any) => [n.empleado_id, n])
   );
 
   const label = new Date(periodo).toLocaleDateString("es-AR", {
@@ -76,7 +76,7 @@ export default async function NovedadesPage({ searchParams }: Props) {
     }))
     .filter((g) => g.empleados.length > 0);
 
-  const cargados = Object.keys(novedadesMap).filter(cuil => filtered.some((e: any) => e.cuil === cuil)).length;
+  const cargados = Object.keys(novedadesMap).filter(id => filtered.some((e: any) => String(e.id) === id)).length;
 
   const activeConsorcioNombre = consorcios.find(([cuit]) => cuit === activeCuit)?.[1] || activeCuit;
 
@@ -134,10 +134,10 @@ export default async function NovedadesPage({ searchParams }: Props) {
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {g.empleados.map((emp: any) => (
                   <NovedadesForm
-                    key={emp.cuil}
+                    key={emp.id}
                     empleado={emp}
                     periodo={periodo}
-                    novedades={novedadesMap[emp.cuil] ?? null}
+                    novedades={novedadesMap[emp.id] ?? null}
                   />
                 ))}
               </div>

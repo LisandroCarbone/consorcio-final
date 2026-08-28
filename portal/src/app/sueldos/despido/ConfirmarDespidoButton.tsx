@@ -4,11 +4,11 @@ import { useState } from "react";
 import { accionLiquidarDespido } from "./actions";
 
 export function ConfirmarDespidoButton({
-  empleadoCuil,
+  empleadoId,
   fechaEgreso,
   tipoEgreso,
 }: {
-  empleadoCuil: string;
+  empleadoId: number;
   fechaEgreso: string;
   tipoEgreso: string;
 }) {
@@ -18,11 +18,11 @@ export function ConfirmarDespidoButton({
     e.preventDefault();
     setLoading(true);
     const fd = new FormData();
-    fd.set("empleado_cuil", empleadoCuil);
+    fd.set("empleado_id", String(empleadoId));
     fd.set("fecha_egreso", fechaEgreso);
     fd.set("tipo_egreso", tipoEgreso);
     await accionLiquidarDespido(fd);
-    window.location.href = `/sueldos/despido?empleado_cuil=${empleadoCuil}&fecha_egreso=${fechaEgreso}&tipo_egreso=${tipoEgreso}&liquidado=1`;
+    window.location.href = `/sueldos/despido?empleado_id=${empleadoId}&fecha_egreso=${fechaEgreso}&tipo_egreso=${tipoEgreso}&liquidado=1`;
   }
 
   return (

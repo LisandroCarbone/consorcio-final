@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 interface EmpleadoRow {
+  id: number;
   cuil: string;
   nombre: string;
   legajo: string | null;
@@ -50,9 +51,9 @@ async function getSueldosStats(activeCuit: string, activePeriodo?: string) {
     db.query(`
       SELECT
         (SELECT COUNT(*) FROM app.empleados WHERE estado = 'activo' AND consorcio_cuit = $2) AS total_empleados,
-        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.cuil = l.empleado_cuil WHERE l.periodo = $1 AND e.consorcio_cuit = $2) AS liquidaciones_mes,
-        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.cuil = l.empleado_cuil WHERE l.periodo = $1 AND l.estado = 'confirmada' AND e.consorcio_cuit = $2) AS confirmadas,
-        (SELECT COALESCE(SUM(l.neto_a_pagar),0) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.cuil = l.empleado_cuil WHERE l.periodo = $1 AND l.estado != 'anulada' AND e.consorcio_cuit = $2) AS total_neto
+        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.id = l.empleado_id WHERE l.periodo = $1 AND e.consorcio_cuit = $2) AS liquidaciones_mes,
+        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.id = l.empleado_id WHERE l.periodo = $1 AND l.estado = 'confirmada' AND e.consorcio_cuit = $2) AS confirmadas,
+        (SELECT COALESCE(SUM(l.neto_a_pagar),0) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.id = l.empleado_id WHERE l.periodo = $1 AND l.estado != 'anulada' AND e.consorcio_cuit = $2) AS total_neto
     `, [periodo, activeCuit]),
     db.query(`SELECT periodo FROM app.escalas_suterh ORDER BY periodo DESC LIMIT 1`),
   ]);
@@ -91,12 +92,12 @@ async function getSueldosChecklist(activeCuit: string, activePeriodo: string) {
     db.query(`
       SELECT
         (SELECT COUNT(*) FROM app.empleados WHERE estado = 'activo' AND consorcio_cuit = $2) AS total_empleados,
-        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.cuil = l.empleado_cuil WHERE l.periodo = $1 AND e.consorcio_cuit = $2 AND l.estado != 'anulada') AS liquidaciones_mes,
-        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.cuil = l.empleado_cuil WHERE l.periodo = $1 AND l.estado = 'confirmada' AND e.consorcio_cuit = $2) AS confirmadas
+        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.id = l.empleado_id WHERE l.periodo = $1 AND e.consorcio_cuit = $2 AND l.estado != 'anulada') AS liquidaciones_mes,
+        (SELECT COUNT(*) FROM app.liquidaciones_sueldo l JOIN app.empleados e ON e.id = l.empleado_id WHERE l.periodo = $1 AND l.estado = 'confirmada' AND e.consorcio_cuit = $2) AS confirmadas
     `, [activePeriodo, activeCuit]),
     db.query(`
       SELECT COUNT(*) FROM app.novedades_sueldo n
-      JOIN app.empleados e ON e.cuil = n.empleado_cuil
+      JOIN app.empleados e ON e.id = n.empleado_id
       WHERE e.consorcio_cuit = $1 AND n.periodo = $2
     `, [activeCuit, activePeriodo]),
     db.query(`

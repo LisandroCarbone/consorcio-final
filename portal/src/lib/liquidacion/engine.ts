@@ -5,6 +5,7 @@ import { pool } from "@/lib/db";
 // ---------------------------------------------------------------------------
 
 export interface Empleado {
+  id: number; // surrogate PK — use for all joins/lookups (multi-consorcio support)
   cuil: string;
   nombre: string;
   legajo: string | null;
@@ -57,7 +58,7 @@ export interface Consorcio {
 }
 
 export interface Novedades {
-  empleado_cuil: string;
+  empleado_id: number;
   periodo: string;
   dias_trabajados_suplente: number | null;
   horas_jornada: number | null;
@@ -202,28 +203,28 @@ function calcContribPatronal(
 // ---------------------------------------------------------------------------
 
 export async function calcularLiquidacion(
-  empleadoCuil: string,
+  empleadoId: number,
   periodo: string
 ): Promise<void> {
   // 1. Load master data in parallel
   const [empRows, adicionalesRows, novedadesRows] = await Promise.all([
     pool.query<Empleado>(
-      `SELECT * FROM app.empleados WHERE cuil = $1`,
-      [empleadoCuil]
+      `SELECT * FROM app.empleados WHERE id = $1`,
+      [empleadoId]
     ),
     pool.query<{ concepto: string; concepto_key: string | null; valor: number }>(
       `SELECT concepto, concepto_key, valor::numeric AS valor FROM app.adicionales_suterh WHERE periodo = $1`,
       [periodo]
     ),
     pool.query<Novedades>(
-      `SELECT * FROM app.novedades_sueldo WHERE empleado_cuil = $1 AND periodo = $2`,
-      [empleadoCuil, periodo]
+      `SELECT * FROM app.novedades_sueldo WHERE empleado_id = $1 AND periodo = $2`,
+      [empleadoId, periodo]
     ),
   ]);
 
   // Load employee's consorcio_cuit early (needed for custom adicionales)
   if (empRows.rows.length === 0) {
-    throw new Error(`Empleado con CUIL ${empleadoCuil} no encontrado`);
+    throw new Error(`Empleado con id ${empleadoId} no encontrado`);
   }
 
   const emp = empRows.rows[0];
@@ -291,7 +292,7 @@ export async function calcularLiquidacion(
   const nov: Novedades =
     novedadesRows.rows[0] ??
     ({
-      empleado_cuil: empleadoCuil,
+      empleado_id: empleadoId,
       periodo,
       dias_trabajados_suplente: null,
       horas_jornada: null,
@@ -314,8 +315,8 @@ export async function calcularLiquidacion(
   // Skip suplentes with no days worked — delete any stale liquidación and return
   if (esSuplente && !Number(nov.dias_trabajados_suplente ?? 0) && !Number(nov.suplencia_100_hs ?? 0)) {
     await pool.query(
-      `DELETE FROM app.liquidaciones_sueldo WHERE empleado_cuil = $1 AND periodo = $2 AND tipo = 'mensual' AND estado != 'confirmada'`,
-      [empleadoCuil, periodo]
+      `DELETE FROM app.liquidaciones_sueldo WHERE empleado_id = $1 AND periodo = $2 AND tipo = 'mensual' AND estado != 'confirmada'`,
+      [empleadoId, periodo]
     );
     return;
   }
@@ -370,7 +371,7 @@ export async function calcularLiquidacion(
         escalaFallbackPeriodo = r.periodo;
       } else {
         throw new Error(
-          `No se encontró escala para función '${emp.funcion}' en período ${periodo} (empleado ${empleadoCuil})`
+          `No se encontró escala para función '${emp.funcion}' en período ${periodo} (empleado id ${empleadoId}, CUIL ${emp.cuil})`
         );
       }
     }
@@ -632,23 +633,23 @@ export async function calcularLiquidacion(
   if (periodoMonth === 12) {
     const sac2Row = await pool.query<{ remuneracion_bruta: string }>(
       `SELECT remuneracion_bruta FROM app.liquidaciones_sueldo
-       WHERE empleado_cuil = $1 AND tipo = 'sac_2'
+       WHERE empleado_id = $1 AND tipo = 'sac_2'
          AND EXTRACT(YEAR FROM periodo::date) = $2
          AND estado != 'anulada'
        LIMIT 1`,
-      [empleadoCuil, periodoYear]
+      [empleadoId, periodoYear]
     );
     if (sac2Row.rows.length > 0) {
       // Find the actual best monthly bruto used for SAC2 (months 7-11 of the same year)
       const mejorBrutoRow = await pool.query<{ mejor_bruto: string }>(
         `SELECT MAX(remuneracion_bruta::numeric) AS mejor_bruto
          FROM app.liquidaciones_sueldo
-         WHERE empleado_cuil = $1
+         WHERE empleado_id = $1
            AND tipo = 'mensual'
            AND estado != 'anulada'
            AND EXTRACT(YEAR FROM periodo::date) = $2
            AND EXTRACT(MONTH FROM periodo::date) BETWEEN 7 AND 11`,
-        [empleadoCuil, periodoYear]
+        [empleadoId, periodoYear]
       );
       const mejorBruto = Number(mejorBrutoRow.rows[0]?.mejor_bruto ?? 0);
       if (mejorBruto > 0 && totalRemunerativo > mejorBruto) {
@@ -674,8 +675,9 @@ export async function calcularLiquidacion(
   // Diferencia Obra Social Ley 26474: for part-time workers, OS must be based on the
   // full-time equivalent salary. In SAC months (6/12), subtract the OS already paid
   // in the SAC liquidation so we don't double-charge.
+  // Suplentes eventuales are excluded — art. 92 ter only applies to permanent part-time.
   let difObraSocial = 0;
-  if (emp.jornada === "Media") {
+  if (emp.jornada === "Media" && !esSuplente) {
     const catKey2 = `cat_${emp.categoria_edificio}` as "cat_1" | "cat_2" | "cat_3" | "cat_4";
     let baseOSCompleta: number;
     if (emp.funcion.includes("No Permanente Sin vivienda")) {
@@ -692,13 +694,13 @@ export async function calcularLiquidacion(
         `SELECT cl.importe::numeric AS importe
          FROM app.conceptos_liquidacion cl
          JOIN app.liquidaciones_sueldo ls ON ls.id = cl.liquidacion_id
-         WHERE ls.empleado_cuil = $1
+         WHERE ls.empleado_id = $1
            AND ls.tipo = $2
            AND EXTRACT(YEAR FROM ls.periodo::date) = $3
            AND ls.estado != 'anulada'
            AND cl.code = '5100'
          LIMIT 1`,
-        [empleadoCuil, sacTipo, periodoYear]
+        [empleadoId, sacTipo, periodoYear]
       );
       if (sacOSRow.rows.length > 0) {
         osSACPagada = Number(sacOSRow.rows[0].importe);
@@ -766,7 +768,7 @@ export async function calcularLiquidacion(
   };
   const nanFields = Object.entries(debugValues).filter(([, v]) => isNaN(v));
   if (nanFields.length > 0) {
-    console.warn(`[engine] NaN detected for empleado ${empleadoCuil} (${emp.nombre}):`,
+    console.warn(`[engine] NaN detected for empleado id ${empleadoId} (${emp.nombre}):`,
       nanFields.map(([k]) => k).join(", "));
   }
 
@@ -782,10 +784,10 @@ export async function calcularLiquidacion(
 
     const upsertResult = await client.query<{ id: number }>(
       `INSERT INTO app.liquidaciones_sueldo
-         (empleado_cuil, periodo, tipo, remuneracion_bruta, total_descuentos_empleado,
+         (empleado_id, periodo, tipo, remuneracion_bruta, total_descuentos_empleado,
           total_aportes_patronales, base_patronal, neto_a_pagar, estado)
        VALUES ($1, $2, 'mensual', $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (empleado_cuil, periodo, tipo) DO UPDATE SET
+       ON CONFLICT (empleado_id, periodo, tipo) DO UPDATE SET
          remuneracion_bruta         = EXCLUDED.remuneracion_bruta,
          total_descuentos_empleado  = EXCLUDED.total_descuentos_empleado,
          total_aportes_patronales   = EXCLUDED.total_aportes_patronales,
@@ -797,7 +799,7 @@ export async function calcularLiquidacion(
          END
        RETURNING id`,
       [
-        empleadoCuil,
+        empleadoId,
         periodo,
         safe(totalRemunerativoFinal),
         safe(totalDescuentos),
@@ -896,9 +898,9 @@ export async function calcularLiquidacion(
     addDescuento("5100", "Obra Social", obraSocial, 32);
     addDescuento("5150", "Diferencia Obra Social Ley 26474", difObraSocial, 33);
     addDescuento("5200", "SUTERH", suterh, 34);
-    addDescuento("5250", "SUTERH (Caja Protección Familiar)", cajaProtFlia, 35);
+    addDescuento("5250", "Caja Protección Familiar", cajaProtFlia, 35);
     addDescuento("5300", "FATERYH", fateryh, 36);
-    addDescuento("5350", "FATERYH (Seguro Vitalicio)", seguroVital, 37);
+    addDescuento("5350", "Seguro Colectivo de Vida Obligatorio", seguroVital, 37);
     addDescuento("5360", "Fondo Educación y Comunicación", fondoEducacion, 38);
     addDescuento("5400", "Descuento Vivienda", descVivienda, 39);
 
@@ -976,7 +978,7 @@ export interface SACPreview {
 }
 
 export async function calcularSACPreview(
-  empleadoCuil: string,
+  empleadoId: number,
   anio: number,
   semestre: 1 | 2
 ): Promise<SACPreview> {
@@ -984,22 +986,22 @@ export async function calcularSACPreview(
   const mesesTotales = meses.length;
 
   const [empRow, consRows, liqRows] = await Promise.all([
-    pool.query<Empleado>(`SELECT * FROM app.empleados WHERE cuil = $1`, [empleadoCuil]),
-    pool.query<Consorcio>(`SELECT c.* FROM app.consorcios c JOIN app.empleados e ON e.consorcio_cuit = c.cuit WHERE e.cuil = $1`, [empleadoCuil]),
+    pool.query<Empleado>(`SELECT * FROM app.empleados WHERE id = $1`, [empleadoId]),
+    pool.query<Consorcio>(`SELECT c.* FROM app.consorcios c JOIN app.empleados e ON e.consorcio_cuit = c.cuit WHERE e.id = $1`, [empleadoId]),
     pool.query<{ remuneracion_bruta: string }>(
       `SELECT remuneracion_bruta
        FROM app.liquidaciones_sueldo
-       WHERE empleado_cuil = $1
+       WHERE empleado_id = $1
          AND tipo = 'mensual'
          AND estado != 'anulada'
          AND EXTRACT(YEAR FROM periodo::date) = $2
          AND EXTRACT(MONTH FROM periodo::date) = ANY($3)
        ORDER BY remuneracion_bruta::numeric DESC`,
-      [empleadoCuil, anio, meses]
+      [empleadoId, anio, meses]
     ),
   ]);
 
-  if (empRow.rows.length === 0) throw new Error(`Empleado con CUIL ${empleadoCuil} no encontrado`);
+  if (empRow.rows.length === 0) throw new Error(`Empleado con id ${empleadoId} no encontrado`);
   if (liqRows.rows.length === 0) throw new Error(`Sin liquidaciones mensuales para SAC ${semestre}° ${anio}`);
 
   const emp = empRow.rows[0];
@@ -1095,11 +1097,11 @@ export async function calcularSACPreview(
 }
 
 export async function liquidarSAC(
-  empleadoCuil: string,
+  empleadoId: number,
   anio: number,
   semestre: 1 | 2
 ): Promise<void> {
-  const p = await calcularSACPreview(empleadoCuil, anio, semestre);
+  const p = await calcularSACPreview(empleadoId, anio, semestre);
 
   const client = await pool.connect();
   try {
@@ -1107,17 +1109,17 @@ export async function liquidarSAC(
 
     const res = await client.query<{ id: number }>(
       `INSERT INTO app.liquidaciones_sueldo
-         (empleado_cuil, periodo, tipo, remuneracion_bruta, total_descuentos_empleado,
+         (empleado_id, periodo, tipo, remuneracion_bruta, total_descuentos_empleado,
           total_aportes_patronales, neto_a_pagar, estado)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'borrador')
-       ON CONFLICT (empleado_cuil, periodo, tipo) DO UPDATE SET
+       ON CONFLICT (empleado_id, periodo, tipo) DO UPDATE SET
          remuneracion_bruta        = EXCLUDED.remuneracion_bruta,
          total_descuentos_empleado = EXCLUDED.total_descuentos_empleado,
          total_aportes_patronales  = EXCLUDED.total_aportes_patronales,
          neto_a_pagar              = EXCLUDED.neto_a_pagar,
          estado = CASE WHEN app.liquidaciones_sueldo.estado IN ('confirmada', 'anulada') THEN app.liquidaciones_sueldo.estado ELSE 'borrador' END
        RETURNING id`,
-      [empleadoCuil, p.periodo, p.tipo, safe(p.sacBase + p.bonificacionSAC), safe(p.totalDescuentos), safe(p.totalPatronal), safe(p.netoAPagar)]
+      [empleadoId, p.periodo, p.tipo, safe(p.sacBase + p.bonificacionSAC), safe(p.totalDescuentos), safe(p.totalPatronal), safe(p.netoAPagar)]
     );
 
     const liqId = res.rows[0].id;
@@ -1131,9 +1133,9 @@ export async function liquidarSAC(
     if (p.pami > 0)          conceptos.push([liqId, "5050", "descuento", "PAMI", safe(p.pami), 31]);
     if (p.obraSocial > 0)    conceptos.push([liqId, "5100", "descuento", "Obra Social", safe(p.obraSocial), 32]);
     if (p.suterh > 0)        conceptos.push([liqId, "5200", "descuento", "SUTERH", safe(p.suterh), 34]);
-    if (p.cajaProtFlia > 0)  conceptos.push([liqId, "5250", "descuento", "SUTERH (Caja Protección Familiar)", safe(p.cajaProtFlia), 35]);
+    if (p.cajaProtFlia > 0)  conceptos.push([liqId, "5250", "descuento", "Caja Protección Familiar", safe(p.cajaProtFlia), 35]);
     if (p.fateryh > 0)       conceptos.push([liqId, "5300", "descuento", "FATERYH", safe(p.fateryh), 36]);
-    if (p.seguroVital > 0)   conceptos.push([liqId, "5350", "descuento", "FATERYH (Seguro Vitalicio)", safe(p.seguroVital), 37]);
+    if (p.seguroVital > 0)   conceptos.push([liqId, "5350", "descuento", "Seguro Colectivo de Vida Obligatorio", safe(p.seguroVital), 37]);
 
     const placeholders = conceptos
       .map((_, i) => `($${i * 6 + 1},$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6})`)
@@ -1205,17 +1207,17 @@ export interface IndemnizacionPreview {
 }
 
 export async function calcularIndemnizacionPreview(
-  empleadoCuil: string,
+  empleadoId: number,
   fechaEgreso: string,
   tipoEgreso: string
 ): Promise<IndemnizacionPreview> {
   const egreso = new Date(fechaEgreso);
   const [empRow, consRows] = await Promise.all([
-    pool.query<Empleado>(`SELECT * FROM app.empleados WHERE cuil = $1`, [empleadoCuil]),
-    pool.query<Consorcio>(`SELECT c.* FROM app.consorcios c JOIN app.empleados e ON e.consorcio_cuit = c.cuit WHERE e.cuil = $1`, [empleadoCuil]),
+    pool.query<Empleado>(`SELECT * FROM app.empleados WHERE id = $1`, [empleadoId]),
+    pool.query<Consorcio>(`SELECT c.* FROM app.consorcios c JOIN app.empleados e ON e.consorcio_cuit = c.cuit WHERE e.id = $1`, [empleadoId]),
   ]);
 
-  if (empRow.rows.length === 0) throw new Error(`Empleado con CUIL ${empleadoCuil} no encontrado`);
+  if (empRow.rows.length === 0) throw new Error(`Empleado con id ${empleadoId} no encontrado`);
   const emp = empRow.rows[0];
   const esSuplente = emp.jornada === "Suplente" || /suplente/i.test(emp.funcion ?? "");
   const cons = consRows.rows[0];
@@ -1228,12 +1230,12 @@ export async function calcularIndemnizacionPreview(
      FROM (
        SELECT remuneracion_bruta
        FROM app.liquidaciones_sueldo
-       WHERE empleado_cuil = $1 AND tipo = 'mensual' AND estado != 'anulada'
+       WHERE empleado_id = $1 AND tipo = 'mensual' AND estado != 'anulada'
          AND periodo < $2
        ORDER BY periodo DESC
        LIMIT 6
      ) sub`,
-    [empleadoCuil, `${egreso.getFullYear()}-${String(egreso.getMonth() + 1).padStart(2, "0")}-01`]
+    [empleadoId, `${egreso.getFullYear()}-${String(egreso.getMonth() + 1).padStart(2, "0")}-01`]
   );
 
   const mejorBruto = liqRows.rows.length > 0 ? Number(liqRows.rows[0].mejor_bruto ?? 0) : 0;
@@ -1331,11 +1333,11 @@ export async function calcularIndemnizacionPreview(
 }
 
 export async function liquidarIndemnizacion(
-  empleadoCuil: string,
+  empleadoId: number,
   fechaEgreso: string,
   tipoEgreso: string
 ): Promise<void> {
-  const p = await calcularIndemnizacionPreview(empleadoCuil, fechaEgreso, tipoEgreso);
+  const p = await calcularIndemnizacionPreview(empleadoId, fechaEgreso, tipoEgreso);
   const totalBruto = p.totalRemunerativo + p.totalNoRemunerativo;
 
   const client = await pool.connect();
@@ -1344,23 +1346,23 @@ export async function liquidarIndemnizacion(
 
     // Update employee with egreso info
     await client.query(
-      `UPDATE app.empleados SET fecha_egreso=$1, tipo_egreso=$2, estado='inactivo', updated_at=now() WHERE cuil=$3`,
-      [fechaEgreso, tipoEgreso, empleadoCuil]
+      `UPDATE app.empleados SET fecha_egreso=$1, tipo_egreso=$2, estado='inactivo', updated_at=now() WHERE id=$3`,
+      [fechaEgreso, tipoEgreso, empleadoId]
     );
 
     const res = await client.query<{ id: number }>(
       `INSERT INTO app.liquidaciones_sueldo
-         (empleado_cuil, periodo, tipo, remuneracion_bruta, total_descuentos_empleado,
+         (empleado_id, periodo, tipo, remuneracion_bruta, total_descuentos_empleado,
           total_aportes_patronales, neto_a_pagar, estado)
        VALUES ($1, $2, 'indemnizacion', $3, $4, $5, $6, 'borrador')
-       ON CONFLICT (empleado_cuil, periodo, tipo) DO UPDATE SET
+       ON CONFLICT (empleado_id, periodo, tipo) DO UPDATE SET
          remuneracion_bruta        = EXCLUDED.remuneracion_bruta,
          total_descuentos_empleado = EXCLUDED.total_descuentos_empleado,
          total_aportes_patronales  = EXCLUDED.total_aportes_patronales,
          neto_a_pagar              = EXCLUDED.neto_a_pagar,
          estado = CASE WHEN app.liquidaciones_sueldo.estado IN ('confirmada', 'anulada') THEN app.liquidaciones_sueldo.estado ELSE 'borrador' END
        RETURNING id`,
-      [empleadoCuil, p.periodo, safe(totalBruto), safe(p.descuentosSobreRem.total), safe(p.totalPatronal), safe(p.netoAPagar)]
+      [empleadoId, p.periodo, safe(totalBruto), safe(p.descuentosSobreRem.total), safe(p.totalPatronal), safe(p.netoAPagar)]
     );
 
     const liqId = res.rows[0].id;
@@ -1383,9 +1385,9 @@ export async function liquidarIndemnizacion(
     if (d.pami > 0)         conceptos.push([liqId, "5050", "descuento", "PAMI", safe(d.pami), 31]);
     if (d.obraSocial > 0)   conceptos.push([liqId, "5100", "descuento", "Obra Social", safe(d.obraSocial), 32]);
     if (d.suterh > 0)       conceptos.push([liqId, "5200", "descuento", "SUTERH", safe(d.suterh), 34]);
-    if (d.cajaProtFlia > 0) conceptos.push([liqId, "5250", "descuento", "SUTERH (Caja Protección Familiar)", safe(d.cajaProtFlia), 35]);
+    if (d.cajaProtFlia > 0) conceptos.push([liqId, "5250", "descuento", "Caja Protección Familiar", safe(d.cajaProtFlia), 35]);
     if (d.fateryh > 0)      conceptos.push([liqId, "5300", "descuento", "FATERYH", safe(d.fateryh), 36]);
-    if (d.seguroVital > 0)  conceptos.push([liqId, "5350", "descuento", "FATERYH (Seguro Vitalicio)", safe(d.seguroVital), 37]);
+    if (d.seguroVital > 0)  conceptos.push([liqId, "5350", "descuento", "Seguro Colectivo de Vida Obligatorio", safe(d.seguroVital), 37]);
 
     if (conceptos.length > 0) {
       const ph = conceptos.map((_, i) => `($${i * 6 + 1},$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6})`).join(",");
@@ -1411,8 +1413,8 @@ export async function liquidarIndemnizacion(
 export async function calcularPeriodo(
   periodo: string
 ): Promise<{ ok: number; errores: string[] }> {
-  const result = await pool.query<{ cuil: string; nombre: string }>(
-    `SELECT cuil, nombre FROM app.empleados WHERE estado = 'activo'`
+  const result = await pool.query<{ id: number; cuil: string; nombre: string }>(
+    `SELECT id, cuil, nombre FROM app.empleados WHERE estado = 'activo'`
   );
 
   const empleados = result.rows;
@@ -1424,7 +1426,7 @@ export async function calcularPeriodo(
   for (let i = 0; i < empleados.length; i += BATCH_SIZE) {
     const batch = empleados.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.allSettled(
-      batch.map((emp) => calcularLiquidacion(emp.cuil, periodo))
+      batch.map((emp) => calcularLiquidacion(emp.id, periodo))
     );
     batchResults.forEach((r, j) => {
       const emp = batch[j];
@@ -1433,7 +1435,7 @@ export async function calcularPeriodo(
       } else {
         const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
         errores.push(`Empleado ${emp.cuil} (${emp.nombre}): ${msg}`);
-        console.error(`[engine] Error en empleado ${emp.cuil}:`, r.reason);
+        console.error(`[engine] Error en empleado id ${emp.id} (CUIL ${emp.cuil}):`, r.reason);
       }
     });
   }

@@ -19,7 +19,7 @@ export default async function DespidoPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    empleado_cuil?: string;
+    empleado_id?: string;
     fecha_egreso?: string;
     tipo_egreso?: string;
     liquidado?: string;
@@ -45,7 +45,7 @@ export default async function DespidoPage({
   const allEmpleados = await getEmpleados();
   const empleados = allEmpleados.filter((e) => e.consorcio_cuit === activeCuit);
 
-  const empleadoCuil = sp.empleado_cuil ?? null;
+  const empleadoId = sp.empleado_id ? Number(sp.empleado_id) : null;
   const fechaEgreso = sp.fecha_egreso ?? new Date().toISOString().slice(0, 10);
   const tipoEgreso = sp.tipo_egreso ?? "despido_sin_causa";
 
@@ -53,9 +53,9 @@ export default async function DespidoPage({
   let previewError: string | null = null;
 
 
-  if (empleadoCuil && sp.fecha_egreso && sp.tipo_egreso) {
+  if (empleadoId && sp.fecha_egreso && sp.tipo_egreso) {
     try {
-      preview = await calcularIndemnizacionPreview(empleadoCuil, fechaEgreso, tipoEgreso);
+      preview = await calcularIndemnizacionPreview(empleadoId, fechaEgreso, tipoEgreso);
     } catch (err) {
       previewError = err instanceof Error ? err.message : "Error al calcular";
     }
@@ -75,10 +75,10 @@ export default async function DespidoPage({
       <form method="GET" className="card p-5 mb-6 grid grid-cols-2 gap-4">
         <div>
           <label className="label">Empleado</label>
-          <select name="empleado_cuil" defaultValue={empleadoCuil ?? ""} className="input" required>
+          <select name="empleado_id" defaultValue={empleadoId ?? ""} className="input" required>
             <option value="">Seleccionar...</option>
             {empleados.map((e) => (
-              <option key={e.cuil} value={e.cuil}>
+              <option key={e.id} value={e.id}>
                 {formatEmpleadoOption(e)}
               </option>
             ))}
@@ -177,7 +177,7 @@ export default async function DespidoPage({
                   {preview.descuentosSobreRem.suterh > 0 && <p>SUTERH: - {formatMoney(preview.descuentosSobreRem.suterh)}</p>}
                   {preview.descuentosSobreRem.cajaProtFlia > 0 && <p>CPF: - {formatMoney(preview.descuentosSobreRem.cajaProtFlia)}</p>}
                   {preview.descuentosSobreRem.fateryh > 0 && <p>FATERYH: - {formatMoney(preview.descuentosSobreRem.fateryh)}</p>}
-                  {preview.descuentosSobreRem.seguroVital > 0 && <p>Seguro Vitalicio: - {formatMoney(preview.descuentosSobreRem.seguroVital)}</p>}
+                  {preview.descuentosSobreRem.seguroVital > 0 && <p>SCVO: - {formatMoney(preview.descuentosSobreRem.seguroVital)}</p>}
                 </div>
               </div>
             )}
@@ -196,7 +196,7 @@ export default async function DespidoPage({
           </div>
 
           <ConfirmarDespidoButton
-            empleadoCuil={empleadoCuil!}
+            empleadoId={empleadoId!}
             fechaEgreso={fechaEgreso}
             tipoEgreso={tipoEgreso}
           />

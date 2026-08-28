@@ -1,14 +1,14 @@
 "use client";
 
 interface Props {
-  empleados: { cuil: string; nombre: string }[];
+  empleados: { id: number; cuil: string; nombre: string }[];
   value: string;
 }
 
 export function EmpleadoSelect({ empleados, value }: Props) {
   return (
     <select
-      name="empleado_cuil"
+      name="empleado_id"
       defaultValue={value}
       className="input"
       required
@@ -18,7 +18,7 @@ export function EmpleadoSelect({ empleados, value }: Props) {
     >
       <option value="">Seleccionar...</option>
       {empleados.map((e) => (
-        <option key={e.cuil} value={e.cuil}>
+        <option key={e.id} value={e.id}>
           {e.nombre}
         </option>
       ))}

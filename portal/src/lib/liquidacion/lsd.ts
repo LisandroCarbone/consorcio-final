@@ -149,10 +149,10 @@ export async function generateLsdTxt(periodo: string, tipo: string, consorcioCui
 
   // 1. Fetch confirmed liquidaciones for the given period and CUIT
   const { rows: liqRows } = await db.query(
-    `SELECT l.*, l.fecha_pago::text AS fecha_pago, e.cuil, e.nombre AS empleado_nombre, e.legajo, e.jornada, e.funcion, e.cod_obra_social, e.cbu,
+    `SELECT l.*, l.fecha_pago::text AS fecha_pago, e.id AS empleado_id, e.cuil, e.nombre AS empleado_nombre, e.legajo, e.jornada, e.funcion, e.cod_obra_social, e.cbu,
             EXTRACT(YEAR FROM AGE(l.periodo::date, e.fecha_ingreso))::int AS antiguedad_anios
      FROM app.liquidaciones_sueldo l
-     JOIN app.empleados e ON e.cuil = l.empleado_cuil
+     JOIN app.empleados e ON e.id = l.empleado_id
      WHERE l.periodo = $1 AND l.tipo = $2 AND e.consorcio_cuit = $3 AND l.estado = 'confirmada'
      ORDER BY e.nombre`,
     [periodo, tipo, consorcioCuit]
@@ -199,6 +199,7 @@ export async function generateLsdTxt(periodo: string, tipo: string, consorcioCui
 
   for (const liq of liqRows) {
     const cuil = liq.cuil;
+    const empleadoId = liq.empleado_id;
     const legajo = liq.legajo || "";
     const cbu = liq.cbu || "";
     const formaPago = cbu && cbu.length === 22 ? "3" : "1"; // 3=CBU, 1=Cash
@@ -283,8 +284,8 @@ export async function generateLsdTxt(periodo: string, tipo: string, consorcioCui
     let diasTrabajados = 30;
     if (isSuplente) {
       const { rows: novRows } = await db.query(
-        "SELECT dias_trabajados_suplente FROM app.novedades_sueldo WHERE empleado_cuil = $1 AND periodo = $2",
-        [cuil, periodo]
+        "SELECT dias_trabajados_suplente FROM app.novedades_sueldo WHERE empleado_id = $1 AND periodo = $2",
+        [empleadoId, periodo]
       );
       if (novRows.length > 0 && novRows[0].dias_trabajados_suplente !== null) {
         diasTrabajados = Number(novRows[0].dias_trabajados_suplente);

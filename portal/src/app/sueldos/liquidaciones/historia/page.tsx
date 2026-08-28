@@ -8,7 +8,7 @@ import Link from "next/link";
 import { EmpleadoSelect } from "./EmpleadoSelect";
 
 interface Props {
-  searchParams: Promise<{ empleado_cuil?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ empleado_id?: string; desde?: string; hasta?: string }>;
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -25,7 +25,7 @@ const ESTADO_CLS: Record<string, string> = {
 };
 
 export default async function HistoriaPage({ searchParams }: Props) {
-  const { empleado_cuil, desde, hasta } = await searchParams;
+  const { empleado_id, desde, hasta } = await searchParams;
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
   const empleados = await getEmpleados(activeCuit || undefined);
@@ -42,23 +42,23 @@ export default async function HistoriaPage({ searchParams }: Props) {
   let liquidaciones: any[] = [];
   let empleadoNombre = "";
 
-  if (empleado_cuil) {
+  if (empleado_id) {
     try {
       const { rows } = await pool.query(
         `SELECT l.id, l.periodo::text AS periodo, l.tipo, l.estado,
                 l.remuneracion_bruta, l.total_descuentos_empleado, l.neto_a_pagar,
                 c.nombre AS consorcio_nombre
          FROM app.liquidaciones_sueldo l
-         JOIN app.empleados e ON e.cuil = l.empleado_cuil
+         JOIN app.empleados e ON e.id = l.empleado_id
          JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
-         WHERE l.empleado_cuil = $1
+         WHERE l.empleado_id = $1
            AND l.periodo >= $2
            AND l.periodo <= $3
          ORDER BY l.periodo DESC, l.tipo`,
-        [empleado_cuil, desdeVal, hastaVal]
+        [Number(empleado_id), desdeVal, hastaVal]
       );
       liquidaciones = rows;
-      const emp = empleados.find((e: any) => e.cuil === empleado_cuil);
+      const emp = empleados.find((e: any) => String(e.id) === empleado_id);
       empleadoNombre = emp ? String(emp.nombre) : "";
     } catch (err) {
       console.error("[HistoriaPage] Error querying history:", err);
@@ -89,7 +89,7 @@ export default async function HistoriaPage({ searchParams }: Props) {
       <form method="GET" className="card p-5 mb-6 grid grid-cols-4 gap-4 items-end">
         <div className="col-span-2">
           <label className="label">Empleado</label>
-          <EmpleadoSelect empleados={empleados} value={empleado_cuil ?? ""} />
+          <EmpleadoSelect empleados={empleados} value={empleado_id ?? ""} />
         </div>
         <div>
           <label className="label">Desde</label>
@@ -104,7 +104,7 @@ export default async function HistoriaPage({ searchParams }: Props) {
         </div>
       </form>
 
-      {empleado_cuil && liquidaciones.length === 0 && (
+      {empleado_id && liquidaciones.length === 0 && (
         <p className="text-center py-12 text-gray-500">
           No hay liquidaciones en el período seleccionado.
         </p>

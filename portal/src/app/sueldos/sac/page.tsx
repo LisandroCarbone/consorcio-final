@@ -9,7 +9,7 @@ import { pool } from "@/lib/db";
 export default async function SACPage({
   searchParams,
 }: {
-  searchParams: Promise<{ empleado_cuil?: string; anio?: string; semestre?: string; liquidado?: string; error?: string }>;
+  searchParams: Promise<{ empleado_id?: string; anio?: string; semestre?: string; liquidado?: string; error?: string }>;
 }) {
   const sp = await searchParams;
   const actionError = sp.error ? decodeURIComponent(sp.error) : null;
@@ -36,7 +36,7 @@ export default async function SACPage({
   const anioDefault = now.getFullYear();
   const semestreDefault = now.getMonth() < 6 ? 1 : 2;
 
-  const empleadoCuil = sp.empleado_cuil ?? null;
+  const empleadoId = sp.empleado_id ? Number(sp.empleado_id) : null;
   const anio = sp.anio ? Number(sp.anio) : anioDefault;
   const semestreRaw = sp.semestre ? Number(sp.semestre) : semestreDefault;
   const semestre = (semestreRaw === 1 || semestreRaw === 2 ? semestreRaw : semestreDefault) as 1 | 2;
@@ -45,9 +45,9 @@ export default async function SACPage({
   let previewError: string | null = null;
 
 
-  if (empleadoCuil) {
+  if (empleadoId) {
     try {
-      preview = await calcularSACPreview(empleadoCuil, anio, semestre);
+      preview = await calcularSACPreview(empleadoId, anio, semestre);
     } catch (err) {
       previewError = err instanceof Error ? err.message : "Error al calcular";
     }
@@ -72,10 +72,10 @@ export default async function SACPage({
       <form method="GET" className="card p-5 mb-6 grid grid-cols-3 gap-4">
         <div>
           <label className="label">Empleado</label>
-          <select name="empleado_cuil" defaultValue={empleadoCuil ?? ""} className="input" required>
+          <select name="empleado_id" defaultValue={empleadoId ?? ""} className="input" required>
             <option value="">Seleccionar...</option>
             {empleados.map((e) => (
-              <option key={e.cuil} value={e.cuil}>
+              <option key={e.id} value={e.id}>
                 {formatEmpleadoOption(e)}
               </option>
             ))}
@@ -171,7 +171,7 @@ export default async function SACPage({
                   </tr>
                 )}
                 <tr className="border-b border-gray-100">
-                  <td className="py-1.5 text-gray-500 pl-4">Seguro Vitalicio (0.75%)</td>
+                  <td className="py-1.5 text-gray-500 pl-4">Seguro Colectivo de Vida Obligatorio (0.75%)</td>
                   <td className="py-1.5 text-right font-mono text-red-600">- {formatMoney(preview.seguroVital)}</td>
                 </tr>
                 <tr className="border-t-2 border-gray-300">
@@ -189,7 +189,7 @@ export default async function SACPage({
           </div>
 
           <div className="flex gap-3 items-center">
-            <ConfirmarSACButton empleadoCuil={empleadoCuil!} anio={anio} semestre={semestre} />
+            <ConfirmarSACButton empleadoId={empleadoId!} anio={anio} semestre={semestre} />
             <a
               href={`/sueldos/liquidaciones?periodo=${anio}-${semestre === 1 ? "06" : "12"}-01&tipo=sac_${semestre}`}
               className="btn-secondary text-sm"
