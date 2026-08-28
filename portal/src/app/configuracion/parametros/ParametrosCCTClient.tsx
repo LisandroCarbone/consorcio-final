@@ -119,7 +119,7 @@ export function ParametrosCCTClient({
                     <th className="th text-right">Con. SS</th>
                     <th className="th text-right">Con. ANSSAL</th>
                     <th className="th text-right">Detr. Empl.</th>
-                    <th className="th text-right">Art.19bis</th>
+                    <th className="th text-right">FATERYH Contrib. Solidaria (Art. 19 bis)</th>
                     <th className="th" />
                   </tr>
                 </thead>

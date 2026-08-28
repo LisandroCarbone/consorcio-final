@@ -146,7 +146,7 @@ export default async function ParametrosCCTPage() {
               <p className="font-semibold text-gray-800">{formatPct(vigente.pct_contrib_anssal)}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide">FATERYH Art.19bis</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wide">FATERYH Contrib. Solidaria (Art. 19 bis)</p>
               <p className="font-semibold text-gray-800">{formatMoney(vigente.fateryh_art19bis)}</p>
             </div>
           </div>
