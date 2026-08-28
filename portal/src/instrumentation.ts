@@ -82,7 +82,7 @@ export async function register() {
                 SELECT array_agg(a.attname)
                 FROM unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)
                 JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
-              ) = ARRAY['cuil']
+              )::text[] = ARRAY['cuil']
           ) THEN
             ALTER TABLE app.empleados DROP CONSTRAINT empleados_pkey;
             ALTER TABLE app.empleados ADD PRIMARY KEY (id);
