@@ -23,6 +23,7 @@ interface LiquidacionRow {
   total_descuentos_empleado: string;
   neto_a_pagar: string;
   estado: string;
+  origen?: string;
 }
 
 interface Props {
@@ -232,11 +233,19 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
                         <td className="px-3 py-2.5 text-right font-mono text-gray-700">{formatMoney0(Number(l.remuneracion_bruta))}</td>
                         <td className="px-3 py-2.5 text-right font-mono text-red-500">-{formatMoney0(Number(l.total_descuentos_empleado))}</td>
                         <td className="px-3 py-2.5 text-right font-mono font-bold text-gray-900">{formatMoney0(Number(l.neto_a_pagar))}</td>
-                        <td className="px-3 py-2.5"><EstadoBadge estado={l.estado} /></td>
+                        <td className="px-3 py-2.5">
+                          {l.origen === "manual" ? (
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Histórico</span>
+                          ) : (
+                            <EstadoBadge estado={l.estado} />
+                          )}
+                        </td>
                         <td className="px-3 py-2.5">
                           <div className="flex gap-3">
-                            <a href={`/sueldos/liquidaciones/${l.id}`} className="text-blue-600 hover:text-blue-800 font-medium">Ver recibo</a>
-                            {l.estado === "borrador" && (
+                            {l.origen !== "manual" && (
+                              <a href={`/sueldos/liquidaciones/${l.id}`} className="text-blue-600 hover:text-blue-800 font-medium">Ver recibo</a>
+                            )}
+                            {l.estado === "borrador" && l.origen !== "manual" && (
                               <ConfirmarLiquidacionButton id={l.id} periodo={periodo} tipo={tipo} />
                             )}
                           </div>
@@ -284,6 +293,13 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
                 <div>
                   <p className="text-sm font-medium text-gray-800">Egreso o Despido</p>
                   <p className="text-xs text-gray-500">Liquidación final e indemnización</p>
+                </div>
+              </Link>
+              <Link href="/sueldos/historial-onboarding" className="flex items-start gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                <TrendingUp className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Onboarding de historial</p>
+                  <p className="text-xs text-gray-500">Cargar meses previos (SAC / plus vacacional)</p>
                 </div>
               </Link>
               <LsdExportButton

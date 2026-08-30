@@ -18,7 +18,10 @@ export type AuditAction =
   | "login"
   | "logout"
   | "login_failed"
-  | "access";
+  | "access"
+  | "historico_create"
+  | "historico_update"
+  | "historico_delete";
 
 export interface AuditEntry {
   id: number;
