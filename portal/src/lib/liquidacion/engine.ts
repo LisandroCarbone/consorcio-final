@@ -786,7 +786,7 @@ export async function calcularLiquidacion(
   // ---------------------------------------------------------------------------
 
   const netBeforeRounding = totalRemunerativoFinal - totalDescuentos;
-  const netRounded = Math.round(netBeforeRounding * 100) / 100;
+  const netRounded = Math.ceil(Math.round(netBeforeRounding * 100) / 100);
   const roundingVal = Math.round((netRounded - netBeforeRounding) * 100) / 100;
   const netoAPagar = netRounded;
 
@@ -1124,7 +1124,7 @@ export async function calcularSACPreview(
     seguroVital,
     totalDescuentos,
     totalPatronal,
-    netoAPagar: Math.round((totalBruto - totalDescuentos) * 100) / 100,
+    netoAPagar: Math.ceil(Math.round((totalBruto - totalDescuentos) * 100) / 100),
     periodo: periodoSAC,
     tipo: semestre === 1 ? "sac_1" : "sac_2",
   };
