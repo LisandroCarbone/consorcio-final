@@ -312,8 +312,14 @@ export async function calcularLiquidacion(
   // Detect suplente from jornada OR funcion
   const esSuplente = emp.jornada === "Suplente" || /suplente/i.test(emp.funcion ?? "");
 
-  // Skip suplentes with no days worked — delete any stale liquidación and return
-  if (esSuplente && !Number(nov.dias_trabajados_suplente ?? 0) && !Number(nov.suplencia_100_hs ?? 0)) {
+  // Skip suplentes with nothing to liquidate — delete any stale liquidación and return
+  const nadaQueLiquidar =
+    !Number(nov.dias_trabajados_suplente ?? 0) &&
+    !Number(nov.suplencia_100_hs ?? 0) &&
+    !Number(nov.horas_extras_50 ?? 0) &&
+    !Number(nov.horas_extras_100 ?? 0) &&
+    !Number(nov.feriados_trabajados_hs ?? 0);
+  if (esSuplente && nadaQueLiquidar) {
     await pool.query(
       `DELETE FROM app.liquidaciones_sueldo WHERE empleado_id = $1 AND periodo = $2 AND tipo = 'mensual' AND estado != 'confirmada'`,
       [empleadoId, periodo]
@@ -595,7 +601,33 @@ export async function calcularLiquidacion(
   // 17. Plus vacacional
   // ---------------------------------------------------------------------------
 
-  const baseVacacional = haberesFijos - adicionalRemEfectivo;
+  // Promedio de remuneración variable (HE 50%/100% y feriados trabajados) de los
+  // últimos 6 períodos mensuales confirmados. Siempre se divide por 6 (LCT art. 155,
+  // promedio del último semestre): los meses sin HE aportan $0 al numerador.
+  let promedioVariablesSemestre = 0;
+  if (novN.plus_vacaciones_dias > 0) {
+    const semestreRows = await pool.query<{ promedio: string }>(
+      `SELECT COALESCE(SUM(sub.total) / 6, 0) AS promedio
+       FROM (
+         SELECT ls.periodo, COALESCE(SUM(cl.importe), 0) AS total
+         FROM app.liquidaciones_sueldo ls
+         LEFT JOIN app.conceptos_liquidacion cl
+           ON cl.liquidacion_id = ls.id
+           AND cl.code IN ('1800', '1850', '1900')
+         WHERE ls.empleado_id = $1
+           AND ls.tipo = 'mensual'
+           AND ls.estado = 'confirmada'
+           AND ls.periodo < $2
+         GROUP BY ls.periodo
+         ORDER BY ls.periodo DESC
+         LIMIT 6
+       ) sub`,
+      [empleadoId, periodo]
+    );
+    promedioVariablesSemestre = Number(semestreRows.rows[0]?.promedio ?? 0);
+  }
+
+  const baseVacacional = haberesFijos - adicionalRemEfectivo + promedioVariablesSemestre;
   const plusVacacional =
     novN.plus_vacaciones_dias > 0
       ? baseVacacional * (1 / 25 - 1 / 30) * novN.plus_vacaciones_dias
