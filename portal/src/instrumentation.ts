@@ -196,5 +196,15 @@ export async function register() {
     } catch (err) {
       console.error("[instrumentation] empleado surrogate-id migration failed:", err);
     }
+
+    // One-shot fix: correct Ley 26475 → 26474 typo in existing conceptos
+    try {
+      const { pool } = await import("@/lib/db");
+      await pool.query(
+        `UPDATE app.conceptos_liquidacion SET concepto = REPLACE(concepto, '26475', '26474') WHERE concepto LIKE '%26475%'`
+      );
+    } catch {
+      // Non-fatal
+    }
   }
 }
