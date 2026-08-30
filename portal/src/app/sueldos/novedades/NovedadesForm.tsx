@@ -96,9 +96,9 @@ export default function NovedadesForm({ empleado, periodo, novedades }: Props) {
             <Field label="Plus vacaciones (días)" name="plus_vacaciones_dias" defaultValue={def("plus_vacaciones_dias")} step="0.5" max={31} />
             <Field label="Días no trabajados" name="dias_no_trabajados" defaultValue={def("dias_no_trabajados")} step="0.5" max={31} />
             <Field label="Lic. enfermedad (días)" name="licencia_enfermedad" defaultValue={def("licencia_enfermedad")} step="0.5" max={31} />
-            <Field label="Adicional voluntario ($)" name="adicional_voluntario" defaultValue={def("adicional_voluntario")} step="1" />
-            <Field label="Embargo ($)" name="embargo" defaultValue={def("embargo")} step="1" />
-            <Field label="Anticipo ($)" name="anticipo" defaultValue={def("anticipo")} step="1" />
+            <Field label="Adicional voluntario ($)" name="adicional_voluntario" defaultValue={def("adicional_voluntario")} step="0.01" />
+            <Field label="Embargo ($)" name="embargo" defaultValue={def("embargo")} step="0.01" />
+            <Field label="Anticipo ($)" name="anticipo" defaultValue={def("anticipo")} step="0.01" />
           </div>
 
           <div className="mt-4">

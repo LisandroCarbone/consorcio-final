@@ -506,7 +506,8 @@ export async function calcularLiquidacion(
     const base = (emp.adicional_remuneratorio !== null && emp.adicional_remuneratorio !== undefined)
       ? Number(emp.adicional_remuneratorio)
       : adicRemBase;
-    adicionalRemEfectivo = horasTotalesSuplente === 0 ? 0 : (base / 200) * horasTotalesSuplente;
+    const horasConHE = horasTotalesSuplente + novN.horas_extras_50 + novN.horas_extras_100;
+    adicionalRemEfectivo = horasConHE === 0 ? 0 : (base / 200) * horasConHE;
   } else if (emp.adicional_remuneratorio !== null && emp.adicional_remuneratorio !== undefined) {
     adicionalRemEfectivo = Number(emp.adicional_remuneratorio);
   } else if (emp.jornada === "Completa") {
@@ -572,7 +573,8 @@ export async function calcularLiquidacion(
   } else if (esVigilNocturna) {
     valorHora = baseHE / 175;
   } else if (esMediaJornada) {
-    valorHora = baseHE / 100;
+    const otrosHaberes = baseHE - sueldoBasico;
+    valorHora = (sueldoBasico / 100) + (otrosHaberes / 200);
   } else {
     valorHora = baseHE / 200;
   }
@@ -752,7 +754,7 @@ export async function calcularLiquidacion(
   // ---------------------------------------------------------------------------
 
   const netBeforeRounding = totalRemunerativoFinal - totalDescuentos;
-  const netRounded = Math.ceil(netBeforeRounding);
+  const netRounded = Math.round(netBeforeRounding * 100) / 100;
   const roundingVal = Math.round((netRounded - netBeforeRounding) * 100) / 100;
   const netoAPagar = netRounded;
 
@@ -1090,7 +1092,7 @@ export async function calcularSACPreview(
     seguroVital,
     totalDescuentos,
     totalPatronal,
-    netoAPagar: Math.ceil(totalBruto - totalDescuentos),
+    netoAPagar: Math.round((totalBruto - totalDescuentos) * 100) / 100,
     periodo: periodoSAC,
     tipo: semestre === 1 ? "sac_1" : "sac_2",
   };

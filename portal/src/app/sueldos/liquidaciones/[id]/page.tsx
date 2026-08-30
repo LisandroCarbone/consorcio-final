@@ -544,7 +544,7 @@ export default async function ReciboPage({
         {/* ══════════════════════════════════════════════════
             BLOQUE 4 — GRÁFICO COSTO LABORAL
         ══════════════════════════════════════════════════ */}
-        <div className="border-2 border-gray-800 border-t-0 mt-0 print:hidden">
+        <div className="border-2 border-gray-800 border-t-0 mt-0">
           <div className="border-t border-gray-200 p-4">
             <p className="text-[10px] text-gray-400 uppercase font-semibold mb-3">
               Composición del costo laboral — Decreto 407/2026
@@ -552,9 +552,9 @@ export default async function ReciboPage({
             <PieChart slices={pieSlices} />
           </div>
         </div>
-        {/* Print-only compact cost composition */}
+        {/* Print-only compact cost composition (text supplement below chart) */}
         <div className="hidden print:block border-2 border-gray-800 border-t-0 px-2 py-0.5 text-[7px]">
-          <span className="text-gray-400 uppercase font-semibold">Composición costo laboral: </span>
+          <span className="text-gray-400 uppercase font-semibold">Detalle: </span>
           {pieSlices.filter(s => s.value > 0).map((s, i) => (
             <span key={i} className="text-gray-700">
               {i > 0 && " · "}{s.label} {((s.value / costoTotal) * 100).toFixed(1)}%

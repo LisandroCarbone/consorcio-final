@@ -245,15 +245,7 @@ export default async function EditarEmpleadoPage({
               </label>
             ))}
           </div>
-          <div className="mt-4">
-            <label className="label">Adicional voluntario ($)</label>
-            <MaskedInput
-              preset="money"
-              name="adicional_voluntario"
-              className="input w-48"
-              defaultValue={emp.adicional_voluntario ?? 0}
-            />
-          </div>
+          {/* Adicional voluntario removed — se carga solo desde Novedades */}
         </div>
 
         <div className="flex gap-3 justify-end">
