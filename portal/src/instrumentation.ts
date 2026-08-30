@@ -206,5 +206,15 @@ export async function register() {
     } catch {
       // Non-fatal
     }
+
+    // Migration 022: add origen column to liquidaciones_sueldo
+    try {
+      const { pool } = await import("@/lib/db");
+      await pool.query(
+        `ALTER TABLE app.liquidaciones_sueldo ADD COLUMN IF NOT EXISTS origen VARCHAR(20) NOT NULL DEFAULT 'sistema'`
+      );
+    } catch {
+      // Non-fatal — column may already exist
+    }
   }
 }
