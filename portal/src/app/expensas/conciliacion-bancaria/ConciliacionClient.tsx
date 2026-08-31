@@ -4,7 +4,14 @@ import { useMemo, useRef, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { formatMoney, formatDate } from "@/lib/format";
-import { bankChargeLabel } from "@/lib/conciliacion/categorizeBankCharge";
+import { bankChargeLabel, type BankChargeCategoria } from "@/lib/conciliacion/categorizeBankCharge";
+
+const BANK_CHARGE_CATEGORIAS: { value: BankChargeCategoria; label: string }[] = [
+  { value: "ley_25413", label: "Imp. Ley 25.413" },
+  { value: "comision", label: "Comisión Bancaria" },
+  { value: "iva", label: "IVA s/Comisiones" },
+  { value: "mantenimiento", label: "Comisión Mantenimiento" },
+];
 import {
   uploadExtracto,
   runAutoMatch,
@@ -13,6 +20,7 @@ import {
   desconfirmarMatch,
   descartarMovimiento,
   asignarManual,
+  marcarGastoBancario,
   cargarGastosBancarios,
   aplicarCreditos,
   aplicarDebitos,
@@ -831,6 +839,17 @@ function MovimientosTable({
                                 estado_match: "sugerido",
                               }));
                             }}
+                            onMarkBankCharge={(categoria) => {
+                              setAssignOpenFor(null);
+                              withPending(m.id, () => marcarGastoBancario(m.id, categoria), (mv) => ({
+                                ...mv,
+                                categoria_bancaria: categoria,
+                                match_tipo: null,
+                                match_id: null,
+                                match_confianza: null,
+                                estado_match: "pendiente",
+                              }));
+                            }}
                           />
                         )}
                       </div>
@@ -859,6 +878,7 @@ function AssignPopover({
   gastos,
   onClose,
   onAssign,
+  onMarkBankCharge,
   triggerRef,
 }: {
   movimiento: Movimiento;
@@ -866,6 +886,7 @@ function AssignPopover({
   gastos: Gasto[];
   onClose: () => void;
   onAssign: (tipo: "cobranza" | "gasto", targetId: number) => void;
+  onMarkBankCharge: (categoria: BankChargeCategoria) => void;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   const [search, setSearch] = useState("");
@@ -930,6 +951,25 @@ function AssignPopover({
             autoFocus
           />
         </div>
+        {!isCredit && (
+          <div className="px-3 pt-2 pb-2 border-b border-gray-100">
+            <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+              Marcar como gasto bancario
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {BANK_CHARGE_CATEGORIAS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  className="rounded-full px-2.5 py-1 text-[11px] font-medium bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors"
+                  onClick={() => onMarkBankCharge(c.value)}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="overflow-y-auto flex-1 p-1.5">
           {isCredit ? (
             filteredUnidades.length > 0 ? (

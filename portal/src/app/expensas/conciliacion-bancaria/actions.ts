@@ -3,7 +3,7 @@
 import { query, queryOne, pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import * as XLSX from "xlsx";
-import { categorizeBankCharge } from "@/lib/conciliacion/categorizeBankCharge";
+import { categorizeBankCharge, type BankChargeCategoria } from "@/lib/conciliacion/categorizeBankCharge";
 import { runCalculateExpenses } from "@/lib/expenses/engine";
 import { logAudit } from "@/lib/audit";
 
@@ -906,6 +906,24 @@ export async function asignarManual(movimientoId: number, tipo: "cobranza" | "ga
       );
     }
   }
+
+  await updateExtractoMatchedCount(mov.extracto_id);
+  revalidatePath(BASE_PATH);
+}
+
+export async function marcarGastoBancario(movimientoId: number, categoria: BankChargeCategoria) {
+  const mov = await queryOne<{ extracto_id: number }>(
+    "SELECT extracto_id FROM app.extracto_movimientos WHERE id = $1",
+    [movimientoId]
+  );
+  if (!mov) return;
+
+  await query(
+    `UPDATE app.extracto_movimientos
+     SET categoria_bancaria = $1, match_tipo = NULL, match_id = NULL, match_confianza = NULL, estado_match = 'pendiente'
+     WHERE id = $2`,
+    [categoria, movimientoId]
+  );
 
   await updateExtractoMatchedCount(mov.extracto_id);
   revalidatePath(BASE_PATH);
