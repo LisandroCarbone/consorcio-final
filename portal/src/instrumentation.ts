@@ -216,5 +216,31 @@ export async function register() {
     } catch {
       // Non-fatal — column may already exist
     }
+
+    // Migration 019: cuota tracking columns on gastos_periodo.
+    // This migration file existed in db/migrations/019_cuota_tracking.sql but was
+    // never wired into this auto-migrate startup hook (unlike 020-022), so on
+    // environments where it was never run manually, every query touching
+    // cuota_grupo_id/cuota_nro/cuota_total/consorcio_cuit (installment expenses,
+    // "gastos en cuota") throws "column does not exist" and crashes the
+    // /expensas Server Component. All statements are idempotent.
+    try {
+      const { pool } = await import("@/lib/db");
+      await pool.query("ALTER TABLE app.gastos_periodo ADD COLUMN IF NOT EXISTS cuota_grupo_id UUID");
+      await pool.query("ALTER TABLE app.gastos_periodo ADD COLUMN IF NOT EXISTS cuota_nro INT");
+      await pool.query("ALTER TABLE app.gastos_periodo ADD COLUMN IF NOT EXISTS cuota_total INT");
+      await pool.query(
+        "ALTER TABLE app.gastos_periodo ADD COLUMN IF NOT EXISTS consorcio_cuit TEXT REFERENCES app.consorcios(cuit)"
+      );
+      await pool.query("ALTER TABLE app.gastos_periodo ALTER COLUMN periodo_id DROP NOT NULL");
+      await pool.query(
+        "CREATE INDEX IF NOT EXISTS idx_gastos_periodo_cuota_grupo ON app.gastos_periodo (cuota_grupo_id) WHERE cuota_grupo_id IS NOT NULL"
+      );
+      await pool.query(
+        "CREATE INDEX IF NOT EXISTS idx_gastos_periodo_pending ON app.gastos_periodo (consorcio_cuit) WHERE periodo_id IS NULL AND cuota_grupo_id IS NOT NULL"
+      );
+    } catch (err) {
+      console.error("[instrumentation] cuota_tracking migration failed:", err);
+    }
   }
 }

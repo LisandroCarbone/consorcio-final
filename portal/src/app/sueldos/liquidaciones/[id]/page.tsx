@@ -301,7 +301,7 @@ export default async function ReciboPage({
         {/* ══════════════════════════════════════════════════
             BLOQUE 1 — ENCABEZADO EMPLEADOR / EMPLEADO
         ══════════════════════════════════════════════════ */}
-        <div className="border-2 border-gray-800 mb-0">
+        <div className="border-2 border-gray-800 mb-0 print:break-inside-avoid">
           {/* Title bar */}
           <div className="bg-gray-800 text-white text-center py-1.5 print:py-[1px] text-sm font-bold tracking-wide">
             {tipoLiq === "sac_1" || tipoLiq === "sac_2"
@@ -394,7 +394,7 @@ export default async function ReciboPage({
             <span className="text-sm font-bold text-gray-900">${fmt(costoTotal)}</span>
           </div>
 
-          <table className="w-full text-xs print:text-[8px] border-collapse">
+          <table className="w-full text-xs print:text-[8px] border-collapse table-fixed">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left p-2 print:p-0.5 font-semibold text-gray-600 w-[46%]">Concepto</th>
@@ -406,7 +406,7 @@ export default async function ReciboPage({
             <tbody>
               {patronalRows.map((r, i) => (
                 <tr key={i} className="border-b border-gray-100">
-                  <td className="p-1.5 print:p-[1px] pl-2 text-gray-800">{r.concepto}</td>
+                  <td className="p-1.5 print:p-[1px] pl-2 text-gray-800 truncate">{r.concepto}</td>
                   <td className="p-1.5 print:p-[1px] text-right text-gray-500">
                     {r.alicuota != null ? fmtPct(r.alicuota) : "Fijo"}
                   </td>
@@ -434,7 +434,7 @@ export default async function ReciboPage({
           </div>
 
           {/* Haberes y Descuentos */}
-          <table className="w-full text-xs print:text-[8px] border-collapse">
+          <table className="w-full text-xs print:text-[8px] border-collapse table-fixed">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left p-2 print:p-0.5 font-semibold text-gray-600 w-[32%]">Concepto</th>
@@ -453,7 +453,7 @@ export default async function ReciboPage({
                 const { unidad, valorUnit } = inferUnidadValor(h.concepto, Math.abs(val), { anios: liq.antiguedad_anios ?? 0 });
                 return (
                   <tr key={i} className="border-b border-gray-100">
-                    <td className="p-1.5 print:p-[1px] pl-2 text-gray-800">{h.concepto}</td>
+                    <td className="p-1.5 print:p-[1px] pl-2 text-gray-800 truncate">{h.concepto}</td>
                     <td className="p-1.5 print:p-[1px] text-right text-gray-500">{unidad}</td>
                     <td className="p-1.5 print:p-[1px] text-right text-gray-500">{valorUnit}</td>
                     <td className={`p-1.5 print:p-[1px] text-right font-medium ${isNegative ? "text-red-700" : "text-gray-900"}`}>
@@ -470,7 +470,7 @@ export default async function ReciboPage({
                 const { unidad, valorUnit } = inferUnidadValor(d.concepto, Number(d.importe));
                 return (
                   <tr key={i} className="border-b border-gray-100">
-                    <td className="p-1.5 print:p-[1px] pl-2 text-gray-800">{d.concepto}</td>
+                    <td className="p-1.5 print:p-[1px] pl-2 text-gray-800 truncate">{d.concepto}</td>
                     <td className="p-1.5 print:p-[1px] text-right text-gray-500">{unidad}</td>
                     <td className="p-1.5 print:p-[1px] text-right text-gray-500">{valorUnit}</td>
                     <td className="p-1.5 print:p-[1px]" />
@@ -517,7 +517,7 @@ export default async function ReciboPage({
         {/* ══════════════════════════════════════════════════
             BLOQUE 3 — NETO + TEXTO DE RECIBO
         ══════════════════════════════════════════════════ */}
-        <div className="border-2 border-gray-800 border-t-0 p-3 print:p-1 text-xs print:text-[8px]">
+        <div className="border-2 border-gray-800 border-t-0 p-3 print:p-1 text-xs print:text-[8px] print:break-inside-avoid">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <p className="italic text-gray-700">
@@ -544,16 +544,16 @@ export default async function ReciboPage({
         {/* ══════════════════════════════════════════════════
             BLOQUE 4 — GRÁFICO COSTO LABORAL
         ══════════════════════════════════════════════════ */}
-        <div className="border-2 border-gray-800 border-t-0 mt-0">
-          <div className="border-t border-gray-200 p-4">
-            <p className="text-[10px] text-gray-400 uppercase font-semibold mb-3">
+        <div className="border-2 border-gray-800 border-t-0 mt-0 print:break-inside-avoid">
+          <div className="border-t border-gray-200 p-4 print:p-1">
+            <p className="text-[10px] print:text-[7px] text-gray-400 uppercase font-semibold mb-3 print:mb-0.5">
               Composición del costo laboral — Decreto 407/2026
             </p>
             <PieChart slices={pieSlices} />
           </div>
         </div>
         {/* Print-only compact cost composition (text supplement below chart) */}
-        <div className="hidden print:block border-2 border-gray-800 border-t-0 px-2 py-0.5 text-[7px]">
+        <div className="hidden print:block print:break-inside-avoid border-2 border-gray-800 border-t-0 px-2 py-0.5 text-[7px]">
           <span className="text-gray-400 uppercase font-semibold">Detalle: </span>
           {pieSlices.filter(s => s.value > 0).map((s, i) => (
             <span key={i} className="text-gray-700">
@@ -566,7 +566,7 @@ export default async function ReciboPage({
             BLOQUE 4B — ÚLTIMO DEPÓSITO DE APORTES Y CONTRIBUCIONES
         ══════════════════════════════════════════════════ */}
         {liq.ultimo_deposito_aportes && (
-          <div className="border-2 border-gray-800 border-t-0 p-3 print:p-1 text-xs print:text-[8px]">
+          <div className="border-2 border-gray-800 border-t-0 p-3 print:p-1 text-xs print:text-[8px] print:break-inside-avoid">
             <p className="text-gray-400 uppercase text-[10px] print:text-[8px] font-semibold mb-1 print:mb-0">
               Último depósito de aportes y contribuciones
             </p>
@@ -602,7 +602,7 @@ export default async function ReciboPage({
         {/* ══════════════════════════════════════════════════
             BLOQUE 5 — FIRMAS
         ══════════════════════════════════════════════════ */}
-        <div className="border-2 border-gray-800 border-t-0 grid grid-cols-2 divide-x divide-gray-300">
+        <div className="border-2 border-gray-800 border-t-0 grid grid-cols-2 divide-x divide-gray-300 print:break-inside-avoid">
           {/* Firma empleador */}
           <div className="p-3 print:px-1 print:py-0.5 text-center">
             <div className="h-16 print:h-10 flex items-end justify-center pb-1 print:pb-0">

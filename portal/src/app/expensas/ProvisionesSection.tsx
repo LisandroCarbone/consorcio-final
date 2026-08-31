@@ -62,7 +62,7 @@ function EditProvisionRow({ p, periodoId, onCancel }: { p: ProvisionRow; periodo
           </div>
           <div className="w-36">
             <label className="label text-xs">Monto</label>
-            <MaskedInput preset="money" name="monto" defaultValue={Number(p.monto)} required className="input" />
+            <MaskedInput preset="money" name="monto" defaultValue={Number(p.monto)} required className="input" allowNegative />
           </div>
           <div className="w-36">
             <label className="label text-xs">Tipo</label>
@@ -309,6 +309,7 @@ export function ProvisionesSection({ provisiones, periodoId }: Props) {
             required
             placeholder="Ej: 300.000"
             className="input"
+            allowNegative
           />
         </div>
 
