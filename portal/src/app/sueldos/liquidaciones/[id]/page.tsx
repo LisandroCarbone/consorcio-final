@@ -4,6 +4,7 @@ import { getLiquidacionDetalle } from "../queries";
 import { notFound } from "next/navigation";
 import { PrintButton } from "./PrintButton";
 import { FechaPagoEditor } from "./FechaPagoEditor";
+import { UltimoDepositoEditor } from "./UltimoDepositoEditor";
 import { numberToWords, formatCuit, formatCbu } from "@/lib/format";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -565,39 +566,46 @@ export default async function ReciboPage({
         {/* ══════════════════════════════════════════════════
             BLOQUE 4B — ÚLTIMO DEPÓSITO DE APORTES Y CONTRIBUCIONES
         ══════════════════════════════════════════════════ */}
-        {liq.ultimo_deposito_aportes && (
-          <div className="border-2 border-gray-800 border-t-0 p-3 print:p-1 text-xs print:text-[8px] print:break-inside-avoid">
-            <p className="text-gray-400 uppercase text-[10px] print:text-[8px] font-semibold mb-1 print:mb-0">
-              Último depósito de aportes y contribuciones
-            </p>
-            <p className="text-gray-700">
-              {liq.ultimo_deposito_aportes.periodo_mes && liq.ultimo_deposito_aportes.periodo_anio && (
-                <>
-                  <span className="text-gray-400 uppercase">Período </span>
-                  <span className="font-semibold">
-                    {String(liq.ultimo_deposito_aportes.periodo_mes).padStart(2, "0")}/{liq.ultimo_deposito_aportes.periodo_anio}
-                  </span>
-                </>
-              )}
-              {liq.ultimo_deposito_aportes.fecha && (
-                <>
-                  {"  —  "}
-                  <span className="text-gray-400 uppercase">Fecha </span>
-                  <span className="font-semibold">
-                    {new Date(liq.ultimo_deposito_aportes.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}
-                  </span>
-                </>
-              )}
-              {liq.ultimo_deposito_aportes.banco && (
-                <>
-                  {"  —  "}
-                  <span className="text-gray-400 uppercase">Banco </span>
-                  <span className="font-semibold">{liq.ultimo_deposito_aportes.banco}</span>
-                </>
-              )}
-            </p>
-          </div>
-        )}
+        {(() => {
+          const dep = liq.ultimo_deposito_aportes;
+          const reciboDate = new Date(liq.periodo);
+          // Default período for a fresh manual entry: mes anterior al recibo
+          // (aportes se depositan con un mes de atraso — ver getUltimoDepositoAportes).
+          let defaultAnio = reciboDate.getUTCFullYear();
+          let defaultMes = reciboDate.getUTCMonth(); // 0-based = mes anterior en 1-based
+          if (defaultMes === 0) {
+            defaultMes = 12;
+            defaultAnio -= 1;
+          }
+          const periodoAnio = dep?.periodo_anio ?? defaultAnio;
+          const periodoMes = dep?.periodo_mes ?? defaultMes;
+          const fechaDisplay = dep?.fecha
+            ? new Date(dep.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })
+            : "";
+          const fechaISO = dep?.fecha ? dep.fecha.slice(0, 10) : "";
+          const hasValue = Boolean(dep?.banco || dep?.fecha || dep?.periodo_mes);
+          return (
+            <div
+              className={`border-2 border-gray-800 border-t-0 p-3 print:p-1 text-xs print:text-[8px] print:break-inside-avoid ${
+                !hasValue ? "print:hidden" : ""
+              }`}
+            >
+              <p className="text-gray-400 uppercase text-[10px] print:text-[8px] font-semibold mb-1 print:mb-0">
+                Último depósito de aportes y contribuciones
+              </p>
+              <UltimoDepositoEditor
+                liquidacionId={liq.id}
+                consorcioCuit={liq.consorcio_cuit}
+                periodoAnio={periodoAnio}
+                periodoMes={periodoMes}
+                banco={dep?.banco ?? ""}
+                fecha={fechaDisplay}
+                fechaISO={fechaISO}
+                isManual={Boolean(dep?.manual)}
+              />
+            </div>
+          );
+        })()}
 
         {/* ══════════════════════════════════════════════════
             BLOQUE 5 — FIRMAS

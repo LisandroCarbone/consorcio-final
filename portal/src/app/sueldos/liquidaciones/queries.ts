@@ -53,6 +53,9 @@ export async function getLiquidacionDetalle(id: number) {
 // correspondiente al período INMEDIATO ANTERIOR, no el más reciente sin más
 // (que podría ser del mismo mes del recibo si ya fue matcheado).
 export async function getUltimoDepositoAportes(consorcioCuit: string, reciboPeriodo?: string) {
+  const manual = await getUltimoDepositoManual(consorcioCuit, reciboPeriodo);
+  if (manual) return { ...manual, manual: true };
+
   const params: unknown[] = [consorcioCuit];
   let periodoFilter = "";
   if (reciboPeriodo) {
@@ -77,6 +80,29 @@ export async function getUltimoDepositoAportes(consorcioCuit: string, reciboPeri
        AND (gp.descripcion ILIKE '%F. 931%' OR gp.descripcion ILIKE '%F.931%' OR gp.descripcion ILIKE '%AFIP%VEP%' OR gp.descripcion ILIKE '%ARCA%931%')
        ${periodoFilter}
      ORDER BY pe.anio DESC, pe.mes DESC, em.fecha DESC
+     LIMIT 1`,
+    params
+  );
+  if (rows.length === 0) return null;
+  return { ...rows[0], manual: false };
+}
+
+async function getUltimoDepositoManual(consorcioCuit: string, reciboPeriodo?: string) {
+  const params: unknown[] = [consorcioCuit];
+  let periodoFilter = "";
+  if (reciboPeriodo) {
+    const d = new Date(reciboPeriodo);
+    const anio = d.getUTCFullYear();
+    const mes = d.getUTCMonth() + 1;
+    params.push(anio, mes);
+    periodoFilter = `AND (periodo_anio < $2 OR (periodo_anio = $2 AND periodo_mes <= $3))`;
+  }
+  const { rows } = await pool.query(
+    `SELECT banco, fecha_deposito::text AS fecha, periodo_anio, periodo_mes
+     FROM app.ultimo_deposito_manual
+     WHERE consorcio_cuit = $1
+       ${periodoFilter}
+     ORDER BY periodo_anio DESC, periodo_mes DESC
      LIMIT 1`,
     params
   );

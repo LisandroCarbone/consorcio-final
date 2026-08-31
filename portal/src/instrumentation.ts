@@ -242,5 +242,24 @@ export async function register() {
     } catch (err) {
       console.error("[instrumentation] cuota_tracking migration failed:", err);
     }
+
+    // Migration 023: manual override for "último depósito de aportes y contribuciones"
+    try {
+      const { pool } = await import("@/lib/db");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS app.ultimo_deposito_manual (
+          id SERIAL PRIMARY KEY,
+          consorcio_cuit TEXT NOT NULL REFERENCES app.consorcios(cuit),
+          periodo_anio INT NOT NULL,
+          periodo_mes INT NOT NULL,
+          banco TEXT,
+          fecha_deposito DATE,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          UNIQUE (consorcio_cuit, periodo_anio, periodo_mes)
+        )
+      `);
+    } catch (err) {
+      console.error("[instrumentation] ultimo_deposito_manual migration failed:", err);
+    }
   }
 }

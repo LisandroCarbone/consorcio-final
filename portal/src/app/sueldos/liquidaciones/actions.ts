@@ -37,3 +37,34 @@ export async function updateFechaPago(liquidacionId: number, fecha: string) {
   );
   revalidatePath(`/sueldos/liquidaciones/${liquidacionId}`);
 }
+
+export async function setUltimoDepositoManual(
+  consorcioCuit: string,
+  anio: number,
+  mes: number,
+  banco: string,
+  fecha: string,
+  liquidacionId: number
+) {
+  await pool.query(
+    `INSERT INTO app.ultimo_deposito_manual (consorcio_cuit, periodo_anio, periodo_mes, banco, fecha_deposito)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (consorcio_cuit, periodo_anio, periodo_mes)
+     DO UPDATE SET banco = EXCLUDED.banco, fecha_deposito = EXCLUDED.fecha_deposito, updated_at = now()`,
+    [consorcioCuit, anio, mes, banco || null, fecha || null]
+  );
+  revalidatePath(`/sueldos/liquidaciones/${liquidacionId}`);
+}
+
+export async function clearUltimoDepositoManual(
+  consorcioCuit: string,
+  anio: number,
+  mes: number,
+  liquidacionId: number
+) {
+  await pool.query(
+    "DELETE FROM app.ultimo_deposito_manual WHERE consorcio_cuit = $1 AND periodo_anio = $2 AND periodo_mes = $3",
+    [consorcioCuit, anio, mes]
+  );
+  revalidatePath(`/sueldos/liquidaciones/${liquidacionId}`);
+}
