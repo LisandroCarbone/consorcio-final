@@ -32,10 +32,12 @@ async function getData(activeCuit?: string) {
       id: number; consorcio_id: string; consorcio_nombre: string;
       anio: number; mes: number; estado: string; fecha_vencimiento: string | null;
       total_gastos: string; total_expensas: string; pagadas: string;
-      monto_fijo: string | null; tipo_expensas: string;
+      monto_fijo: string | null; monto_fijo_a: string | null; monto_fijo_b: string | null;
+      tipo_expensas: string;
     }>(
       `SELECT p.id, p.consorcio_cuit AS consorcio_id, c.nombre AS consorcio_nombre,
               p.anio, p.mes, p.estado, p.fecha_vencimiento::text, p.monto_fijo::text,
+              p.monto_fijo_a::text, p.monto_fijo_b::text,
               c.tipo_expensas,
               COALESCE((SELECT SUM(monto) FROM app.gastos_periodo WHERE periodo_id=p.id), 0) AS total_gastos,
               (SELECT COUNT(*) FROM app.res_cuenta_periodo WHERE periodo_id=p.id) AS total_expensas,
@@ -43,7 +45,7 @@ async function getData(activeCuit?: string) {
        FROM app.periodos_expensas p
        JOIN app.consorcios c ON c.cuit = p.consorcio_cuit
        ${where}
-       GROUP BY p.id, c.nombre, p.anio, p.mes, p.estado, p.fecha_vencimiento, p.monto_fijo, c.tipo_expensas
+       GROUP BY p.id, c.nombre, p.anio, p.mes, p.estado, p.fecha_vencimiento, p.monto_fijo, p.monto_fijo_a, p.monto_fijo_b, c.tipo_expensas
        ORDER BY p.anio DESC, p.mes DESC`,
       params
     ),
@@ -693,19 +695,29 @@ export default async function ExpensasPage({
                     <form className="flex items-end gap-3">
                       <input type="hidden" name="periodo_id" value={selected.id} />
                       <div>
-                        <label className="label">Monto fijo mensual</label>
+                        <label className="label">Monto fijo A</label>
                         <MaskedInput
                           preset="money"
-                          name="monto_fijo"
-                          defaultValue={selected.monto_fijo ? Number(selected.monto_fijo) : ""}
+                          name="monto_fijo_a"
+                          defaultValue={selected.monto_fijo_a ? Number(selected.monto_fijo_a) : ""}
                           className="input w-48"
-                          placeholder="Ej: 1.500.000"
+                          placeholder="Ej: 1.000.000"
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Monto fijo B</label>
+                        <MaskedInput
+                          preset="money"
+                          name="monto_fijo_b"
+                          defaultValue={selected.monto_fijo_b ? Number(selected.monto_fijo_b) : ""}
+                          className="input w-48"
+                          placeholder="Ej: 500.000"
                         />
                       </div>
                       <SaveMontoFijoButton />
                     </form>
                     <p className="text-xs text-gray-500 mt-2">
-                      Este consorcio liquida expensas fijas: el monto se prorratea entre las unidades según coeficiente.
+                      Este consorcio liquida expensas fijas: cada monto se prorratea entre las unidades según su coeficiente correspondiente (A o B).
                     </p>
                   </div>
                 )}

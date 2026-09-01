@@ -18,12 +18,20 @@ export async function createPeriodo(formData: FormData): Promise<number | null> 
 
   if (row?.id) {
     await query(
-      `UPDATE app.periodos_expensas SET monto_fijo = COALESCE(
-         (SELECT monto_fijo FROM app.periodos_expensas
-          WHERE consorcio_cuit = $1 AND id != $2
-          ORDER BY anio DESC, mes DESC LIMIT 1),
-         (SELECT monto_fijo_default FROM app.consorcios WHERE cuit = $1)
-       ) WHERE id = $2`,
+      `UPDATE app.periodos_expensas SET
+         monto_fijo = COALESCE(
+           (SELECT monto_fijo FROM app.periodos_expensas
+            WHERE consorcio_cuit = $1 AND id != $2
+            ORDER BY anio DESC, mes DESC LIMIT 1),
+           (SELECT monto_fijo_default FROM app.consorcios WHERE cuit = $1)
+         ),
+         monto_fijo_a = (SELECT monto_fijo_a FROM app.periodos_expensas
+           WHERE consorcio_cuit = $1 AND id != $2
+           ORDER BY anio DESC, mes DESC LIMIT 1),
+         monto_fijo_b = (SELECT monto_fijo_b FROM app.periodos_expensas
+           WHERE consorcio_cuit = $1 AND id != $2
+           ORDER BY anio DESC, mes DESC LIMIT 1)
+       WHERE id = $2`,
       [consorcio_cuit, row.id]
     );
   }
@@ -404,6 +412,24 @@ export async function calcularExpensas(periodo_id: number) {
 
 export async function actualizarMontoFijo(formData: FormData) {
   const periodo_id = Number(formData.get("periodo_id"));
+  const montoFijoARaw = formData.get("monto_fijo_a");
+  const montoFijoBRaw = formData.get("monto_fijo_b");
+
+  if (montoFijoARaw !== null || montoFijoBRaw !== null) {
+    // Separate A/B fixed amounts mode.
+    const monto_fijo_a = Number(montoFijoARaw || "0");
+    const monto_fijo_b = Number(montoFijoBRaw || "0");
+    if (!periodo_id || isNaN(monto_fijo_a) || monto_fijo_a < 0 || isNaN(monto_fijo_b) || monto_fijo_b < 0) {
+      throw new Error("Datos inválidos");
+    }
+    await query(
+      "UPDATE app.periodos_expensas SET monto_fijo_a = $1, monto_fijo_b = $2 WHERE id = $3",
+      [monto_fijo_a, monto_fijo_b, periodo_id]
+    );
+    revalidatePath("/expensas");
+    return;
+  }
+
   const raw = (formData.get("monto_fijo") as string) || "0";
   const monto_fijo = Number(raw);
   if (!periodo_id || isNaN(monto_fijo) || monto_fijo < 0) throw new Error("Datos inválidos");

@@ -129,8 +129,12 @@ async function _runCalculateExpenses(
     mes: number;
     total_previsiones: number;
     monto_fijo: number | null;
+    monto_fijo_a: number | null;
+    monto_fijo_b: number | null;
   }>(
-    "SELECT consorcio_cuit, anio, mes, COALESCE(total_previsiones, 0)::numeric AS total_previsiones, monto_fijo::numeric FROM app.periodos_expensas WHERE id = $1",
+    `SELECT consorcio_cuit, anio, mes, COALESCE(total_previsiones, 0)::numeric AS total_previsiones,
+            monto_fijo::numeric, monto_fijo_a::numeric, monto_fijo_b::numeric
+     FROM app.periodos_expensas WHERE id = $1`,
     [periodoId]
   );
   if (!periodo) {
@@ -172,10 +176,29 @@ async function _runCalculateExpenses(
     depto: string;
     coef_a: number;
     coef_b: number;
+    saldo_inicial_historico: number;
   }>(
-    "SELECT id, uf, uf_numero, depto, coef_a::numeric, coef_b::numeric FROM app.unidades WHERE consorcio_cuit = $1 ORDER BY uf",
+    `SELECT id, uf, uf_numero, depto, coef_a::numeric, coef_b::numeric,
+            COALESCE(saldo_inicial_historico, 0)::numeric AS saldo_inicial_historico
+     FROM app.unidades WHERE consorcio_cuit = $1 ORDER BY uf`,
     [cuit]
   );
+
+  // Units that already have at least one prior res_cuenta_periodo row (any
+  // period before the one being calculated now). Only units with NO prior
+  // period ever generated should have their saldo_inicial_historico (a fixed,
+  // interest-free manual opening balance) folded into saldoAnterior — once
+  // the system's own saldo_anterior chain has started, that value takes over
+  // completely and the historical seed must no longer be re-added.
+  const priorPeriodRows = await query<{ unidad_id: number }>(
+    `SELECT DISTINCT rcp.unidad_id
+     FROM app.res_cuenta_periodo rcp
+     JOIN app.periodos_expensas pe ON pe.id = rcp.periodo_id
+     WHERE pe.consorcio_cuit = $1 AND rcp.periodo_id != $2
+       AND (pe.anio < $3 OR (pe.anio = $3 AND pe.mes < $4))`,
+    [cuit, periodoId, periodo.anio, periodo.mes]
+  );
+  const unitsWithPriorPeriod = new Set(priorPeriodRows.map(r => r.unidad_id));
 
   // 4. Fetch all expenses for this period
   const expenses = await query<{
@@ -318,10 +341,19 @@ async function _runCalculateExpenses(
   const totalPrevisiones = Number(periodo.total_previsiones || 0);
   const pctA = Number(consorcio.pct_expensa_a);
   const montoFijo = Number(periodo.monto_fijo || 0);
+  // monto_fijo_a/monto_fijo_b are independent absolute amounts for coefficient
+  // A and B respectively. When either is set, they take precedence over the
+  // legacy monto_fijo * pct_expensa_a proportional split (kept for backward
+  // compatibility with periods that never set the new columns).
+  const hasMontoFijoAB = periodo.monto_fijo_a != null || periodo.monto_fijo_b != null;
+  const montoFijoA = Number(periodo.monto_fijo_a || 0);
+  const montoFijoB = Number(periodo.monto_fijo_b || 0);
   const totalProrrateoA = isFija
-    ? round2(montoFijo * pctA)
+    ? (hasMontoFijoAB ? round2(montoFijoA) : round2(montoFijo * pctA))
     : round2(totalPagosA + totalPrevisiones);
-  const totalProrrateoB = isFija ? round2(montoFijo * (1 - pctA)) : round2(totalPagosB);
+  const totalProrrateoB = isFija
+    ? (hasMontoFijoAB ? round2(montoFijoB) : round2(montoFijo * (1 - pctA)))
+    : round2(totalPagosB);
   // Calculate total prorrateo including specific Coef B expenses and particulars for trace
   const totalBAndPart = isFija ? 0 : Array.from(unitBMap.values()).reduce((sum, v) => sum + v, 0);
   const totalProrrateoAyB = round2(totalProrrateoA + totalProrrateoB + totalBAndPart);
@@ -468,6 +500,15 @@ async function _runCalculateExpenses(
           );
         }
       }
+    }
+
+    // Fold in the unit's manual historical opening balance (fixed amount, no
+    // interest) only for the unit's very first period ever. Once at least
+    // one prior res_cuenta_periodo exists, the system's own saldo_anterior
+    // chain fully takes over and the historical seed is no longer added.
+    const saldoInicialHistorico = Number(u.saldo_inicial_historico || 0);
+    if (saldoInicialHistorico > 0 && !unitsWithPriorPeriod.has(u.id)) {
+      saldoAnterior = round2(saldoAnterior + saldoInicialHistorico);
     }
 
     // su_pago: from pagos table or fallback to existing res_cuenta_periodo.su_pago
