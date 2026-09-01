@@ -325,7 +325,7 @@ export function AddGastoForm({
             >
               <span className="truncate">
                 {ufsSel.length === 0
-                  ? "— Seleccionar UFs —"
+                  ? "Todas las unidades"
                   : `${ufsSel.length} UF${ufsSel.length > 1 ? "s" : ""} seleccionada${ufsSel.length > 1 ? "s" : ""}`}
               </span>
               <span className="text-gray-400 text-xs">▼</span>
@@ -334,6 +334,15 @@ export function AddGastoForm({
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowUfDropdown(false)} />
                 <div className="absolute left-0 top-full mt-1 z-20 w-full border border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto p-2 shadow-lg space-y-1">
+                  <label className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-sm text-gray-700 border-b border-gray-100 mb-1">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                      checked={ufsSel.length === 0}
+                      onChange={() => setUfsSel([])}
+                    />
+                    <span className="font-medium">Todas las unidades</span>
+                  </label>
                   {unidades.length === 0 ? (
                     <p className="text-xs text-gray-400 p-2">Sin unidades</p>
                   ) : (

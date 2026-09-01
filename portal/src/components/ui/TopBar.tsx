@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 interface Consorcio {
   cuit: string;
@@ -32,7 +32,10 @@ const MONTHS = [
 export function TopBar({ consorcios, activeCuit, activePeriodo }: TopBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const urlPeriodo = searchParams.get("periodo");
+
+  const isConsorcioPage = /^\/consorcios\/[^/]+/.test(pathname);
 
   React.useEffect(() => {
     if (urlPeriodo && urlPeriodo !== activePeriodo) {
@@ -103,7 +106,8 @@ export function TopBar({ consorcios, activeCuit, activePeriodo }: TopBarProps) {
             <select
               value={activeCuit}
               onChange={handleSelectChange}
-              className="block w-full appearance-none rounded-lg border border-gray-200 bg-white py-1.5 pl-2.5 pr-8 text-sm font-medium text-gray-800 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 cursor-pointer transition-shadow hover:shadow-sm"
+              disabled={isConsorcioPage}
+              className={`block w-full appearance-none rounded-lg border border-gray-200 py-1.5 pl-2.5 pr-8 text-sm font-medium text-gray-800 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 transition-shadow ${isConsorcioPage ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white cursor-pointer hover:shadow-sm"}`}
             >
               <option value="">Todos los consorcios</option>
               {consorcios.map((c) => (

@@ -118,7 +118,7 @@ async function getEstadoFinanciero(periodoId: number, consorcioCuit: string, ani
   let prevMes = mes - 1;
   if (prevMes === 0) { prevMes = 12; prevAnio -= 1; }
 
-  const [periodoData, cobranzasRes, prevSaldoRes, totalGastosRes] = await Promise.all([
+  const [periodoData, cobranzasRes, prevSaldoRes, totalGastosRes, gastosBreakdownRes] = await Promise.all([
     queryOne<{
       ef_saldo_anterior: string;
       ef_cobranzas_sin_identificar: string;
@@ -150,12 +150,24 @@ async function getEstadoFinanciero(periodoId: number, consorcioCuit: string, ani
       "SELECT COALESCE(SUM(monto), 0)::numeric AS total FROM app.gastos_periodo WHERE periodo_id = $1 AND (es_provision = false OR es_provision IS NULL)",
       [periodoId]
     ),
+    queryOne<{ total_a: string; total_b: string; total_particulares: string }>(
+      `SELECT
+         COALESCE(SUM(monto) FILTER (WHERE tipo = 'A'), 0)::numeric AS total_a,
+         COALESCE(SUM(monto) FILTER (WHERE tipo = 'B'), 0)::numeric AS total_b,
+         COALESCE(SUM(monto) FILTER (WHERE tipo = 'Particular'), 0)::numeric AS total_particulares
+       FROM app.gastos_periodo
+       WHERE periodo_id = $1 AND (es_provision = false OR es_provision IS NULL)`,
+      [periodoId]
+    ),
   ]);
 
   const saldoAnterior = Number(periodoData?.ef_saldo_anterior ?? 0);
   const cobranzas = Number(cobranzasRes?.total ?? 0);
   const cobranzasSinIdentificar = Number(periodoData?.ef_cobranzas_sin_identificar ?? 0);
   const totalGastos = Number(totalGastosRes?.total ?? 0);
+  const totalGastosA = Number(gastosBreakdownRes?.total_a ?? 0);
+  const totalGastosB = Number(gastosBreakdownRes?.total_b ?? 0);
+  const totalParticulares = Number(gastosBreakdownRes?.total_particulares ?? 0);
 
   let gastosExtra: { concepto: string; monto: number }[] = [];
   try {
@@ -180,6 +192,9 @@ async function getEstadoFinanciero(periodoId: number, consorcioCuit: string, ani
     cobranzas,
     cobranzasSinIdentificar,
     totalGastos,
+    totalGastosA,
+    totalGastosB,
+    totalParticulares,
     gastosExtra,
     saldoCierre,
     periodoId,

@@ -252,6 +252,19 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
                         </td>
                       </tr>
                     ))}
+                    <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold">
+                      <td className="px-4 py-2.5 text-gray-900" colSpan={2}>TOTALES</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-gray-900">
+                        {formatMoney0(liquidaciones.filter(l => l.estado !== "anulada").reduce((s, l) => s + Number(l.remuneracion_bruta), 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-red-600">
+                        -{formatMoney0(liquidaciones.filter(l => l.estado !== "anulada").reduce((s, l) => s + Number(l.total_descuentos_empleado), 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-gray-900">
+                        {formatMoney0(totalNeto)}
+                      </td>
+                      <td colSpan={2} />
+                    </tr>
                   </tbody>
                 </table>
               </div>

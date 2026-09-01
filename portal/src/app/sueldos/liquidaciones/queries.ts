@@ -18,6 +18,7 @@ export async function getLiquidacionDetalle(id: number) {
        c.art_pct_variable, c.art_fijo,
        c.sv_costo_fijo, c.sv_cant_cuiles,
        c.pct_cct_suterh, c.pct_cct_fateryh, c.pct_cct_seracarh,
+       (SELECT COUNT(*)::int FROM app.unidades u WHERE u.consorcio_cuit = c.cuit) AS consorcio_total_unidades,
        n.horas_jornada::numeric AS novedad_horas_jornada,
        n.dias_trabajados_suplente::numeric AS novedad_dias_trabajados_suplente,
        n.suplencia_100_hs::numeric AS novedad_suplencia_100_hs,

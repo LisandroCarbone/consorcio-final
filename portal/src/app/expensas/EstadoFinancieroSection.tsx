@@ -15,6 +15,9 @@ interface EstadoFinancieroData {
   cobranzas: number;
   cobranzasSinIdentificar: number;
   totalGastos: number;
+  totalGastosA?: number;
+  totalGastosB?: number;
+  totalParticulares?: number;
   gastosExtra: GastoExtra[];
   saldoCierre: number;
   periodoId: number;
@@ -33,11 +36,22 @@ export function EstadoFinancieroSection({ data }: Props) {
 
   const gastosExtraTotal = gastosExtra.reduce((s, g) => s + g.monto, 0);
 
+  const totalGastosB = data.totalGastosB ?? 0;
+  const totalParticulares = data.totalParticulares ?? 0;
+  const showGastosBreakdown = totalGastosB > 0 || totalParticulares > 0;
+  const totalGastosA = data.totalGastosA ?? (data.totalGastos - totalGastosB - totalParticulares);
+
   const rows: { label: string; value: number; bold?: boolean; negative?: boolean; editable?: string }[] = [
     { label: "Saldo anterior", value: data.saldoAnterior, editable: "ef_saldo_anterior" },
     { label: "Cobranzas del período", value: data.cobranzas },
     { label: "Cobranzas bancarias sin identificar", value: data.cobranzasSinIdentificar, editable: "ef_cobranzas_sin_identificar" },
-    { label: "Pagos del período", value: -data.totalGastos, negative: true },
+    ...(showGastosBreakdown
+      ? [
+          { label: "Pagos del período — Gastos A", value: -totalGastosA, negative: true },
+          { label: "Pagos del período — Gastos B", value: -totalGastosB, negative: true },
+          { label: "Pagos del período — Particulares", value: -totalParticulares, negative: true },
+        ]
+      : [{ label: "Pagos del período", value: -data.totalGastos, negative: true }]),
   ];
 
   const handleSave = (fd: FormData) => {

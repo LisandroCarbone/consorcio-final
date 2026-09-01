@@ -198,9 +198,8 @@ export function ConciliacionClient({
       });
       if (updater) {
         setLocalMovimientos((prev) => prev.map((m) => (m.id === id ? updater(m) : m)));
-      } else {
-        router.refresh();
       }
+      router.refresh();
     } catch (e) {
       setPendingIds((prev) => {
         const next = new Set(prev);

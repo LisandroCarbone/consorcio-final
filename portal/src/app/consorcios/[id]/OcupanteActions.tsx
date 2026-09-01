@@ -21,8 +21,11 @@ export function ReplacePropietarioButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[10px] text-blue-600 hover:underline"
+        className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline"
       >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+          <path d="M13.488 2.513a1.75 1.75 0 0 0-2.475 0L3.22 10.306a1 1 0 0 0-.26.445l-.813 2.846a.75.75 0 0 0 .926.926l2.846-.813a1 1 0 0 0 .445-.26l7.793-7.793a1.75 1.75 0 0 0 0-2.475l-.669-.669Z" />
+        </svg>
         {label}
       </button>
       {open && (
@@ -40,8 +43,8 @@ export function ReplacePropietarioButton({
               <input type="hidden" name="unidad_id" value={unidadId} />
               <input type="hidden" name="consorcio_cuit" value={consorcioCuit} />
               <div className="grid grid-cols-2 gap-2">
-                <input name="nombre" required placeholder="Nombre" className="input" />
                 <input name="apellido" required placeholder="Apellido" className="input" />
+                <input name="nombre" required placeholder="Nombre" className="input" />
               </div>
               <input name="dni" placeholder="DNI / CUIT" className="input" />
               <input name="email" type="email" placeholder="Email" className="input" />
