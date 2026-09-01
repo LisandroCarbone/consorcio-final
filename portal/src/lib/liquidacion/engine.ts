@@ -318,7 +318,10 @@ export async function calcularLiquidacion(
     !Number(nov.suplencia_100_hs ?? 0) &&
     !Number(nov.horas_extras_50 ?? 0) &&
     !Number(nov.horas_extras_100 ?? 0) &&
-    !Number(nov.feriados_trabajados_hs ?? 0);
+    !Number(nov.feriados_trabajados_hs ?? 0) &&
+    !Number(nov.plus_vacaciones_dias ?? 0) &&
+    !Number(nov.embargo ?? 0) &&
+    !Number(nov.anticipo ?? 0);
   if (esSuplente && nadaQueLiquidar) {
     await pool.query(
       `DELETE FROM app.liquidaciones_sueldo WHERE empleado_id = $1 AND periodo = $2 AND tipo = 'mensual' AND estado != 'confirmada'`,
@@ -1016,8 +1019,8 @@ export async function calcularSACPreview(
   anio: number,
   semestre: 1 | 2
 ): Promise<SACPreview> {
-  const meses = semestre === 1 ? [1, 2, 3, 4, 5, 6] : [7, 8, 9, 10, 11];
-  const mesesTotales = meses.length;
+  const meses = semestre === 1 ? [1, 2, 3, 4, 5, 6] : [7, 8, 9, 10, 11, 12];
+  const mesesTotales = 6;
 
   const [empRow, consRows, liqRows] = await Promise.all([
     pool.query<Empleado>(`SELECT * FROM app.empleados WHERE id = $1`, [empleadoId]),
@@ -1316,9 +1319,9 @@ export async function calcularIndemnizacionPreview(
   const ingreso = new Date(emp.fecha_ingreso);
   const inicioAnio = new Date(egreso.getFullYear(), 0, 1);
   const inicioCalculo = ingreso > inicioAnio ? ingreso : inicioAnio;
-  const mesesVac = Math.ceil((egreso.getTime() - inicioCalculo.getTime()) / (1000 * 60 * 60 * 24 * 30));
+  const diasTrabajados = Math.ceil((egreso.getTime() - inicioCalculo.getTime()) / (1000 * 60 * 60 * 24));
   const diasVacAnuales = diasVacacionesPorAntigüedad(aniosServicio);
-  const diasVacProp = Math.round((diasVacAnuales / 12) * Math.min(mesesVac, 12));
+  const diasVacProp = Math.round((diasVacAnuales * diasTrabajados) / 365);
   const importeVac = safe(diasVacProp * (mejorBruto / 25));
   if (importeVac > 0) {
     conceptos.push({ label: `Vacaciones proporcionales (${diasVacProp} días)`, importe: importeVac, remunerativo: false });
@@ -1326,10 +1329,10 @@ export async function calcularIndemnizacionPreview(
 
   // SAC s/preaviso and SAC s/vacaciones (No Rem)
   if (esDespidoSinCausa && importePreaviso > 0) {
-    conceptos.push({ label: "SAC s/Preaviso", importe: safe(importePreaviso / 6), remunerativo: false });
+    conceptos.push({ label: "SAC s/Preaviso", importe: safe(importePreaviso / 12), remunerativo: false });
   }
   if (importeVac > 0) {
-    conceptos.push({ label: "SAC s/Vacaciones no gozadas", importe: safe(importeVac / 6), remunerativo: false });
+    conceptos.push({ label: "SAC s/Vacaciones no gozadas", importe: safe(importeVac / 12), remunerativo: false });
   }
 
   // Totals
@@ -1361,7 +1364,7 @@ export async function calcularIndemnizacionPreview(
     totalNoRemunerativo: safe(totalNoRemunerativo),
     descuentosSobreRem: { jubilacion: safe(jubilacion), pami: safe(pami), obraSocial: safe(obraSocial), suterh: safe(suterh), cajaProtFlia: safe(cajaProtFlia), fateryh: safe(fateryh), seguroVital: safe(seguroVital), total: safe(totalDesc) },
     totalPatronal: safe(totalPatronal),
-    netoAPagar: safe(totalRemunerativo + totalNoRemunerativo - totalDesc),
+    netoAPagar: Math.ceil(Math.round((totalRemunerativo + totalNoRemunerativo - totalDesc) * 100) / 100),
     periodo,
   };
 }

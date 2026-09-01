@@ -20,7 +20,7 @@ export function AddGastoForm({
   const [aperturar, setAperturar] = useState(false);
   const [pctA, setPctA] = useState(100);
   const [ufsSel, setUfsSel] = useState<number[]>([]);
-  const [showUfDropdown, setShowUfDropdown] = useState(false);
+
   const [isPending, startTransition] = useTransition();
 
   // Controlled fields for autocomplete fill
@@ -34,9 +34,6 @@ export function AddGastoForm({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const conceptoRef = useRef<HTMLInputElement>(null);
-
-  const toggleUf = (id: number) =>
-    setUfsSel((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
 
   const particularUf = unidades.find((u) => ufsSel.includes(u.id));
 
@@ -106,24 +103,7 @@ export function AddGastoForm({
           setSubmitError("Ingrese un monto válido");
           return;
         }
-        if (tipo === "B" && ufsSel.length > 0) {
-          for (const uid of ufsSel) {
-            const u = unidades.find((x) => x.id === uid);
-            if (!u) continue;
-            const sfd = new FormData();
-            sfd.set("periodo_id", String(periodoId));
-            sfd.set("concepto", concepto);
-            sfd.set("monto", rawMonto);
-            sfd.set("tipo", "B");
-            sfd.set("target_uf", String(u.uf));
-            sfd.set("categoria", categoria);
-            sfd.set("cuotas", fd.get("cuotas") as string);
-            sfd.set("pct_a", String(aperturar ? pctA : 0));
-            await addGasto(sfd);
-          }
-        } else {
-          await addGasto(fd);
-        }
+        await addGasto(fd);
         resetForm();
         window.location.reload();
       } catch (e) {
@@ -291,10 +271,10 @@ export function AddGastoForm({
 
       <div className="min-w-40">
         <label className="label text-xs">
-          {tipo === "A" ? "UF (no aplica)" : tipo === "B" ? "UFs destinatarias" : "UF destinataria"}
+          {tipo === "Particular" ? "UF destinataria" : "UF (no aplica)"}
         </label>
 
-        {tipo === "A" && (
+        {tipo !== "Particular" && (
           <div className="input bg-gray-100 text-gray-400 cursor-not-allowed select-none text-sm">
             Todas las unidades
           </div>
@@ -313,58 +293,6 @@ export function AddGastoForm({
               <option key={u.id} value={u.id}>UF {u.uf}</option>
             ))}
           </select>
-        )}
-
-        {tipo === "B" && (
-          <div className="relative min-w-48">
-            <button
-              type="button"
-              onClick={() => setShowUfDropdown(!showUfDropdown)}
-              className="input text-left flex justify-between items-center text-sm bg-white"
-              disabled={isPending}
-            >
-              <span className="truncate">
-                {ufsSel.length === 0
-                  ? "Todas las unidades"
-                  : `${ufsSel.length} UF${ufsSel.length > 1 ? "s" : ""} seleccionada${ufsSel.length > 1 ? "s" : ""}`}
-              </span>
-              <span className="text-gray-400 text-xs">▼</span>
-            </button>
-            {showUfDropdown && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowUfDropdown(false)} />
-                <div className="absolute left-0 top-full mt-1 z-20 w-full border border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto p-2 shadow-lg space-y-1">
-                  <label className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-sm text-gray-700 border-b border-gray-100 mb-1">
-                    <input
-                      type="checkbox"
-                      className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                      checked={ufsSel.length === 0}
-                      onChange={() => setUfsSel([])}
-                    />
-                    <span className="font-medium">Todas las unidades</span>
-                  </label>
-                  {unidades.length === 0 ? (
-                    <p className="text-xs text-gray-400 p-2">Sin unidades</p>
-                  ) : (
-                    unidades.map((u) => {
-                      const isChecked = ufsSel.includes(u.id);
-                      return (
-                        <label key={u.id} className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-sm text-gray-700">
-                          <input
-                            type="checkbox"
-                            className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                            checked={isChecked}
-                            onChange={() => toggleUf(u.id)}
-                          />
-                          <span>UF {u.uf}</span>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-              </>
-            )}
-          </div>
         )}
       </div>
 
