@@ -37,7 +37,8 @@ async function getData(activeCuit?: string) {
     }>(
       `SELECT p.id, p.consorcio_cuit AS consorcio_id, c.nombre AS consorcio_nombre,
               p.anio, p.mes, p.estado, p.fecha_vencimiento::text, p.monto_fijo::text,
-              p.monto_fijo_a::text, p.monto_fijo_b::text,
+              CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='periodos_expensas' AND column_name='monto_fijo_a') THEN p.monto_fijo_a::text ELSE NULL END AS monto_fijo_a,
+              CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='periodos_expensas' AND column_name='monto_fijo_b') THEN p.monto_fijo_b::text ELSE NULL END AS monto_fijo_b,
               c.tipo_expensas,
               COALESCE((SELECT SUM(monto) FROM app.gastos_periodo WHERE periodo_id=p.id), 0) AS total_gastos,
               (SELECT COUNT(*) FROM app.res_cuenta_periodo WHERE periodo_id=p.id) AS total_expensas,
@@ -45,7 +46,7 @@ async function getData(activeCuit?: string) {
        FROM app.periodos_expensas p
        JOIN app.consorcios c ON c.cuit = p.consorcio_cuit
        ${where}
-       GROUP BY p.id, c.nombre, p.anio, p.mes, p.estado, p.fecha_vencimiento, p.monto_fijo, p.monto_fijo_a, p.monto_fijo_b, c.tipo_expensas
+       GROUP BY p.id, c.nombre, p.anio, p.mes, p.estado, p.fecha_vencimiento, p.monto_fijo, c.tipo_expensas
        ORDER BY p.anio DESC, p.mes DESC`,
       params
     ),
@@ -349,6 +350,7 @@ export default async function ExpensasPage({
         monto_ordinario: string;
         monto_extraordinario: string;
         monto_fondo_reserva: string;
+        monto_fondo_obra: string;
         total_pagar: string;
         enviada: boolean;
         pdf_url: string | null;
@@ -358,6 +360,7 @@ export default async function ExpensasPage({
                 rcp.expensas_a::text AS monto_ordinario,
                 rcp.expensas_b::text AS monto_extraordinario,
                 (rcp.s_asamblea + rcp.otros + rcp.gast_part)::text AS monto_fondo_reserva,
+                COALESCE(rcp.fondo_obra, 0)::text AS monto_fondo_obra,
                 rcp.total_pagar::text,
                 rcp.enviada,
                 rcp.pdf_url
