@@ -27,6 +27,7 @@ export interface CuentaCorrienteRow {
   ultimo_pago?: string | null;
   expensa_pendiente_id?: number | null;
   expensa_pendiente_monto?: string | null;
+  credito_pendiente?: number;
   [key: string]: unknown;
 }
 
@@ -187,6 +188,14 @@ export function CuentaCorrienteTableClient({
                   </td>
                   <td className="py-2 px-3 text-gray-700 whitespace-nowrap sticky left-[60px] bg-inherit z-10">
                     {r.propietario ?? "—"}
+                    {Number(r.credito_pendiente ?? 0) > 0 && (
+                      <span
+                        className="ml-1.5 inline-block px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold align-middle"
+                        title="Saldo a favor pendiente de aplicar en la próxima liquidación"
+                      >
+                        Saldo a favor: {money(Number(r.credito_pendiente))}
+                      </span>
+                    )}
                   </td>
                   {editandoSaldos ? (
                     <td className="py-1 px-2">

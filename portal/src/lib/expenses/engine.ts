@@ -157,8 +157,15 @@ async function _runCalculateExpenses(
     tipo_expensas: string;
     pct_expensa_a: number;
     formato_cobro: string;
+    fondo_obra: number;
+    fondo_obra_activo: boolean;
   }>(
-    "SELECT cuit, divisor_a, divisor_b, interest_rate, tipo_expensas, COALESCE(pct_expensa_a, 1)::numeric AS pct_expensa_a, COALESCE(formato_cobro, 'exacto') AS formato_cobro FROM app.consorcios WHERE cuit = $1",
+    `SELECT cuit, divisor_a, divisor_b, interest_rate, tipo_expensas,
+            COALESCE(pct_expensa_a, 1)::numeric AS pct_expensa_a,
+            COALESCE(formato_cobro, 'exacto') AS formato_cobro,
+            CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='consorcios' AND column_name='fondo_obra') THEN COALESCE(fondo_obra, 0)::numeric ELSE 0 END AS fondo_obra,
+            CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='consorcios' AND column_name='fondo_obra_activo') THEN COALESCE(fondo_obra_activo, false) ELSE false END AS fondo_obra_activo
+     FROM app.consorcios WHERE cuit = $1`,
     [cuit]
   );
   if (!consorcio) {
@@ -390,10 +397,15 @@ async function _runCalculateExpenses(
   }
 
   // 9. Calculate prorrateo for each unit and save to res_cuenta_periodo
+  const fondoObraTotal = consorcio.fondo_obra_activo ? Number(consorcio.fondo_obra || 0) : 0;
+
   for (const u of units) {
     const expensasA = round2(totalProrrateoA * Number(u.coef_a) / divisorA) + (isFija ? 0 : round2(unitAMap.get(u.id) || 0));
     const expensasB = (isFija && pctA >= 1) ? 0 : round2(totalProrrateoB * Number(u.coef_b) / divisorB) + (isFija ? 0 : round2(unitBMap.get(u.id) || 0));
     const gastPart = isFija ? 0 : round2(unitParticularMap.get(u.id) || 0);
+    // F3: Fondo de obra — fixed total amount prorated by the unit's Coef. A,
+    // stored as a separate line item (not folded into expensas_a).
+    const fondoObra = fondoObraTotal > 0 ? round2(fondoObraTotal * Number(u.coef_a) / divisorA) : 0;
 
     const exist = existingMap.get(u.id);
     const sAsamblea = exist ? Number(exist.s_asamblea || 0) : 0;
@@ -518,7 +530,7 @@ async function _runCalculateExpenses(
 
     const deuda = round2(saldoAnterior - suPago);
 
-    const totalMes = round2(expensasA + expensasB + sAsamblea + otros + gastPart);
+    const totalMes = round2(expensasA + expensasB + sAsamblea + otros + gastPart + fondoObra);
     let totalPagar = round2(totalMes + deuda + intereses);
 
     if (consorcio.formato_cobro === 'identificacion_uf' && u.uf_numero && totalPagar > 0) {
@@ -526,13 +538,60 @@ async function _runCalculateExpenses(
       totalPagar = Math.floor(totalPagar) + ufNum / 100;
     }
 
+    // F4 — Compensación automática de crédito en cuenta corriente: any
+    // unapplied overpayment credit (app.credito_unidad, aplicado = false)
+    // is used to discount this period's total_pagar, oldest credit first.
+    // Consumption is tracked at row granularity — a row that is only
+    // partially used is marked applied and its unused remainder is
+    // re-inserted as a fresh unapplied credit, so overpayment is never
+    // silently lost across periods (confirmed with revisor-liquidacion:
+    // an aggregate "mark everything applied" would leak money whenever
+    // total_pagar > 0 but smaller than the accumulated credit).
+    let creditoAplicado = 0;
+    if (totalPagar > 0) {
+      const creditosRows = await query<{ id: number; monto: string }>(
+        `SELECT id, monto::text AS monto FROM app.credito_unidad
+         WHERE unidad_id = $1 AND consorcio_cuit = $2 AND aplicado = false
+         ORDER BY created_at ASC`,
+        [u.id, cuit]
+      );
+      let remaining = round2(Math.min(totalPagar, creditosRows.reduce((s, c) => s + Number(c.monto), 0)));
+      creditoAplicado = remaining;
+      for (const c of creditosRows) {
+        if (remaining <= 0) break;
+        const montoC = round2(Number(c.monto));
+        if (montoC <= remaining) {
+          await query(
+            `UPDATE app.credito_unidad SET aplicado = true, aplicado_en_periodo_id = $1 WHERE id = $2`,
+            [periodoId, c.id]
+          );
+          remaining = round2(remaining - montoC);
+        } else {
+          await query(
+            `UPDATE app.credito_unidad SET aplicado = true, aplicado_en_periodo_id = $1 WHERE id = $2`,
+            [periodoId, c.id]
+          );
+          const leftover = round2(montoC - remaining);
+          await query(
+            `INSERT INTO app.credito_unidad (unidad_id, consorcio_cuit, monto, origen, aplicado)
+             VALUES ($1, $2, $3, 'sobrepago', false)`,
+            [u.id, cuit, leftover]
+          );
+          remaining = 0;
+        }
+      }
+      if (creditoAplicado > 0) {
+        totalPagar = round2(totalPagar - creditoAplicado);
+      }
+    }
+
     const estado = totalPagar <= 0 ? "pagada" : "pendiente";
 
     await query(
       `INSERT INTO app.res_cuenta_periodo
          (periodo_id, unidad_id, coef_a, coef_b, saldo_anterior, su_pago,
-          expensas_a, expensas_b, s_asamblea, otros, gast_part, deuda, intereses, total_mes, total_pagar, estado)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          expensas_a, expensas_b, s_asamblea, otros, gast_part, fondo_obra, deuda, intereses, total_mes, total_pagar, estado, credito_aplicado)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        ON CONFLICT (periodo_id, unidad_id) DO UPDATE SET
          coef_a = EXCLUDED.coef_a,
          coef_b = EXCLUDED.coef_b,
@@ -543,15 +602,17 @@ async function _runCalculateExpenses(
          s_asamblea = EXCLUDED.s_asamblea,
          otros = EXCLUDED.otros,
          gast_part = EXCLUDED.gast_part,
+         fondo_obra = EXCLUDED.fondo_obra,
          deuda = EXCLUDED.deuda,
          intereses = EXCLUDED.intereses,
          total_mes = EXCLUDED.total_mes,
          total_pagar = EXCLUDED.total_pagar,
          estado = EXCLUDED.estado,
+         credito_aplicado = EXCLUDED.credito_aplicado,
          updated_at = now()`,
       [
         periodoId, u.id, u.coef_a, u.coef_b, saldoAnterior, suPago,
-        expensasA, expensasB, sAsamblea, otros, gastPart, deuda, intereses, totalMes, totalPagar, estado
+        expensasA, expensasB, sAsamblea, otros, gastPart, fondoObra, deuda, intereses, totalMes, totalPagar, estado, creditoAplicado
       ]
     );
 

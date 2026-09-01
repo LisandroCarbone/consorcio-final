@@ -6,6 +6,10 @@ import { createPortal } from "react-dom";
 import { formatMoney, formatDate } from "@/lib/format";
 import { bankChargeLabel, type BankChargeCategoria } from "@/lib/conciliacion/categorizeBankCharge";
 
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
 const BANK_CHARGE_CATEGORIAS: { value: BankChargeCategoria; label: string }[] = [
   { value: "ley_25413", label: "Imp. Ley 25.413" },
   { value: "comision", label: "Comisión Bancaria" },
@@ -20,6 +24,7 @@ import {
   desconfirmarMatch,
   descartarMovimiento,
   asignarManual,
+  asignarSplit,
   marcarGastoBancario,
   cargarGastosBancarios,
   aplicarCreditos,
@@ -849,6 +854,15 @@ function MovimientosTable({
                                 estado_match: "pendiente",
                               }));
                             }}
+                            onAssignSplit={(splits) => {
+                              setAssignOpenFor(null);
+                              withPending(m.id, () => asignarSplit(m.id, splits), (mv) => ({
+                                ...mv,
+                                match_tipo: "cobranza_split",
+                                match_id: null,
+                                estado_match: "confirmado",
+                              }));
+                            }}
                           />
                         )}
                       </div>
@@ -878,6 +892,7 @@ function AssignPopover({
   onClose,
   onAssign,
   onMarkBankCharge,
+  onAssignSplit,
   triggerRef,
 }: {
   movimiento: Movimiento;
@@ -886,11 +901,15 @@ function AssignPopover({
   onClose: () => void;
   onAssign: (tipo: "cobranza" | "gasto", targetId: number) => void;
   onMarkBankCharge: (categoria: BankChargeCategoria) => void;
+  onAssignSplit?: (splits: { unidadId: number; monto: number }[]) => void;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   const [search, setSearch] = useState("");
   const q = search.toLowerCase();
   const [pos, setPos] = useState<{ top: number; left: number; openUp: boolean }>({ top: 0, left: 0, openUp: false });
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitSelected, setSplitSelected] = useState<number[]>([]);
+  const [splitAmounts, setSplitAmounts] = useState<Record<number, string>>({});
   const panelW = 420;
   const panelH = 480;
 
@@ -941,14 +960,29 @@ function AssignPopover({
           <div className="text-[11px] text-gray-500 mb-2 truncate">
             {movimiento.descripcion} · <span className="font-mono font-medium">{formatMoney(movimiento.monto)}</span>
           </div>
-          <input
-            type="text"
-            placeholder="Buscar por nombre, monto..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="input text-xs w-full"
-            autoFocus
-          />
+          {isCredit && onAssignSplit && (
+            <button
+              type="button"
+              onClick={() => setSplitMode((v) => !v)}
+              className={`mb-2 text-[11px] font-medium px-2 py-1 rounded-lg border transition-colors ${
+                splitMode
+                  ? "bg-blue-50 border-blue-300 text-blue-700"
+                  : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {splitMode ? "✕ Cancelar división" : "➗ Dividir entre UFs"}
+            </button>
+          )}
+          {!splitMode && (
+            <input
+              type="text"
+              placeholder="Buscar por nombre, monto..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input text-xs w-full"
+              autoFocus
+            />
+          )}
         </div>
         {!isCredit && (
           <div className="px-3 pt-2 pb-2 border-b border-gray-100">
@@ -969,8 +1003,78 @@ function AssignPopover({
             </div>
           </div>
         )}
+        {splitMode && isCredit && onAssignSplit && (() => {
+          const montoTotal = Number(movimiento.monto);
+          const asignado = splitSelected.reduce((s, id) => s + (Number(splitAmounts[id]) || 0), 0);
+          const restante = round2(montoTotal - asignado);
+          const toggleUnidad = (id: number) => {
+            setSplitSelected((prev) =>
+              prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+            );
+          };
+          const canConfirm = splitSelected.length > 0 && Math.abs(restante) < 0.01;
+          return (
+            <div className="px-3 pt-2 pb-3 border-b border-gray-100">
+              <div className="flex items-center justify-between text-[11px] mb-2">
+                <span className="text-gray-500">Depósito: <span className="font-mono font-medium text-gray-800">{formatMoney(montoTotal)}</span></span>
+                <span className={restante === 0 ? "text-green-600 font-semibold" : "text-orange-600 font-semibold"}>
+                  Restante: {formatMoney(restante)}
+                </span>
+              </div>
+              <div className="max-h-56 overflow-y-auto space-y-1 mb-2">
+                {filteredUnidades.map((u) => {
+                  const checked = splitSelected.includes(u.id);
+                  return (
+                    <div key={u.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${checked ? "bg-blue-50" : "hover:bg-gray-50"}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleUnidad(u.id)}
+                        className="shrink-0"
+                      />
+                      <span className="text-xs text-gray-800 flex-1 truncate">
+                        UF {u.uf_numero ?? u.uf}
+                        {u.propietario && <span className="text-gray-500 ml-1">· {u.propietario}</span>}
+                      </span>
+                      {checked && (
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={splitAmounts[u.id] ?? ""}
+                          onChange={(e) =>
+                            setSplitAmounts((prev) => ({ ...prev, [u.id]: e.target.value }))
+                          }
+                          className="input text-xs w-24 text-right py-1 px-1.5"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                disabled={!canConfirm}
+                onClick={() => {
+                  const splits = splitSelected.map((id) => ({
+                    unidadId: id,
+                    monto: round2(Number(splitAmounts[id]) || 0),
+                  }));
+                  onAssignSplit(splits);
+                }}
+                className={`w-full text-xs font-semibold py-2 rounded-lg transition-colors ${
+                  canConfirm
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                Confirmar división
+              </button>
+            </div>
+          );
+        })()}
         <div className="overflow-y-auto flex-1 p-1.5">
-          {isCredit ? (
+          {splitMode ? null : isCredit ? (
             filteredUnidades.length > 0 ? (
               filteredUnidades.map((u) => (
                 <button

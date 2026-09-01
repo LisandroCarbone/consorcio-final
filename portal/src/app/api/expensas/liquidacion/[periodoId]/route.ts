@@ -107,9 +107,11 @@ type UfRow = {
   expensas_a: string;
   coef_b: string;
   expensas_b: string;
+  fondo_obra: string;
   total_mes: string;
   deuda: string;
   intereses: string;
+  credito_aplicado: string;
   total_pagar: string;
 }
 
@@ -177,7 +179,9 @@ export async function GET(
               rcp.saldo_anterior::numeric, rcp.su_pago::numeric,
               rcp.coef_a::numeric, rcp.expensas_a::numeric,
               rcp.coef_b::numeric, rcp.expensas_b::numeric,
+              CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='res_cuenta_periodo' AND column_name='fondo_obra') THEN COALESCE(rcp.fondo_obra, 0)::numeric ELSE 0 END AS fondo_obra,
               rcp.total_mes::numeric, rcp.deuda::numeric, rcp.intereses::numeric,
+              CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='res_cuenta_periodo' AND column_name='credito_aplicado') THEN COALESCE(rcp.credito_aplicado, 0)::numeric ELSE 0 END AS credito_aplicado,
               rcp.total_pagar::numeric
        FROM app.res_cuenta_periodo rcp
        JOIN app.unidades u ON u.id = rcp.unidad_id
@@ -287,12 +291,14 @@ export async function GET(
       su_pago: acc.su_pago + Number(r.su_pago),
       expensas_a: acc.expensas_a + Number(r.expensas_a),
       expensas_b: acc.expensas_b + Number(r.expensas_b),
+      fondo_obra: acc.fondo_obra + Number(r.fondo_obra),
       total_mes: acc.total_mes + Number(r.total_mes),
       deuda: acc.deuda + Number(r.deuda),
       intereses: acc.intereses + Number(r.intereses),
+      credito_aplicado: acc.credito_aplicado + Number(r.credito_aplicado),
       total_pagar: acc.total_pagar + Number(r.total_pagar),
     }),
-    { saldo_anterior: 0, su_pago: 0, expensas_a: 0, expensas_b: 0, total_mes: 0, deuda: 0, intereses: 0, total_pagar: 0 }
+    { saldo_anterior: 0, su_pago: 0, expensas_a: 0, expensas_b: 0, fondo_obra: 0, total_mes: 0, deuda: 0, intereses: 0, credito_aplicado: 0, total_pagar: 0 }
   );
 
   const ufTableRows = ufRows.map(r => `
@@ -306,9 +312,11 @@ export async function GET(
       <td class="r mono">${moneyCompact(r.expensas_a)}</td>
       <td class="r mono">${pct(r.coef_b)}</td>
       <td class="r mono">${moneyCompact(r.expensas_b)}</td>
+      <td class="r mono">${moneyCompact(r.fondo_obra)}</td>
       <td class="r mono">${moneyCompact(r.total_mes)}</td>
       <td class="r mono">${moneyCompact(r.deuda)}</td>
       <td class="r mono">${moneyCompact(r.intereses)}</td>
+      <td class="r mono">${Number(r.credito_aplicado) > 0 ? `-${moneyCompact(r.credito_aplicado)}` : "—"}</td>
       <td class="r mono total-col">${moneyCompact(r.total_pagar)}</td>
     </tr>`).join("");
 
@@ -595,14 +603,16 @@ export async function GET(
         <th class="r">Exp. A</th>
         <th class="r">% B</th>
         <th class="r">Exp. B</th>
+        <th class="r">Fondo de Obra</th>
         <th class="r">Total Mes</th>
         <th class="r">Deuda</th>
         <th class="r">Intereses</th>
+        <th class="r">Saldo a Favor</th>
         <th class="r">Total</th>
       </tr>
     </thead>
     <tbody>
-      ${ufTableRows || `<tr><td colspan="13">Sin unidades liquidadas</td></tr>`}
+      ${ufTableRows || `<tr><td colspan="15">Sin unidades liquidadas</td></tr>`}
       <tr class="totales-row">
         <td colspan="3">TOTALES</td>
         <td class="r mono">${moneyCompact(totales.saldo_anterior)}</td>
@@ -611,9 +621,11 @@ export async function GET(
         <td class="r mono">${moneyCompact(totales.expensas_a)}</td>
         <td></td>
         <td class="r mono">${moneyCompact(totales.expensas_b)}</td>
+        <td class="r mono">${moneyCompact(totales.fondo_obra)}</td>
         <td class="r mono">${moneyCompact(totales.total_mes)}</td>
         <td class="r mono">${moneyCompact(totales.deuda)}</td>
         <td class="r mono">${moneyCompact(totales.intereses)}</td>
+        <td class="r mono">${totales.credito_aplicado > 0 ? `-${moneyCompact(totales.credito_aplicado)}` : "—"}</td>
         <td class="r mono">${moneyCompact(totales.total_pagar)}</td>
       </tr>
     </tbody>

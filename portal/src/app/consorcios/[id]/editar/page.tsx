@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { ActionFeedback } from "@/components/ui/ActionFeedback";
 import MaskedInput from "@/components/ui/MaskedInput";
 import { SaveButton } from "./SaveButton";
+import { FondoObraFields } from "./FondoObraFields";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -29,6 +30,8 @@ export default async function EditarConsorcioPage({ params }: Props) {
     formato_cobro: string;
     monto_fijo_default: string | null;
     pct_expensa_a: string;
+    fondo_obra: string | null;
+    fondo_obra_activo: boolean;
   }>("SELECT * FROM app.consorcios WHERE cuit = $1", [id]);
 
   if (!c) notFound();
@@ -191,6 +194,8 @@ export default async function EditarConsorcioPage({ params }: Props) {
             ))}
           </div>
         </div>
+
+        <FondoObraFields activo={c.fondo_obra_activo} monto={c.fondo_obra ? Number(c.fondo_obra) : 0} />
 
         <p className="text-xs text-gray-400 border-t pt-4">
           ART, SUTERH, FATERYH, SERACARH, SCVO y alícuotas AFIP se configuran en{" "}

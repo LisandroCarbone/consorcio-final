@@ -42,6 +42,10 @@ function formToConsorcio(formData: FormData) {
     pct_expensa_a: formData.get("pct_expensa_a")
       ? Number(formData.get("pct_expensa_a")) / 100
       : 1.0,
+    fondo_obra_activo: bool("fondo_obra_activo"),
+    fondo_obra: formData.get("fondo_obra")
+      ? Number(formData.get("fondo_obra"))
+      : 0,
   };
 }
 
@@ -56,8 +60,9 @@ export async function createConsorcio(formData: FormData) {
         tiene_calefaccion_central, tiene_aire_acondicionado_central,
         tiene_grupo_electrogeno, tiene_seguridad_centralizada,
         tiene_compactador, tiene_montacargas, tiene_otros_servicios_centrales,
-        interest_rate, tipo_expensas, monto_fijo_default, pct_expensa_a, formato_cobro)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
+        interest_rate, tipo_expensas, monto_fijo_default, pct_expensa_a, formato_cobro,
+        fondo_obra_activo, fondo_obra)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)`,
     [d.nombre, d.direccion, d.cuit, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.categoria_edificio, d.banco,
      d.tiene_cochera, d.tiene_movimiento_coches, d.tiene_jardin, d.zona_desfavorable,
@@ -65,7 +70,8 @@ export async function createConsorcio(formData: FormData) {
      d.tiene_calefaccion_central, d.tiene_aire_acondicionado_central,
      d.tiene_grupo_electrogeno, d.tiene_seguridad_centralizada,
      d.tiene_compactador, d.tiene_montacargas, d.tiene_otros_servicios_centrales,
-     d.intereses_mora_pct, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro]
+     d.intereses_mora_pct, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro,
+     d.fondo_obra_activo, d.fondo_obra]
   );
   revalidatePath("/consorcios");
 }
@@ -85,7 +91,8 @@ export async function updateConsorcio(formData: FormData) {
        tiene_compactador = $20, tiene_montacargas = $21,
        tiene_otros_servicios_centrales = $22, interest_rate = $23,
        clave_suterh = $24, tipo_expensas = $25,
-       monto_fijo_default = $26, pct_expensa_a = $27, formato_cobro = $28
+       monto_fijo_default = $26, pct_expensa_a = $27, formato_cobro = $28,
+       fondo_obra_activo = $30, fondo_obra = $31
      WHERE cuit = $29`,
     [d.nombre, d.direccion, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.categoria_edificio, d.banco,
@@ -96,7 +103,8 @@ export async function updateConsorcio(formData: FormData) {
      d.tiene_grupo_electrogeno, d.tiene_seguridad_centralizada,
      d.tiene_compactador, d.tiene_montacargas,
      d.tiene_otros_servicios_centrales, d.intereses_mora_pct,
-     d.clave_suterh, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro, cuit]
+     d.clave_suterh, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro, cuit,
+     d.fondo_obra_activo, d.fondo_obra]
   );
   revalidatePath("/consorcios");
   revalidatePath(`/consorcios/${cuit}`);
@@ -118,7 +126,8 @@ export async function updateConsorcioNoRedirect(formData: FormData) {
        tiene_compactador = $20, tiene_montacargas = $21,
        tiene_otros_servicios_centrales = $22, interest_rate = $23,
        clave_suterh = $24, tipo_expensas = $25,
-       monto_fijo_default = $26, pct_expensa_a = $27, formato_cobro = $28
+       monto_fijo_default = $26, pct_expensa_a = $27, formato_cobro = $28,
+       fondo_obra_activo = $30, fondo_obra = $31
      WHERE cuit = $29`,
     [d.nombre, d.direccion, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.categoria_edificio, d.banco,
@@ -129,7 +138,8 @@ export async function updateConsorcioNoRedirect(formData: FormData) {
      d.tiene_grupo_electrogeno, d.tiene_seguridad_centralizada,
      d.tiene_compactador, d.tiene_montacargas,
      d.tiene_otros_servicios_centrales, d.intereses_mora_pct,
-     d.clave_suterh, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro, cuit]
+     d.clave_suterh, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro, cuit,
+     d.fondo_obra_activo, d.fondo_obra]
   );
   revalidatePath("/consorcios");
   revalidatePath(`/consorcios/${cuit}`);

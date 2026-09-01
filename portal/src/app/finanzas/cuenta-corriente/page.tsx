@@ -111,7 +111,7 @@ export default async function CuentaCorrientePage({
   let prevYear = mes === 1 ? anio - 1 : anio;
   let prevMonth = mes === 1 ? 12 : mes - 1;
 
-  const [consorcios, rows, periodoRow, prevPeriodoRow] = await Promise.all([
+  const [consorcios, rows, periodoRow, prevPeriodoRow, creditosPendientesRows] = await Promise.all([
     query<{ cuit: string; nombre: string }>(
       "SELECT cuit, nombre FROM app.consorcios ORDER BY nombre"
     ),
@@ -128,7 +128,22 @@ export default async function CuentaCorrientePage({
           [activeCuit, prevYear, prevMonth]
         )
       : Promise.resolve([]),
+    // F4: pending overpayment credit per unit (app.credito_unidad, aplicado = false)
+    activeCuit
+      ? query<{ unidad_id: number; total: string }>(
+          `SELECT unidad_id, SUM(monto)::text AS total
+           FROM app.credito_unidad
+           WHERE consorcio_cuit = $1 AND aplicado = false
+           GROUP BY unidad_id`,
+          [activeCuit]
+        ).catch(() => [] as { unidad_id: number; total: string }[])
+      : Promise.resolve([]),
   ]);
+
+  const creditoPendienteMap = new Map(creditosPendientesRows.map((c) => [c.unidad_id, Number(c.total)]));
+  for (const row of rows) {
+    (row as Record<string, unknown>).credito_pendiente = creditoPendienteMap.get(Number(row.unidad_id)) ?? 0;
+  }
 
   const periodoId = periodoRow[0]?.id ?? null;
   const esPrimerPeriodo = !!periodoId && prevPeriodoRow.length === 0;

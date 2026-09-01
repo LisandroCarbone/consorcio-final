@@ -44,6 +44,7 @@ type ReceiptRow = {
   expensas_a: string;
   expensas_b: string;
   fondo_otros: string;
+  fondo_obra: string;
   total_pagar: string;
   total_mes: string;
   su_pago: string;
@@ -101,6 +102,7 @@ export async function GET(
   const receipt = await queryOne<ReceiptRow>(
     `SELECT rcp.id, rcp.periodo_id, rcp.unidad_id, rcp.expensas_a::numeric, rcp.expensas_b::numeric,
             (rcp.s_asamblea + rcp.otros + rcp.gast_part)::numeric AS fondo_otros,
+            CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='res_cuenta_periodo' AND column_name='fondo_obra') THEN COALESCE(rcp.fondo_obra, 0)::numeric ELSE 0 END AS fondo_obra,
             rcp.total_pagar::numeric, rcp.total_mes::numeric, rcp.su_pago::numeric,
             rcp.saldo_anterior::numeric, rcp.deuda::numeric, rcp.intereses::numeric,
             u.uf, u.uf_numero, u.coef_a, u.coef_b,
@@ -407,6 +409,7 @@ export async function GET(
       <tr><td>Ordinario (A)</td><td class="r mono">${money(receipt.expensas_a)}</td></tr>
       <tr><td>Extraordinario (B)</td><td class="r mono">${money(receipt.expensas_b)}</td></tr>
       <tr><td>Fondo / Otros</td><td class="r mono">${money(receipt.fondo_otros)}</td></tr>
+      ${Number(receipt.fondo_obra) > 0 ? `<tr><td>Fondo de Obra</td><td class="r mono">${money(receipt.fondo_obra)}</td></tr>` : ""}
       <tr><td>Deuda</td><td class="r mono">${money(receipt.deuda)}</td></tr>
       <tr><td>Intereses</td><td class="r mono">${money(receipt.intereses)}</td></tr>
       <tr class="total-row"><td>TOTAL A PAGAR</td><td class="r mono">${money(receipt.total_pagar)}</td></tr>

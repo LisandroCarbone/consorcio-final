@@ -911,6 +911,93 @@ export async function asignarManual(movimientoId: number, tipo: "cobranza" | "ga
   revalidatePath(BASE_PATH);
 }
 
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+export async function asignarSplit(
+  movimientoId: number,
+  splits: { unidadId: number; monto: number }[]
+) {
+  if (!splits || splits.length === 0) {
+    throw new Error("Debe indicar al menos una unidad para dividir el depósito.");
+  }
+
+  const mov = await queryOne<{
+    extracto_id: number;
+    monto: string;
+    fecha: string;
+    referencia: string | null;
+  }>(
+    "SELECT extracto_id, monto::text, fecha::text, referencia FROM app.extracto_movimientos WHERE id = $1",
+    [movimientoId]
+  );
+  if (!mov) throw new Error("Movimiento no encontrado");
+
+  const montoTotal = round2(Number(mov.monto));
+  const sumaSplits = round2(splits.reduce((s, x) => s + Number(x.monto), 0));
+  if (Math.abs(sumaSplits - montoTotal) > 0.01) {
+    throw new Error(
+      `La suma de los splits (${sumaSplits}) no coincide con el monto del depósito (${montoTotal}).`
+    );
+  }
+
+  const extracto = await queryOne<{ consorcio_cuit: string; periodo_id: number | null }>(
+    "SELECT consorcio_cuit, periodo_id FROM app.extractos_bancarios WHERE id = $1",
+    [mov.extracto_id]
+  );
+  if (!extracto) throw new Error("Extracto no encontrado");
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    for (const s of splits) {
+      const montoSplit = round2(Number(s.monto));
+      if (montoSplit <= 0) continue;
+      const refSplit = mov.referencia
+        ? `${mov.referencia}-uf${s.unidadId}`
+        : `split_${movimientoId}_${s.unidadId}`;
+
+      const pagoRes = await client.query<{ id: number }>(
+        `INSERT INTO app.pagos (consorcio_cuit, unidad_id, fecha, monto, medio_pago, referencia)
+         VALUES ($1,$2,$3,$4,'transferencia',$5)
+         RETURNING id`,
+        [extracto.consorcio_cuit, s.unidadId, mov.fecha, montoSplit, refSplit]
+      );
+      const pagoId = pagoRes.rows[0].id;
+
+      await client.query(
+        `INSERT INTO app.pago_splits (movimiento_id, unidad_id, monto)
+         VALUES ($1, $2, $3)`,
+        [movimientoId, s.unidadId, montoSplit]
+      );
+      void pagoId;
+    }
+
+    await client.query(
+      `UPDATE app.extracto_movimientos
+       SET match_tipo = 'cobranza_split', match_id = NULL, match_confianza = 1.0,
+           estado_match = 'confirmado', categoria_bancaria = NULL, comprobante_ref = $2
+       WHERE id = $1`,
+      [movimientoId, mov.referencia]
+    );
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  await updateExtractoMatchedCount(mov.extracto_id);
+  revalidatePath(BASE_PATH);
+  revalidatePath("/expensas");
+  revalidatePath("/finanzas/cuenta-corriente");
+  logAudit("create", "extracto_bancario", movimientoId, { after: { splits } }, extracto.consorcio_cuit);
+}
+
 export async function marcarGastoBancario(movimientoId: number, categoria: BankChargeCategoria) {
   const mov = await queryOne<{ extracto_id: number }>(
     "SELECT extracto_id FROM app.extracto_movimientos WHERE id = $1",

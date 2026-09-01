@@ -13,6 +13,7 @@ export interface UfLiquidacionRow {
   monto_ordinario: string;
   monto_extraordinario: string;
   monto_fondo_reserva: string;
+  monto_fondo_obra: string;
   total_pagar: string;
   enviada: boolean;
   pdf_url: string | null;
@@ -62,6 +63,7 @@ export function UfLiquidacionesTableClient({ data }: UfLiquidacionesTableClientP
             <th className="px-5 py-3.5 text-right">Ordinario (A)</th>
             <th className="px-5 py-3.5 text-right">Extraordinario (B)</th>
             <th className="px-5 py-3.5 text-right">Fondo / Otros</th>
+            <th className="px-5 py-3.5 text-right">Fondo de Obra</th>
             <th className="px-5 py-3.5 text-right">Total</th>
             <th className="px-5 py-3.5 text-center">Estado Envío</th>
             <th className="px-5 py-3.5 text-right pr-6">Acciones</th>
@@ -80,6 +82,7 @@ export function UfLiquidacionesTableClient({ data }: UfLiquidacionesTableClientP
                 <td className="px-5 py-3.5 text-right font-mono text-gray-600">{formatMoney(row.monto_ordinario)}</td>
                 <td className="px-5 py-3.5 text-right font-mono text-gray-600">{formatMoney(row.monto_extraordinario)}</td>
                 <td className="px-5 py-3.5 text-right font-mono text-gray-600">{formatMoney(row.monto_fondo_reserva)}</td>
+                <td className="px-5 py-3.5 text-right font-mono text-gray-600">{formatMoney(row.monto_fondo_obra)}</td>
                 <td className="px-5 py-3.5 text-right font-mono font-bold text-gray-900">{formatMoney(row.total_pagar)}</td>
                 <td className="px-5 py-3.5 text-center">
                   {row.enviada ? (

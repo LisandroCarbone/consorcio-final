@@ -360,7 +360,7 @@ export default async function ExpensasPage({
                 rcp.expensas_a::text AS monto_ordinario,
                 rcp.expensas_b::text AS monto_extraordinario,
                 (rcp.s_asamblea + rcp.otros + rcp.gast_part)::text AS monto_fondo_reserva,
-                COALESCE(rcp.fondo_obra, 0)::text AS monto_fondo_obra,
+                CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='res_cuenta_periodo' AND column_name='fondo_obra') THEN COALESCE(rcp.fondo_obra, 0)::text ELSE '0' END AS monto_fondo_obra,
                 rcp.total_pagar::text,
                 rcp.enviada,
                 rcp.pdf_url
