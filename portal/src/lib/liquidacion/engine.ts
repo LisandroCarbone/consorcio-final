@@ -119,6 +119,20 @@ function esFuncionVigilNocturna(funcion: string): boolean {
   return funcion.toLowerCase().includes("vigilancia nocturna");
 }
 
+// Resolves the full-time ("Permanente") equivalent function name for a part-time
+// ("No Permanente") function, used for Dif. OS Ley 26474 and the media jornada
+// SAC/OS calculations (art. 92 ter). Returns null when funcion is empty.
+function resolverFuncionCompletaEquivalente(funcion: string): string | null {
+  if (!funcion) return null;
+  if (funcion.includes("No Permanente Sin vivienda")) {
+    return "Encargado Permanente sin vivienda";
+  }
+  if (funcion.includes("No Permanente Con vivienda")) {
+    return "Encargado Permanente con vivienda";
+  }
+  return funcion.replace(/No Permanente/i, "Permanente");
+}
+
 // ---------------------------------------------------------------------------
 // Shared descuentos / contribuciones helpers
 // ---------------------------------------------------------------------------
@@ -604,30 +618,43 @@ export async function calcularLiquidacion(
   // 17. Plus vacacional
   // ---------------------------------------------------------------------------
 
-  // Promedio de remuneración variable (HE 50%/100% y feriados trabajados) de los
-  // últimos 6 períodos mensuales confirmados. Siempre se divide por 6 (LCT art. 155,
-  // promedio del último semestre): los meses sin HE aportan $0 al numerador.
+  // Promedio de remuneración variable de los últimos 6 períodos mensuales confirmados
+  // (LCT art. 155, promedio del último semestre). Siempre se divide por 6: los meses
+  // sin importe aportan $0 al numerador.
+  //
+  // Feriados trabajados (code 1900) se incluyen siempre. Horas extras (codes 1800/1850)
+  // solo se incluyen si son habituales: los 6 períodos del semestre deben tener HE > 0.
+  // Si hay menos de 6 liquidaciones de historial, HE se considera NO habitual.
   let promedioVariablesSemestre = 0;
   if (novN.plus_vacaciones_dias > 0) {
-    const semestreRows = await pool.query<{ promedio: string }>(
-      `SELECT COALESCE(SUM(sub.total) / 6, 0) AS promedio
-       FROM (
-         SELECT ls.periodo, COALESCE(SUM(cl.importe), 0) AS total
-         FROM app.liquidaciones_sueldo ls
-         LEFT JOIN app.conceptos_liquidacion cl
-           ON cl.liquidacion_id = ls.id
-           AND cl.code IN ('1800', '1850', '1900')
-         WHERE ls.empleado_id = $1
-           AND ls.tipo = 'mensual'
-           AND ls.estado = 'confirmada'
-           AND ls.periodo < $2
-         GROUP BY ls.periodo
-         ORDER BY ls.periodo DESC
-         LIMIT 6
-       ) sub`,
+    const semestreRows = await pool.query<{ periodo: string; he_total: string; feriados_total: string }>(
+      `SELECT ls.periodo,
+              COALESCE(SUM(cl.importe) FILTER (WHERE cl.code IN ('1800', '1850')), 0) AS he_total,
+              COALESCE(SUM(cl.importe) FILTER (WHERE cl.code = '1900'), 0) AS feriados_total
+       FROM app.liquidaciones_sueldo ls
+       LEFT JOIN app.conceptos_liquidacion cl
+         ON cl.liquidacion_id = ls.id
+         AND cl.code IN ('1800', '1850', '1900')
+       WHERE ls.empleado_id = $1
+         AND ls.tipo = 'mensual'
+         AND ls.estado = 'confirmada'
+         AND ls.periodo < $2
+       GROUP BY ls.periodo
+       ORDER BY ls.periodo DESC
+       LIMIT 6`,
       [empleadoId, periodo]
     );
-    promedioVariablesSemestre = Number(semestreRows.rows[0]?.promedio ?? 0);
+
+    const heEsHabitual =
+      semestreRows.rows.length === 6 &&
+      semestreRows.rows.every(r => Number(r.he_total) > 0);
+
+    const sumaFeriados = semestreRows.rows.reduce((acc, r) => acc + Number(r.feriados_total), 0);
+    const sumaHE = heEsHabitual
+      ? semestreRows.rows.reduce((acc, r) => acc + Number(r.he_total), 0)
+      : 0;
+
+    promedioVariablesSemestre = (sumaFeriados + sumaHE) / 6;
   }
 
   const baseVacacional = haberesFijos - adicionalRemEfectivo + promedioVariablesSemestre;
@@ -716,14 +743,9 @@ export async function calcularLiquidacion(
   let difObraSocial = 0;
   if (emp.jornada === "Media" && !esSuplente) {
     const catKey2 = `cat_${emp.categoria_edificio}` as "cat_1" | "cat_2" | "cat_3" | "cat_4";
-    let baseOSCompleta: number;
-    if (emp.funcion.includes("No Permanente Sin vivienda")) {
-      baseOSCompleta = escalaMap["Encargado Permanente sin vivienda"]?.[catKey2] ?? sueldoBasico * 2;
-    } else if (emp.funcion.includes("No Permanente Con vivienda")) {
-      baseOSCompleta = escalaMap["Encargado Permanente con vivienda"]?.[catKey2] ?? sueldoBasico * 2;
-    } else {
-      baseOSCompleta = sueldoBasico * 2;
-    }
+    const funcionCompletaOS = resolverFuncionCompletaEquivalente(emp.funcion);
+    const baseOSCompleta: number =
+      (funcionCompletaOS ? escalaMap[funcionCompletaOS]?.[catKey2] : undefined) ?? sueldoBasico * 2;
     let osSACPagada = 0;
     if (periodoMonth === 6 || periodoMonth === 12) {
       const sacTipo = periodoMonth === 6 ? "sac_1" : "sac_2";
@@ -763,15 +785,8 @@ export async function calcularLiquidacion(
   if (emp.jornada === "Media") {
     // Only the obra social contribution uses the full-time equivalent basic for media jornada
     const catKey2 = `cat_${emp.categoria_edificio}` as "cat_1" | "cat_2" | "cat_3" | "cat_4";
-    let funcionCompleta: string;
-    if (emp.funcion.includes("No Permanente Sin vivienda")) {
-      funcionCompleta = "Encargado Permanente sin vivienda";
-    } else if (emp.funcion.includes("No Permanente Con vivienda")) {
-      funcionCompleta = "Encargado Permanente con vivienda";
-    } else {
-      funcionCompleta = emp.funcion.replace(/No Permanente/i, "Permanente");
-    }
-    basePatronalOS = escalaMap[funcionCompleta]?.[catKey2] ?? totalRemunerativoFinal;
+    const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion);
+    basePatronalOS = (funcionCompleta ? escalaMap[funcionCompleta]?.[catKey2] : undefined) ?? totalRemunerativoFinal;
   }
   const patron = calcContribPatronal(
     basePatronal,
@@ -1074,14 +1089,7 @@ export async function calcularSACPreview(
 
   let basePatronalSACOS = totalBruto;
   if (emp.jornada === "Media") {
-    let funcionCompleta: string;
-    if (emp.funcion.includes("No Permanente Sin vivienda")) {
-      funcionCompleta = "Encargado Permanente sin vivienda";
-    } else if (emp.funcion.includes("No Permanente Con vivienda")) {
-      funcionCompleta = "Encargado Permanente con vivienda";
-    } else {
-      funcionCompleta = emp.funcion.replace(/No Permanente/i, "Permanente");
-    }
+    const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion) ?? emp.funcion;
     const escalaCompletaRow = await pool.query<EscalaRow>(
       `SELECT cat_1::numeric, cat_2::numeric, cat_3::numeric, cat_4::numeric
        FROM app.escalas_suterh
