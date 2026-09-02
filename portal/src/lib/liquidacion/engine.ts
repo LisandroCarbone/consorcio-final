@@ -55,6 +55,7 @@ export interface Consorcio {
   fateryh_fijo_completa: number | null;
   fateryh_fijo_media: number | null;
   fateryh_fijo_suplente_hora: number | null;
+  uf_retiro_residuos: number | null;
 }
 
 export interface Novedades {
@@ -108,6 +109,13 @@ function calcAniosAntigüedad(fechaIngreso: string, periodo: string): number {
   const diff = lastDay.getFullYear() - ingreso.getFullYear()
     - (lastDay.getMonth() * 100 + lastDay.getDate() < ingreso.getMonth() * 100 + ingreso.getDate() ? 1 : 0);
   return Math.max(0, diff);
+}
+
+function diasAntiguedad(fechaIngreso: string, periodo: string): number {
+  const [y, m] = periodo.split("-").map(Number);
+  const lastDay = new Date(y, m, 0);
+  const ingreso = new Date(fechaIngreso);
+  return Math.max(0, Math.floor((lastDay.getTime() - ingreso.getTime()) / 86400000));
 }
 
 function esFuncionEncargado(funcion: string): boolean {
@@ -443,7 +451,7 @@ export async function calcularLiquidacion(
     "Clasificación de residuos Resol. 2013 243 SSRT-GCABA";
 
   const retiroResiduos = emp.retiro_residuos
-    ? adic("retiro_residuos", adicionales[retiroResKey] ?? 0) * (cons.cant_uf ?? 0)
+    ? adic("retiro_residuos", adicionales[retiroResKey] ?? 0) * (cons.uf_retiro_residuos ?? cons.cant_uf ?? 0)
     : 0;
 
   let clasifResiduos = 0;
@@ -788,6 +796,7 @@ export async function calcularLiquidacion(
     const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion);
     basePatronalOS = (funcionCompleta ? escalaMap[funcionCompleta]?.[catKey2] : undefined) ?? totalRemunerativoFinal;
   }
+  const excluirSCVO = emp.jornada === "Suplente" && diasAntiguedad(emp.fecha_ingreso, periodo) < 30;
   const patron = calcContribPatronal(
     basePatronal,
     basePatronalOS,
@@ -795,7 +804,7 @@ export async function calcularLiquidacion(
     emp.jornada,
     horasTotalesSuplente,
     fateryh_art19bis,
-    scvoFromParametros
+    excluirSCVO ? 0 : scvoFromParametros
   );
   const totalPatronal = patron.total;
 
@@ -1115,8 +1124,9 @@ export async function calcularSACPreview(
     fateryhArt19bisSAC = Number(parametrosCctRow.rows[0]?.fateryh_art19bis ?? 0);
     scvoSAC = parametrosCctRow.rows[0]?.sv_costo_fijo != null ? Number(parametrosCctRow.rows[0].sv_costo_fijo) : null;
   }
+  const excluirSCVOsac = emp.jornada === "Suplente" && diasAntiguedad(emp.fecha_ingreso, periodoSAC) < 30;
   const totalPatronal = cons
-    ? calcContribPatronal(totalBruto, basePatronalSACOS, cons, emp.jornada, 0, fateryhArt19bisSAC, scvoSAC).total
+    ? calcContribPatronal(totalBruto, basePatronalSACOS, cons, emp.jornada, 0, fateryhArt19bisSAC, excluirSCVOsac ? 0 : scvoSAC).total
     : 0;
 
   return {
@@ -1358,7 +1368,8 @@ export async function calcularIndemnizacionPreview(
   const pctFateryh = Number(cons?.pct_cct_fateryh ?? 0.0475);
   const pctSeracarh = Number(cons?.pct_cct_seracarh ?? 0.005);
   const pctART = Number(cons?.art_pct_variable ?? 0);
-  const scvoFijo = cons?.sv_costo_fijo ? Number(cons.sv_costo_fijo) : 0;
+  const excluirSCVOegreso = emp.jornada === "Suplente" && diasAntiguedad(emp.fecha_ingreso, `${egreso.getFullYear()}-${String(egreso.getMonth() + 1).padStart(2, "0")}-01`) < 30;
+  const scvoFijo = excluirSCVOegreso ? 0 : (cons?.sv_costo_fijo ? Number(cons.sv_costo_fijo) : 0);
   const totalPatronal = totalRemunerativo * (pctJubilPatronal + pctOSPatronal + pctSuterh + pctFateryh + pctSeracarh + pctART) + scvoFijo;
 
   const periodo = `${egreso.getFullYear()}-${String(egreso.getMonth() + 1).padStart(2, "0")}-01`;

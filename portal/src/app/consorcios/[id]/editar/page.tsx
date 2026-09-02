@@ -17,7 +17,7 @@ export default async function EditarConsorcioPage({ params }: Props) {
   const c = await queryOne<{
     cuit: string; nombre: string; direccion: string;
     codigo_postal: string | null; suterh_key: string | null; clave_suterh: string | null;
-    cant_uf: number | null; categoria_edificio: string | null; banco: string | null;
+    cant_uf: number | null; uf_retiro_residuos: number | null; categoria_edificio: string | null; banco: string | null;
     tiene_cochera: boolean; tiene_movimiento_coches: boolean; tiene_jardin: boolean;
     zona_desfavorable: boolean; tiene_pileta: boolean; tiene_caldera: boolean;
     tiene_ascensor: boolean; tiene_agua_caliente_central: boolean;
@@ -97,9 +97,14 @@ export default async function EditarConsorcioPage({ params }: Props) {
             <input name="clave_suterh" defaultValue={c.clave_suterh ?? ""} className="input" />
           </div>
           <div>
-            <label className="label">UF p/ Retiro de Residuos</label>
+            <label className="label">Cantidad de UF</label>
             <input name="cant_uf" type="number" defaultValue={c.cant_uf ?? ""} className="input" />
-            <p className="text-xs text-gray-400 mt-0.5">Solo las UF alcanzadas por el servicio de retiro</p>
+            <p className="text-xs text-gray-400 mt-0.5">Total de unidades funcionales del edificio</p>
+          </div>
+          <div>
+            <label className="label">UF p/ Retiro de Residuos</label>
+            <input name="uf_retiro_residuos" type="number" defaultValue={c.uf_retiro_residuos ?? ""} className="input" />
+            <p className="text-xs text-gray-400 mt-0.5">Solo las UF alcanzadas por el servicio. Si vacío, usa Cantidad de UF</p>
           </div>
           <div>
             <label className="label">Categoría edificio</label>
