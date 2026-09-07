@@ -1,7 +1,7 @@
 import { redis } from "./redis";
 
 const SESSION_PREFIX = "session:";
-const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const SESSION_TTL_SECONDS = 8 * 60 * 60; // 8 hours
 
 function key(sessionId: string): string {
   return `${SESSION_PREFIX}${sessionId}`;

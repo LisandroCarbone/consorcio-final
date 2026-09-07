@@ -12,17 +12,6 @@ import { logAuditDirect } from "@/lib/audit";
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-    
-    // 1. Check rate limit
-    const rateCheck = await checkRateLimit(ip);
-    if (!rateCheck.allowed) {
-      return NextResponse.json(
-        {
-          error: `Demasiados intentos fallidos. Por seguridad, la cuenta está bloqueada temporalmente. Intente nuevamente en ${rateCheck.waitMinutes} minutos.`,
-        },
-        { status: 429 }
-      );
-    }
 
     const body = await req.json();
     const { username, password } = body || {};
@@ -34,16 +23,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const usernameKey = `user:${username.trim().toLowerCase()}`;
+
+    // 1. Check rate limit by IP and username
+    const ipCheck = await checkRateLimit(`ip:${ip}`);
+    const userCheck = await checkRateLimit(usernameKey);
+    if (!ipCheck.allowed || !userCheck.allowed) {
+      const waitMinutes = ipCheck.waitMinutes || userCheck.waitMinutes;
+      return NextResponse.json(
+        {
+          error: `Demasiados intentos fallidos. Por seguridad, la cuenta está bloqueada temporalmente. Intente nuevamente en ${waitMinutes} minutos.`,
+        },
+        { status: 429 }
+      );
+    }
+
     // 2. Validate credentials
-    const isValid = validateCredentials(username.trim(), password);
+    const isValid = await validateCredentials(username.trim(), password);
 
     if (!isValid) {
-      const lockResult = await recordFailedAttempt(ip);
+      const ipLock = await recordFailedAttempt(`ip:${ip}`);
+      const userLock = await recordFailedAttempt(usernameKey);
       logAuditDirect(username.trim(), ip, "login_failed", "auth", null, {
         success: false,
         username: username.trim(),
       });
-      if (lockResult.locked) {
+      if (ipLock.locked || userLock.locked) {
         return NextResponse.json(
           {
             error: "Demasiados intentos fallidos. Acceso bloqueado por 15 minutos.",
@@ -58,10 +63,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Clear failed attempts on success
-    await clearFailedAttempts(ip);
+    await clearFailedAttempts(`ip:${ip}`);
+    await clearFailedAttempts(usernameKey);
 
-    // 4. Create signed session token (30 days validity)
-    const token = await createSessionToken(username.trim(), 30);
+    // 4. Create signed session token (8h validity)
+    const token = await createSessionToken(username.trim());
     logAuditDirect(username.trim(), ip, "login", "auth", null, {
       success: true,
       username: username.trim(),
@@ -77,7 +83,7 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      maxAge: 8 * 60 * 60, // 8 hours
     });
 
     return response;

@@ -4,7 +4,7 @@
 
 interface Env {
   AUTH_USER: string;
-  AUTH_PASSWORD: string;
+  AUTH_PASSWORD_HASH: string;
   AUTH_SECRET: string;
   ARCA_ENCRYPTION_KEY: string;
   AGENT_API_KEY: string;
@@ -14,7 +14,7 @@ interface Env {
 
 const REQUIRED_VARS = [
   "AUTH_USER",
-  "AUTH_PASSWORD",
+  "AUTH_PASSWORD_HASH",
   "AUTH_SECRET",
   "ARCA_ENCRYPTION_KEY",
   "AGENT_API_KEY",
@@ -41,7 +41,7 @@ export function validateEnv(): Env {
 
   return {
     AUTH_USER: process.env.AUTH_USER!,
-    AUTH_PASSWORD: process.env.AUTH_PASSWORD!,
+    AUTH_PASSWORD_HASH: process.env.AUTH_PASSWORD_HASH!,
     AUTH_SECRET: process.env.AUTH_SECRET!,
     ARCA_ENCRYPTION_KEY: process.env.ARCA_ENCRYPTION_KEY!,
     AGENT_API_KEY: process.env.AGENT_API_KEY!,

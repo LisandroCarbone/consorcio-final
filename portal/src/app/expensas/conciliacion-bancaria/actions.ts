@@ -369,6 +369,10 @@ export async function uploadExtracto(formData: FormData) {
     throw new Error("Faltan datos requeridos para el extracto.");
   }
 
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error("El archivo es demasiado grande (máximo 10MB).");
+  }
+
   const ext = file.name.toLowerCase().split(".").pop();
   if (!ext || !["csv", "xls", "xlsx"].includes(ext)) {
     throw new Error("Solo se aceptan archivos CSV, XLS o XLSX");

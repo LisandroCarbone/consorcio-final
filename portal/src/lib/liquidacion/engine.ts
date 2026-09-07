@@ -837,7 +837,7 @@ export async function calcularLiquidacion(
   };
   const nanFields = Object.entries(debugValues).filter(([, v]) => isNaN(v));
   if (nanFields.length > 0) {
-    console.warn(`[engine] NaN detected for empleado id ${empleadoId} (${emp.nombre}):`,
+    console.warn(`[engine] NaN detected for empleado id ${empleadoId}:`,
       nanFields.map(([k]) => k).join(", "));
   }
 
@@ -1498,8 +1498,8 @@ export async function calcularPeriodo(
         ok++;
       } else {
         const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
-        errores.push(`Empleado ${emp.cuil} (${emp.nombre}): ${msg}`);
-        console.error(`[engine] Error en empleado id ${emp.id} (CUIL ${emp.cuil}):`, r.reason);
+        errores.push(`Empleado id ${emp.id}: ${msg}`);
+        console.error(`[engine] Error en empleado id ${emp.id}:`, r.reason);
       }
     });
   }

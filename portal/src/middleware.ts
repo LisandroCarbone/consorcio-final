@@ -31,14 +31,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // TEMP: migration endpoint (remove after migration confirmed)
-  if (pathname === "/api/migrate-empleado") {
-    if (isValidApiKey(request.headers.get("x-api-key"))) {
-      return NextResponse.next();
-    }
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   // 2. Allow n8n webhook for SUTERH escalas only with a valid x-api-key
   if (pathname === "/api/sueldos/escalas") {
     if (isValidApiKey(request.headers.get("x-api-key"))) {
@@ -81,6 +73,10 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
+  );
   return response;
 }
 
