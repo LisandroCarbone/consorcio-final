@@ -130,13 +130,21 @@ function esFuncionVigilNocturna(funcion: string): boolean {
 // Resolves the full-time ("Permanente") equivalent function name for a part-time
 // ("No Permanente") function, used for Dif. OS Ley 26474 and the media jornada
 // SAC/OS calculations (art. 92 ter). Returns null when funcion is empty.
-function resolverFuncionCompletaEquivalente(funcion: string): string | null {
+function resolverFuncionCompletaEquivalente(funcion: string, tieneVivienda = false): string | null {
   if (!funcion) return null;
   if (funcion.includes("No Permanente Sin vivienda")) {
     return "Encargado Permanente sin vivienda";
   }
   if (funcion.includes("No Permanente Con vivienda")) {
     return "Encargado Permanente con vivienda";
+  }
+  if (/media jornada/i.test(funcion)) {
+    if (/ayudante/i.test(funcion)) {
+      return tieneVivienda ? "Ayudante Permanente con vivienda" : "Ayudante Permanente sin vivienda";
+    }
+    if (/encargado/i.test(funcion)) {
+      return tieneVivienda ? "Encargado Permanente con vivienda" : "Encargado Permanente sin vivienda";
+    }
   }
   return funcion.replace(/No Permanente/i, "Permanente");
 }
@@ -751,7 +759,7 @@ export async function calcularLiquidacion(
   let difObraSocial = 0;
   if (emp.jornada === "Media" && !esSuplente) {
     const catKey2 = `cat_${emp.categoria_edificio}` as "cat_1" | "cat_2" | "cat_3" | "cat_4";
-    const funcionCompletaOS = resolverFuncionCompletaEquivalente(emp.funcion);
+    const funcionCompletaOS = resolverFuncionCompletaEquivalente(emp.funcion, emp.tiene_vivienda);
     const baseOSCompleta: number =
       (funcionCompletaOS ? escalaMap[funcionCompletaOS]?.[catKey2] : undefined) ?? sueldoBasico * 2;
     let osSACPagada = 0;
@@ -793,7 +801,7 @@ export async function calcularLiquidacion(
   if (emp.jornada === "Media") {
     // Only the obra social contribution uses the full-time equivalent basic for media jornada
     const catKey2 = `cat_${emp.categoria_edificio}` as "cat_1" | "cat_2" | "cat_3" | "cat_4";
-    const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion);
+    const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion, emp.tiene_vivienda);
     basePatronalOS = (funcionCompleta ? escalaMap[funcionCompleta]?.[catKey2] : undefined) ?? totalRemunerativoFinal;
   }
   const excluirSCVO = emp.jornada === "Suplente" && diasAntiguedad(emp.fecha_ingreso, periodo) < 30;
@@ -1098,7 +1106,7 @@ export async function calcularSACPreview(
 
   let basePatronalSACOS = totalBruto;
   if (emp.jornada === "Media") {
-    const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion) ?? emp.funcion;
+    const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion, emp.tiene_vivienda) ?? emp.funcion;
     const escalaCompletaRow = await pool.query<EscalaRow>(
       `SELECT cat_1::numeric, cat_2::numeric, cat_3::numeric, cat_4::numeric
        FROM app.escalas_suterh

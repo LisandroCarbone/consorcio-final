@@ -429,9 +429,13 @@ export async function uploadExtracto(formData: FormData) {
     );
     extractoId = extractoRes.rows[0].id;
 
+    const refCounts = new Map<string, number>();
     for (const m of movimientos) {
-      const syntheticRef =
+      const baseRef =
         m.referencia || `${m.fecha || "nodate"}_${m.monto}_${(m.descripcion || "").slice(0, 20)}`;
+      const count = refCounts.get(baseRef) ?? 0;
+      refCounts.set(baseRef, count + 1);
+      const syntheticRef = count === 0 ? baseRef : `${baseRef}_#${count + 1}`;
       const categoriaBancaria = m.monto < 0 ? categorizeBankCharge(m.descripcion) : null;
       const absM = Math.abs(m.monto);
 
