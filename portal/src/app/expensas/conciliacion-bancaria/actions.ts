@@ -270,6 +270,8 @@ function parseExtractoXls(buffer: ArrayBuffer): ParsedExtracto {
   const headers = rawRows[headerIdx].map((c) => String(c ?? "").toLowerCase().trim());
 
   const findCol = (...candidates: string[]) => {
+    let exact = headers.findIndex((h) => candidates.some((c) => h === c));
+    if (exact >= 0) return exact;
     const idx = headers.findIndex((h) => candidates.some((c) => h.includes(c)));
     return idx >= 0 ? idx : -1;
   };
