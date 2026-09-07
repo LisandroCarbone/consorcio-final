@@ -9,7 +9,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const MIGRATIONS_DIR = path.join(process.cwd(), "..", "db", "migrations");
+const MIGRATIONS_DIR = fs.existsSync("/db/migrations")
+  ? "/db/migrations"
+  : path.join(process.cwd(), "..", "db", "migrations");
 
 interface MigrationFile {
   version: number;
