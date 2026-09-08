@@ -7,50 +7,6 @@ import ManagePaymentsModal from "./ManagePaymentsModal";
 import { CuentaCorrienteTableClient, CuentaCorrienteRow } from "./CuentaCorrienteTableClient";
 import HistorialCuentaCorrienteClient, { HistorialRow } from "./HistorialCuentaCorrienteClient";
 
-function calcularInteresSimple(
-  saldoInicial: number,
-  historial: { total_mes: number; su_pago: number }[],
-  tasa: number
-): { intereses: number; saldoFinal: number; saldoAnterior: number } {
-  let deudasVivas: { capital: number; meses: number }[] = [];
-  if (saldoInicial > 0) {
-    deudasVivas.push({ capital: saldoInicial, meses: 0 });
-  }
-
-  let lastIntereses = 0;
-  let lastSaldo = saldoInicial;
-  let lastSaldoAnterior = saldoInicial;
-
-  for (const row of historial) {
-    lastSaldoAnterior = lastSaldo;
-
-    for (const d of deudasVivas) d.meses++;
-
-    if (row.total_mes > 0) {
-      deudasVivas.push({ capital: row.total_mes, meses: 0 });
-    }
-
-    let pagoRestante = row.su_pago;
-    while (pagoRestante > 0 && deudasVivas.length > 0) {
-      if (pagoRestante >= deudasVivas[0].capital) {
-        pagoRestante -= deudasVivas[0].capital;
-        deudasVivas.shift();
-      } else {
-        deudasVivas[0].capital -= pagoRestante;
-        pagoRestante = 0;
-      }
-    }
-
-    lastIntereses = deudasVivas.reduce(
-      (sum, d) => sum + d.capital * tasa * d.meses, 0
-    );
-    const capitalPostPago = deudasVivas.reduce((s, d) => s + d.capital, 0);
-    lastSaldo = capitalPostPago + lastIntereses;
-  }
-
-  return { intereses: lastIntereses, saldoFinal: lastSaldo, saldoAnterior: lastSaldoAnterior };
-}
-
 async function getCuentaCorriente(
   consorcioCuit: string,
   anio: number,
@@ -161,53 +117,11 @@ export default async function CuentaCorrientePage({
   const selectedCuit = activeCuit;
   const selectedConsorcio = consorcios.find((c) => c.cuit === selectedCuit);
 
-  // Recalculate interest using historial logic (interés simple per-expense)
-  if (rows.length > 0) {
-    const [saldosRes, historialAllRes, tasaRes] = await Promise.all([
-      query<{ id: number; saldo_inicial_historico: number }>(
-        `SELECT id, COALESCE(saldo_inicial_historico, 0)::numeric AS saldo_inicial_historico
-         FROM app.unidades WHERE consorcio_cuit = $1`,
-        [activeCuit]
-      ),
-      query<{ unidad_id: number; total_mes: number; su_pago: number }>(
-        `SELECT rcp.unidad_id, COALESCE(rcp.total_mes, 0)::numeric AS total_mes,
-                COALESCE(rcp.su_pago, 0)::numeric AS su_pago
-         FROM app.res_cuenta_periodo rcp
-         JOIN app.periodos_expensas pe ON pe.id = rcp.periodo_id
-         WHERE pe.consorcio_cuit = $1
-         ORDER BY pe.anio ASC, pe.mes ASC`,
-        [activeCuit]
-      ),
-      query<{ tasa: number }>(
-        `SELECT COALESCE(tasa, 0)::numeric AS tasa FROM app.tasas_interes
-         WHERE consorcio_cuit = $1 ORDER BY fecha_desde DESC LIMIT 1`,
-        [activeCuit]
-      ),
-    ]);
-
-    const tasa = Number(tasaRes[0]?.tasa ?? 0);
-    const saldoMap = new Map(saldosRes.map(s => [s.id, Number(s.saldo_inicial_historico)]));
-    const historialMap = new Map<number, { total_mes: number; su_pago: number }[]>();
-    for (const h of historialAllRes) {
-      if (!historialMap.has(h.unidad_id)) historialMap.set(h.unidad_id, []);
-      historialMap.get(h.unidad_id)!.push({ total_mes: Number(h.total_mes), su_pago: Number(h.su_pago) });
-    }
-
-    for (const row of rows) {
-      const uid = Number(row.unidad_id);
-      const saldoIni = saldoMap.get(uid) ?? 0;
-      const hist = historialMap.get(uid) ?? [];
-      if (saldoIni > 0 || hist.length > 0) {
-        const { intereses, saldoFinal, saldoAnterior } = calcularInteresSimple(saldoIni, hist, tasa);
-        const r = row as Record<string, unknown>;
-        const hasRcp = Number(row.total_mes) !== 0 || Number(row.su_pago) !== 0 || row.estado !== null;
-        r.saldo_anterior = hasRcp ? saldoAnterior : saldoFinal;
-        r.intereses = hasRcp ? intereses : 0;
-        r.deuda = Number(r.saldo_anterior) + Number(row.total_mes) - Number(row.su_pago);
-        r.total_pagar = hasRcp ? saldoFinal : Number(r.saldo_anterior);
-      }
-    }
-  }
+  // saldo_anterior, intereses, deuda and total_pagar come directly from
+  // app.res_cuenta_periodo (computed by the real engine in
+  // lib/expenses/engine.ts, FIFO with historical rates). No local
+  // recalculation here — that used to duplicate the engine with a
+  // simplified single-rate formula and silently override its output.
 
   const totalDeuda = rows.reduce((s, r) => s + (Number(r.total_pagar) > 0 ? Number(r.total_pagar) : 0), 0);
   const totalPagado = rows.reduce((s, r) => s + Number(r.total_pagado), 0);

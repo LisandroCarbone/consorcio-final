@@ -962,6 +962,8 @@ export async function asignarSplit(
   try {
     await client.query("BEGIN");
 
+    const unidadesAfectadas = new Set<number>();
+
     for (const s of splits) {
       const montoSplit = round2(Number(s.monto));
       if (montoSplit <= 0) continue;
@@ -969,11 +971,23 @@ export async function asignarSplit(
         ? `${mov.referencia}-uf${s.unidadId}`
         : `split_${movimientoId}_${s.unidadId}`;
 
+      // Link the pago to the specific res_cuenta_periodo row for this unidad
+      // + periodo (when the extracto is tied to a periodo) so su_pago can be
+      // recomputed by the real engine instead of a lifetime SUM.
+      let resCuentaId: number | null = null;
+      if (extracto.periodo_id) {
+        const rc = await client.query<{ id: number }>(
+          "SELECT id FROM app.res_cuenta_periodo WHERE periodo_id = $1 AND unidad_id = $2",
+          [extracto.periodo_id, s.unidadId]
+        );
+        resCuentaId = rc.rows[0]?.id ?? null;
+      }
+
       const pagoRes = await client.query<{ id: number }>(
-        `INSERT INTO app.pagos (consorcio_cuit, unidad_id, fecha, monto, medio_pago, referencia)
-         VALUES ($1,$2,$3,$4,'transferencia',$5)
+        `INSERT INTO app.pagos (consorcio_cuit, unidad_id, res_cuenta_id, fecha, monto, medio_pago, referencia)
+         VALUES ($1,$2,$3,$4,$5,'transferencia',$6)
          RETURNING id`,
-        [extracto.consorcio_cuit, s.unidadId, mov.fecha, montoSplit, refSplit]
+        [extracto.consorcio_cuit, s.unidadId, resCuentaId, mov.fecha, montoSplit, refSplit]
       );
       const pagoId = pagoRes.rows[0].id;
 
@@ -983,6 +997,7 @@ export async function asignarSplit(
         [movimientoId, s.unidadId, montoSplit]
       );
       void pagoId;
+      unidadesAfectadas.add(s.unidadId);
     }
 
     await client.query(
@@ -992,6 +1007,13 @@ export async function asignarSplit(
        WHERE id = $1`,
       [movimientoId, mov.referencia]
     );
+
+    // Recompute su_pago (and everything downstream) via the real engine —
+    // asignarSplit previously never triggered this, leaving su_pago stale.
+    if (extracto.periodo_id && unidadesAfectadas.size > 0) {
+      const { warnings } = await runCalculateExpenses(extracto.periodo_id, client);
+      for (const w of warnings) console.warn(`[asignarSplit] ${w}`);
+    }
 
     await client.query("COMMIT");
   } catch (err) {
@@ -1078,10 +1100,22 @@ export async function aplicarCreditos(extractoId: number) {
       [extractoId]
     );
     for (const m of confirmados) {
+      // Link the pago to the specific res_cuenta_periodo row for this unidad
+      // + periodo (when the extracto is tied to a periodo) so su_pago can be
+      // recomputed by the real engine instead of a lifetime SUM.
+      let resCuentaId: number | null = null;
+      if (extracto.periodo_id) {
+        const rc = await client.query<{ id: number }>(
+          "SELECT id FROM app.res_cuenta_periodo WHERE periodo_id = $1 AND unidad_id = $2",
+          [extracto.periodo_id, m.match_id]
+        );
+        resCuentaId = rc.rows[0]?.id ?? null;
+      }
+
       await client.query(
-        `INSERT INTO app.pagos (consorcio_cuit, unidad_id, fecha, monto, medio_pago, referencia)
-         VALUES ($1,$2,$3,$4,'transferencia',$5)`,
-        [extracto.consorcio_cuit, m.match_id, m.fecha, m.monto, m.referencia]
+        `INSERT INTO app.pagos (consorcio_cuit, unidad_id, res_cuenta_id, fecha, monto, medio_pago, referencia)
+         VALUES ($1,$2,$3,$4,$5,'transferencia',$6)`,
+        [extracto.consorcio_cuit, m.match_id, resCuentaId, m.fecha, m.monto, m.referencia]
       );
       await client.query(
         "UPDATE app.extracto_movimientos SET comprobante_ref = $1 WHERE id = $2",
@@ -1093,25 +1127,20 @@ export async function aplicarCreditos(extractoId: number) {
       `UPDATE app.extractos_bancarios SET estado = 'creditos_aplicados' WHERE id = $1 AND estado NOT IN ('aplicado')`,
       [extractoId]
     );
+
+    // Recompute su_pago (and everything downstream) via the real engine,
+    // inside the same transaction, instead of a raw lifetime-SUM UPDATE.
+    if (extracto.periodo_id && confirmados.length > 0) {
+      const { warnings } = await runCalculateExpenses(extracto.periodo_id, client);
+      for (const w of warnings) console.warn(`[aplicarCreditos] ${w}`);
+    }
+
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
   } finally {
     client.release();
-  }
-
-  if (extracto.periodo_id) {
-    await query(
-      `UPDATE app.res_cuenta_periodo rcp
-       SET su_pago = COALESCE((
-         SELECT SUM(p.monto) FROM app.pagos p
-         WHERE p.unidad_id = rcp.unidad_id
-           AND p.consorcio_cuit = (SELECT consorcio_cuit FROM app.periodos_expensas WHERE id = rcp.periodo_id)
-       ), 0)
-       WHERE rcp.periodo_id = $1`,
-      [extracto.periodo_id]
-    );
   }
 
   revalidatePath(BASE_PATH);
