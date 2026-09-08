@@ -22,6 +22,13 @@ export interface GastoRow {
   cuota_nro?: number | null;
   cuota_total?: number | null;
   cuota_completa?: boolean | null;
+  unidad_id?: number | null;
+  unidad_uf?: number | null;
+}
+
+export interface UF {
+  id: number;
+  uf: number;
 }
 
 export const CATEGORIA_LABELS: Record<number, string> = {
@@ -136,13 +143,15 @@ function SalaryBreakdown({ row }: { row: GastoRow }) {
 interface Props {
   gastos: GastoRow[];
   periodoId: number;
+  unidades: UF[];
 }
 
-function EditGastoRow({ g, periodoId, onCancel }: { g: GastoRow; periodoId: number; onCancel: () => void }) {
+function EditGastoRow({ g, periodoId, unidades, onCancel }: { g: GastoRow; periodoId: number; unidades: UF[]; onCancel: () => void }) {
   const initialAperturar = g.tipo !== "Particular" && Number(g.pct_a) > 0 && Number(g.pct_a) < 100;
   const [tipo, setTipo] = useState(g.tipo);
   const [aperturar, setAperturar] = useState(initialAperturar);
   const [pctA, setPctA] = useState(Number(g.pct_a ?? 100));
+  const [ufSel, setUfSel] = useState<number | "">(g.unidad_id ?? "");
 
   const handleTipoChange = (val: string) => {
     setTipo(val);
@@ -151,6 +160,8 @@ function EditGastoRow({ g, periodoId, onCancel }: { g: GastoRow; periodoId: numb
     setAperturar(false);
   };
 
+  const selectedUf = unidades.find((u) => u.id === ufSel);
+
   return (
     <tr className="border-b border-gray-100 bg-amber-50">
       <td className="td" colSpan={4}>
@@ -158,6 +169,9 @@ function EditGastoRow({ g, periodoId, onCancel }: { g: GastoRow; periodoId: numb
           <input type="hidden" name="id" value={g.id} />
           <input type="hidden" name="periodo_id" value={periodoId} />
           <input type="hidden" name="pct_a" value={aperturar ? pctA : (tipo === "B" ? 0 : 100)} />
+          {tipo === "Particular" && selectedUf && (
+            <input type="hidden" name="target_uf" value={selectedUf.uf} />
+          )}
           <div className="flex-[2] min-w-64">
             <label className="label text-xs">Concepto</label>
             <input name="concepto" defaultValue={g.concepto} required className="input" title={g.concepto} />
@@ -213,6 +227,22 @@ function EditGastoRow({ g, periodoId, onCancel }: { g: GastoRow; periodoId: numb
               )}
             </div>
           )}
+          {tipo === "Particular" && (
+            <div className="w-36">
+              <label className="label text-xs">UF destinataria</label>
+              <select
+                value={ufSel}
+                onChange={(e) => setUfSel(e.target.value ? Number(e.target.value) : "")}
+                required
+                className="input"
+              >
+                <option value="">— Elegir UF —</option>
+                {unidades.map((u) => (
+                  <option key={u.id} value={u.id}>UF {u.uf}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex gap-2 self-end">
             <button type="submit" className="btn-primary text-xs px-3 py-1.5">Guardar</button>
             <button type="button" onClick={onCancel} className="btn-secondary text-xs px-3 py-1.5">Cancelar</button>
@@ -223,7 +253,7 @@ function EditGastoRow({ g, periodoId, onCancel }: { g: GastoRow; periodoId: numb
   );
 }
 
-export function ExpensasTableClient({ gastos, periodoId }: Props) {
+export function ExpensasTableClient({ gastos, periodoId, unidades }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   if (gastos.length === 0) {
@@ -264,7 +294,7 @@ export function ExpensasTableClient({ gastos, periodoId }: Props) {
               <tbody>
                 {rows.map((g) =>
                   editingId === g.id ? (
-                    <EditGastoRow key={g.id} g={g} periodoId={periodoId} onCancel={() => setEditingId(null)} />
+                    <EditGastoRow key={g.id} g={g} periodoId={periodoId} unidades={unidades} onCancel={() => setEditingId(null)} />
                   ) : (
                     <tr key={g.id} className="group border-b border-gray-100 last:border-b-0 hover:bg-gray-50/60 transition-colors">
                       <td className="px-5 py-2.5">

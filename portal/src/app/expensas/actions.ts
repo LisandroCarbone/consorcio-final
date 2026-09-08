@@ -209,14 +209,35 @@ export async function updateGasto(formData: FormData) {
   const periodoId = Number(formData.get("periodo_id"));
   const tipo = formData.get("tipo") as string;
   const pct_a = resolvePctA(formData, tipo);
+  const targetUf = formData.get("target_uf") as string;
+
+  let unidad_id: number | null = null;
+  if (tipo === "Particular" && targetUf) {
+    const ufNum = Number(targetUf.trim());
+    if (!isNaN(ufNum)) {
+      const period = await queryOne<{ consorcio_cuit: string }>(
+        "SELECT consorcio_cuit FROM app.periodos_expensas WHERE id = $1",
+        [periodoId]
+      );
+      if (period) {
+        const unit = await queryOne<{ id: number }>(
+          "SELECT id FROM app.unidades WHERE consorcio_cuit = $1 AND uf = $2",
+          [period.consorcio_cuit, ufNum]
+        );
+        if (unit) unidad_id = unit.id;
+      }
+    }
+  }
+
   await query(
-    `UPDATE app.gastos_periodo SET descripcion=$1, monto=$2, categoria=$3, tipo=$4, pct_a=$5 WHERE id=$6`,
+    `UPDATE app.gastos_periodo SET descripcion=$1, monto=$2, categoria=$3, tipo=$4, pct_a=$5, unidad_id=$6 WHERE id=$7`,
     [
       formData.get("concepto") as string,
       Number(formData.get("monto")),
       Number(formData.get("categoria")),
       tipo,
       pct_a,
+      unidad_id,
       id,
     ]
   );

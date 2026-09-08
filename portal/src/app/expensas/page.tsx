@@ -65,6 +65,7 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
       pct_a: number;
       cuota_grupo_id: string | null; cuota_nro: number | null; cuota_total: number | null;
       cuota_completa: boolean | null;
+      unidad_id: number | null; unidad_uf: number | null;
     }>(
       `SELECT g.id, g.descripcion AS concepto, g.monto::numeric, g.tipo, g.categoria,
               g.pct_a::numeric,
@@ -78,9 +79,11 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
               g.cuota_grupo_id, g.cuota_nro, g.cuota_total,
               CASE WHEN g.cuota_grupo_id IS NOT NULL THEN
                 (SELECT COUNT(*) FROM app.gastos_periodo g2 WHERE g2.cuota_grupo_id = g.cuota_grupo_id AND g2.periodo_id IS NOT NULL) = g.cuota_total
-              ELSE NULL END AS cuota_completa
+              ELSE NULL END AS cuota_completa,
+              g.unidad_id, u.uf AS unidad_uf
        FROM app.gastos_periodo g
        LEFT JOIN app.liquidaciones_sueldo l ON l.id = g.liquidacion_id
+       LEFT JOIN app.unidades u ON u.id = g.unidad_id
        WHERE g.periodo_id = $1 AND g.es_provision = false
        ORDER BY g.categoria,
          CASE
@@ -732,7 +735,7 @@ export default async function ExpensasPage({
                   <h3 className="font-semibold text-gray-800 text-base">Gastos del período</h3>
                   <p className="text-lg font-bold text-gray-900">{formatMoney(selected.total_gastos)}</p>
                 </div>
-                <ExpensasTableClient gastos={detail?.gastos ?? []} periodoId={selected.id} />
+                <ExpensasTableClient gastos={detail?.gastos ?? []} periodoId={selected.id} unidades={detail?.unidades ?? []} />
                 <AddGastoForm
                   periodoId={selected.id}
                   unidades={detail?.unidades ?? []}

@@ -87,6 +87,7 @@ type GastoRow = {
   descripcion: string;
   monto: string;
   tipo: string;
+  pct_a: string | null;
   categoria: number;
   liquidacion_id: number | null;
   liq_bruto: string | null;
@@ -152,7 +153,7 @@ export async function GET(
 
   const [gastos, ufRows] = await Promise.all([
     query<GastoRow>(
-      `SELECT g.descripcion, g.monto::numeric, g.tipo, g.categoria,
+      `SELECT g.descripcion, g.monto::numeric, g.tipo, g.pct_a::numeric, g.categoria,
               g.liquidacion_id,
               l.remuneracion_bruta::numeric AS liq_bruto,
               l.total_descuentos_empleado::numeric AS liq_descuentos,
@@ -207,8 +208,9 @@ export async function GET(
   const categoriaSubtotals = [...gastosPorCategoria.entries()]
     .sort(([a], [b]) => a - b)
     .map(([categoria, items]) => {
-      const subtotalA = items.filter(g => g.tipo === "A").reduce((s, g) => s + Number(g.monto), 0);
-      const subtotalB = items.filter(g => g.tipo === "B").reduce((s, g) => s + Number(g.monto), 0);
+      const itemsAB = items.filter(g => g.tipo !== "Particular");
+      const subtotalA = itemsAB.reduce((s, g) => s + Math.round(Number(g.monto) * (Number(g.pct_a ?? 100) / 100) * 100) / 100, 0);
+      const subtotalB = itemsAB.reduce((s, g) => s + Math.round(Number(g.monto) * (1 - Number(g.pct_a ?? 100) / 100) * 100) / 100, 0);
       const subtotal = subtotalA + subtotalB;
       totalGastosA += subtotalA;
       totalGastosB += subtotalB;
@@ -266,11 +268,14 @@ export async function GET(
               <td></td><td></td>
             </tr>`;
         }
+        const isParticular = g.tipo === "Particular";
+        const montoA = isParticular ? 0 : Math.round(Number(g.monto) * (Number(g.pct_a ?? 100) / 100) * 100) / 100;
+        const montoB = isParticular ? 0 : Math.round(Number(g.monto) * (1 - Number(g.pct_a ?? 100) / 100) * 100) / 100;
         return `
         <tr>
           <td class="gasto-desc">${esc(g.descripcion)}</td>
-          <td class="r mono">${g.tipo === "A" ? moneyCompact(g.monto) : ""}</td>
-          <td class="r mono">${g.tipo === "B" ? moneyCompact(g.monto) : ""}</td>
+          <td class="r mono">${montoA > 0 ? moneyCompact(montoA) : ""}</td>
+          <td class="r mono">${montoB > 0 ? moneyCompact(montoB) : ""}</td>
           <td></td>
         </tr>${conceptRows}`;
       }).join("");
@@ -401,17 +406,13 @@ export async function GET(
   const paymentSection = (periodo.banco || periodo.cbu)
     ? `
     <div class="section-title">FORMAS DE PAGO</div>
-    <table class="payment-table">
-      <tr>
-        ${periodo.banco ? `<td><span class="label">Banco:</span> ${esc(periodo.banco)}</td>` : ""}
-        ${periodo.bank_titular ? `<td><span class="label">Titular:</span> ${esc(periodo.bank_titular)}</td>` : ""}
-      </tr>
-      <tr>
-        ${periodo.bank_account_number ? `<td><span class="label">Cuenta:</span> ${esc(periodo.bank_account_number)}</td>` : ""}
-        ${periodo.cbu ? `<td><span class="label">CBU:</span> <strong>${esc(periodo.cbu)}</strong></td>` : ""}
-      </tr>
-      ${periodo.bank_alias ? `<tr><td><span class="label">Alias:</span> <strong>${esc(periodo.bank_alias)}</strong></td><td></td></tr>` : ""}
-    </table>`
+    <div class="payment-list">
+      ${periodo.bank_titular ? `<div class="payment-row"><span class="label">Titular:</span> ${esc(periodo.bank_titular)}</div>` : ""}
+      ${periodo.banco ? `<div class="payment-row"><span class="label">Banco:</span> ${esc(periodo.banco)}</div>` : ""}
+      ${periodo.bank_account_number ? `<div class="payment-row"><span class="label">Cuenta:</span> ${esc(periodo.bank_account_number)}</div>` : ""}
+      ${periodo.cbu ? `<div class="payment-row"><span class="label">CBU:</span> <strong>${esc(periodo.cbu)}</strong></div>` : ""}
+      ${periodo.bank_alias ? `<div class="payment-row"><span class="label">Alias:</span> <strong>${esc(periodo.bank_alias)}</strong></div>` : ""}
+    </div>`
     : "";
 
   const html = `<!doctype html>
@@ -428,6 +429,7 @@ export async function GET(
   body {
     font-family: "Segoe UI", Arial, Helvetica, sans-serif;
     color: #222;
+    max-width: 210mm;
     margin: 0 auto;
     padding: 20px;
     background: #fff;
@@ -519,9 +521,9 @@ export async function GET(
   .prorrateo-table td { white-space: nowrap; font-size: 9.5px; }
 
   /* Payment */
-  .payment-table { font-size: 11px; margin: 4px 0; }
-  .payment-table td { border: none; padding: 2px 12px 2px 0; }
-  .payment-table .label { color: #666; }
+  .payment-list { font-size: 11px; margin: 4px 0; text-align: left; }
+  .payment-row { padding: 2px 0; }
+  .payment-list .label { color: #666; }
 
   /* Vencimiento */
   .vencimiento-bar {
@@ -544,7 +546,7 @@ export async function GET(
 
   /* Print */
   @media print {
-    body { padding: 0; }
+    body { padding: 0; max-width: none; }
     .no-print { display: none !important; }
   }
   .no-print {

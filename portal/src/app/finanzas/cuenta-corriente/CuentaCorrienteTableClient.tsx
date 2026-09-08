@@ -16,6 +16,7 @@ export interface CuentaCorrienteRow {
   expensas_a: number;
   coef_b: number;
   expensas_b: number;
+  fondo_obra: number;
   total_mes: number;
   deuda: number;
   intereses: number;
@@ -80,6 +81,7 @@ export function CuentaCorrienteTableClient({
       expensas_a: acc.expensas_a + Number(r.expensas_a),
       coef_b: acc.coef_b + Number(r.coef_b),
       expensas_b: acc.expensas_b + Number(r.expensas_b),
+      fondo_obra: acc.fondo_obra + Number(r.fondo_obra),
       total_mes: acc.total_mes + Number(r.total_mes),
       deuda: acc.deuda + Number(r.deuda),
       intereses: acc.intereses + Number(r.intereses),
@@ -92,6 +94,7 @@ export function CuentaCorrienteTableClient({
       expensas_a: 0,
       coef_b: 0,
       expensas_b: 0,
+      fondo_obra: 0,
       total_mes: 0,
       deuda: 0,
       intereses: 0,
@@ -170,6 +173,7 @@ export function CuentaCorrienteTableClient({
                 <th className="py-2 px-3 text-right min-w-[100px]">Exp. A</th>
                 <th className="py-2 px-3 text-right min-w-[70px]">% B</th>
                 <th className="py-2 px-3 text-right min-w-[100px]">Exp. B</th>
+                <th className="py-2 px-3 text-right min-w-[110px]">Fondo de Obra</th>
                 <th className="py-2 px-3 text-right min-w-[110px]">Totales del Mes</th>
                 <th className="py-2 px-3 text-right min-w-[100px]">Deuda</th>
                 <th className="py-2 px-3 text-right min-w-[100px]">Intereses</th>
@@ -229,6 +233,7 @@ export function CuentaCorrienteTableClient({
                     {formatPercent(Number(r.coef_b))}
                   </td>
                   <MoneyCell value={Number(r.expensas_b)} />
+                  <MoneyCell value={Number(r.fondo_obra)} />
                   <MoneyCell value={Number(r.total_mes)} />
                   <MoneyCell value={Number(r.deuda)} />
                   <MoneyCell value={Number(r.intereses)} />
@@ -279,6 +284,7 @@ export function CuentaCorrienteTableClient({
                   {formatPercent(totals.coef_b)}
                 </td>
                 <MoneyCell value={totals.expensas_b} bold />
+                <MoneyCell value={totals.fondo_obra} bold />
                 <MoneyCell value={totals.total_mes} bold />
                 <MoneyCell value={totals.deuda} bold />
                 <MoneyCell value={totals.intereses} bold />

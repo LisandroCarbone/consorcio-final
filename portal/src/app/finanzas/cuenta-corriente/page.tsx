@@ -67,6 +67,7 @@ async function getCuentaCorriente(
        COALESCE(rcp.expensas_a, 0)::numeric AS expensas_a,
        COALESCE(rcp.coef_b, 0)::numeric AS coef_b,
        COALESCE(rcp.expensas_b, 0)::numeric AS expensas_b,
+       COALESCE(rcp.fondo_obra, 0)::numeric AS fondo_obra,
        COALESCE(rcp.total_mes, 0)::numeric AS total_mes,
        COALESCE(rcp.deuda, 0)::numeric AS deuda,
        COALESCE(rcp.intereses, 0)::numeric AS intereses,
