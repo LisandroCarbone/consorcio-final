@@ -459,8 +459,14 @@ export async function calcularLiquidacion(
   const clasifResKey =
     "Clasificación de residuos Resol. 2013 243 SSRT-GCABA";
 
+  if (emp.retiro_residuos && cons.uf_retiro_residuos == null) {
+    throw new Error(
+      `El consorcio "${cons.nombre}" no tiene definida la cantidad de UF para retiro de residuos. ` +
+      `Cargue el dato en la ficha del consorcio antes de liquidar.`
+    );
+  }
   const retiroResiduos = emp.retiro_residuos
-    ? adic("retiro_residuos", adicionales[retiroResKey] ?? 0) * (cons.uf_retiro_residuos ?? cons.cant_uf ?? 0)
+    ? adic("retiro_residuos", adicionales[retiroResKey] ?? 0) * cons.uf_retiro_residuos!
     : 0;
 
   let clasifResiduos = 0;

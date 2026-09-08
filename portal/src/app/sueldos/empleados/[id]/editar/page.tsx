@@ -10,7 +10,7 @@ import { EmpleadoFormClient } from "../../EmpleadoFormClient";
 
 async function getEmpleado(id: number) {
   const { rows } = await pool.query(
-    `SELECT e.*, c.nombre AS consorcio_nombre
+    `SELECT e.*, c.nombre AS consorcio_nombre, c.uf_retiro_residuos
      FROM app.empleados e
      JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
      WHERE e.id = $1`,
@@ -245,6 +245,11 @@ export default async function EditarEmpleadoPage({
               </label>
             ))}
           </div>
+          {emp.retiro_residuos && emp.uf_retiro_residuos == null && (
+            <p className="mt-3 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded p-2">
+              ⚠️ Este consorcio no tiene definida la cantidad de UF para retiro de residuos. La liquidación fallará hasta que se cargue el dato en la ficha del consorcio.
+            </p>
+          )}
           {/* Adicional voluntario removed — se carga solo desde Novedades */}
         </div>
 
