@@ -32,7 +32,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // 2. Allow API-key-authenticated routes
-  if (pathname === "/api/sueldos/escalas" || pathname === "/api/admin/clean-periods") {
+  if (pathname === "/api/sueldos/escalas") {
     if (isValidApiKey(request.headers.get("x-api-key"))) {
       return NextResponse.next();
     }
