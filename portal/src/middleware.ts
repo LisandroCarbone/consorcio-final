@@ -31,8 +31,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Allow n8n webhook for SUTERH escalas only with a valid x-api-key
-  if (pathname === "/api/sueldos/escalas") {
+  // 2. Allow API-key-authenticated routes
+  if (pathname === "/api/sueldos/escalas" || pathname === "/api/admin/clean-periods") {
     if (isValidApiKey(request.headers.get("x-api-key"))) {
       return NextResponse.next();
     }
