@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { calcularLiquidacion, calcularPeriodo } from "@/lib/liquidacion/engine";
+import { pool } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   // Auth
@@ -9,14 +10,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { periodo?: string; empleadoId?: number };
+  let body: { periodo?: string; empleadoId?: number; cuil?: string; consorcioCuit?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { periodo, empleadoId } = body;
+  const { periodo, cuil, consorcioCuit } = body;
+  let { empleadoId } = body;
 
   if (!periodo || typeof periodo !== "string") {
     return NextResponse.json(
@@ -35,6 +37,36 @@ export async function POST(req: NextRequest) {
       { error: "Formato de período inválido. Usar YYYY-MM o YYYY-MM-DD" },
       { status: 400 }
     );
+  }
+
+  // Resolve empleadoId from cuil if provided
+  if (!empleadoId && cuil) {
+    const { rows } = await pool.query(
+      "SELECT id FROM app.empleados WHERE cuil = $1 AND estado = 'activo' LIMIT 1",
+      [cuil.replace(/[-\s]/g, "")]
+    );
+    if (!rows.length) return NextResponse.json({ error: `No active employee with CUIL ${cuil}` }, { status: 404 });
+    empleadoId = rows[0].id;
+  }
+
+  // Batch by consorcio
+  if (!empleadoId && consorcioCuit) {
+    const { rows } = await pool.query(
+      "SELECT id FROM app.empleados WHERE consorcio_cuit = $1 AND estado = 'activo'",
+      [consorcioCuit]
+    );
+    if (!rows.length) return NextResponse.json({ error: `No active employees for CUIT ${consorcioCuit}` }, { status: 404 });
+    let ok = 0;
+    const errores: string[] = [];
+    for (const emp of rows) {
+      try {
+        await calcularLiquidacion(emp.id, periodoNorm);
+        ok++;
+      } catch (err) {
+        errores.push(`emp ${emp.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    return NextResponse.json({ ok, errores });
   }
 
   if (empleadoId !== undefined) {
