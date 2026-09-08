@@ -25,5 +25,16 @@ export async function GET(req: NextRequest) {
     [liqId]
   );
 
-  return NextResponse.json({ liq: liqRows[0] ?? null, conceptos });
+  const emp = liqRows[0];
+  let scvoDebug = null;
+  if (emp) {
+    const esSuplente = emp.jornada === "Suplente" || /suplente/i.test(emp.funcion ?? "");
+    const [y2, m2] = emp.periodo.split("-").map(Number);
+    const lastDay = new Date(y2, m2, 0);
+    const ingreso = new Date(emp.fecha_ingreso);
+    const diasAnt = Math.max(0, Math.floor((lastDay.getTime() - ingreso.getTime()) / 86400000));
+    const excluirSCVO = esSuplente && diasAnt < 30;
+    scvoDebug = { esSuplente, diasAnt, excluirSCVO, jornada: emp.jornada, funcion: emp.funcion, fechaIngreso: emp.fecha_ingreso, buildMarker: "v2-debug" };
+  }
+  return NextResponse.json({ liq: liqRows[0] ?? null, conceptos, scvoDebug });
 }
