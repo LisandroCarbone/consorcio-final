@@ -804,7 +804,7 @@ export async function calcularLiquidacion(
     const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion, emp.tiene_vivienda);
     basePatronalOS = (funcionCompleta ? escalaMap[funcionCompleta]?.[catKey2] : undefined) ?? totalRemunerativoFinal;
   }
-  const excluirSCVO = emp.jornada === "Suplente" && diasAntiguedad(emp.fecha_ingreso, periodo) < 30;
+  const excluirSCVO = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodo) < 30;
   const patron = calcContribPatronal(
     basePatronal,
     basePatronalOS,
@@ -1132,7 +1132,7 @@ export async function calcularSACPreview(
     fateryhArt19bisSAC = Number(parametrosCctRow.rows[0]?.fateryh_art19bis ?? 0);
     scvoSAC = parametrosCctRow.rows[0]?.sv_costo_fijo != null ? Number(parametrosCctRow.rows[0].sv_costo_fijo) : null;
   }
-  const excluirSCVOsac = emp.jornada === "Suplente" && diasAntiguedad(emp.fecha_ingreso, periodoSAC) < 30;
+  const excluirSCVOsac = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodoSAC) < 30;
   const totalPatronal = cons
     ? calcContribPatronal(totalBruto, basePatronalSACOS, cons, emp.jornada, 0, fateryhArt19bisSAC, excluirSCVOsac ? 0 : scvoSAC).total
     : 0;
@@ -1376,7 +1376,7 @@ export async function calcularIndemnizacionPreview(
   const pctFateryh = Number(cons?.pct_cct_fateryh ?? 0.0475);
   const pctSeracarh = Number(cons?.pct_cct_seracarh ?? 0.005);
   const pctART = Number(cons?.art_pct_variable ?? 0);
-  const excluirSCVOegreso = emp.jornada === "Suplente" && diasAntiguedad(emp.fecha_ingreso, `${egreso.getFullYear()}-${String(egreso.getMonth() + 1).padStart(2, "0")}-01`) < 30;
+  const excluirSCVOegreso = esSuplente && diasAntiguedad(emp.fecha_ingreso, `${egreso.getFullYear()}-${String(egreso.getMonth() + 1).padStart(2, "0")}-01`) < 30;
   const scvoFijo = excluirSCVOegreso ? 0 : (cons?.sv_costo_fijo ? Number(cons.sv_costo_fijo) : 0);
   const totalPatronal = totalRemunerativo * (pctJubilPatronal + pctOSPatronal + pctSuterh + pctFateryh + pctSeracarh + pctART) + scvoFijo;
 

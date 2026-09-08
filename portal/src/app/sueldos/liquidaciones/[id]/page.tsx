@@ -111,15 +111,16 @@ export default async function ReciboPage({
   function inferUnidadValor(
     concepto: string,
     importe: number,
-    opts: { anios?: number; totalUnidades?: number | null } = {}
+    opts: { anios?: number; totalUnidades?: number | null; ufRetiroResiduos?: number | null; cantUf?: number | null } = {}
   ): { unidad: string; valorUnit: string } {
     const c = concepto.toLowerCase();
     const i = Number(importe);
 
     if (c.includes("retiro de residuos")) {
-      // Unit price not available in recibo context — show total only
-      const unidad = opts.totalUnidades ? `${opts.totalUnidades} unidades` : "—";
-      return { unidad, valorUnit: fmt(i) };
+      const uf = opts.ufRetiroResiduos ?? opts.cantUf ?? opts.totalUnidades;
+      const unidad = uf ? `${uf} unidades` : "—";
+      const unitVal = uf && uf > 0 ? fmt(Math.round((i / uf) * 100) / 100) : fmt(i);
+      return { unidad, valorUnit: unitVal };
     }
     if (c.includes("clasificación de residuos") || c.includes("clasificacion")) {
       return { unidad: "—", valorUnit: fmt(i) };
@@ -452,7 +453,7 @@ export default async function ReciboPage({
                 const esNoRem = NO_REMUNERATIVOS.has(h.concepto);
                 const val = Number(h.importe);
                 const isNegative = val < 0;
-                const { unidad, valorUnit } = inferUnidadValor(h.concepto, Math.abs(val), { anios: liq.antiguedad_anios ?? 0, totalUnidades: liq.consorcio_total_unidades });
+                const { unidad, valorUnit } = inferUnidadValor(h.concepto, Math.abs(val), { anios: liq.antiguedad_anios ?? 0, totalUnidades: liq.consorcio_total_unidades, ufRetiroResiduos: liq.uf_retiro_residuos, cantUf: liq.cant_uf });
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="p-1.5 print:p-[1px] pl-2 text-gray-800 truncate">{h.concepto}</td>
