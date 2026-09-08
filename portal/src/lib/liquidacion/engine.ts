@@ -191,7 +191,7 @@ function calcDescuentosEmpleado(
   const suterh        = !esSuplente ? base * 0.02 : 0;
   const cajaProtFlia  = base * 0.01;
   const fateryh       = !esSuplente ? base * 0.01 : 0;
-  const seguroVital   = excluirSCVO ? 0 : base * 0.0075;
+  const seguroVital   = base * 0.0075;
   const fondoEducacion = aplicarFondoEducacion && !esSuplente ? base * 0.02 : 0;
   const total = jubilacion + pami + obraSocial + difObraSocial + suterh + cajaProtFlia + fateryh + seguroVital + fondoEducacion;
   return { jubilacion, pami, obraSocial, difObraSocial, suterh, cajaProtFlia, fateryh, seguroVital, fondoEducacion, total };
