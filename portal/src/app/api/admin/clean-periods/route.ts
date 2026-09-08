@@ -38,9 +38,17 @@ export async function POST(req: NextRequest) {
     const liqIds = liqRows.rows.map((r: any) => r.id);
     log.push(`Liquidaciones: ${liqIds.length}`);
 
+    const desdeDate = new Date(desde);
+    const hastaDate = new Date(hasta);
+    const anioMesPairs: string[] = [];
+    const d = new Date(desdeDate);
+    while (d <= hastaDate) {
+      anioMesPairs.push(`(${d.getFullYear()}, ${d.getMonth() + 1})`);
+      d.setMonth(d.getMonth() + 1);
+    }
     const periodoRows = await client.query(
-      `SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 AND periodo >= $2 AND periodo <= $3`,
-      [cuit, desde, hasta]
+      `SELECT id FROM app.periodos_expensas WHERE consorcio_cuit = $1 AND (anio, mes) IN (${anioMesPairs.join(",")})`,
+      [cuit]
     );
     const periodoIds = periodoRows.rows.map((r: any) => r.id);
     log.push(`Periodos expensas: ${periodoIds.length}`);
