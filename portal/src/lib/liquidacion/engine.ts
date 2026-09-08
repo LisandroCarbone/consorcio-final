@@ -10,6 +10,7 @@ export interface Empleado {
   nombre: string;
   legajo: string | null;
   fecha_ingreso: string;
+  fecha_egreso: string | null;
   consorcio_cuit: string; // unified schema uses consorcio_cuit VARCHAR(20)
   funcion: string;
   categoria_edificio: 1 | 2 | 3 | 4;
@@ -111,11 +112,15 @@ function calcAniosAntigüedad(fechaIngreso: string, periodo: string): number {
   return Math.max(0, diff);
 }
 
-function diasAntiguedad(fechaIngreso: string, periodo: string): number {
+function diasAntiguedad(fechaIngreso: string, periodo: string, fechaEgreso?: string | null): number {
   const [y, m] = periodo.split("-").map(Number);
-  const lastDay = new Date(y, m, 0);
+  let tope = new Date(y, m, 0);
+  if (fechaEgreso) {
+    const egreso = new Date(fechaEgreso);
+    if (egreso < tope) tope = egreso;
+  }
   const ingreso = new Date(fechaIngreso);
-  return Math.max(0, Math.floor((lastDay.getTime() - ingreso.getTime()) / 86400000));
+  return Math.max(0, Math.floor((tope.getTime() - ingreso.getTime()) / 86400000));
 }
 
 function esFuncionEncargado(funcion: string): boolean {
@@ -183,7 +188,6 @@ function calcDescuentosEmpleado(
   esSuplente: boolean,
   difObraSocial = 0,
   aplicarFondoEducacion = false,
-  excluirSCVO = false
 ): DescuentosEmpleado {
   const jubilacion    = base * 0.11;
   const pami          = base * 0.03;
@@ -795,8 +799,7 @@ export async function calcularLiquidacion(
   const embargo = novN.embargo;
   const anticipo = novN.anticipo;
 
-  const excluirSCVOEmpleado = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodo) < 30;
-  const desc = calcDescuentosEmpleado(totalRemunerativoFinal, esSuplente, difObraSocial, aplicarFondoEducacion, excluirSCVOEmpleado);
+  const desc = calcDescuentosEmpleado(totalRemunerativoFinal, esSuplente, difObraSocial, aplicarFondoEducacion);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital, fondoEducacion } = desc;
   const totalDescuentos = desc.total + descVivienda + embargo + anticipo + customDescuentos;
 
@@ -812,7 +815,7 @@ export async function calcularLiquidacion(
     const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion, emp.tiene_vivienda);
     basePatronalOS = (funcionCompleta ? escalaMap[funcionCompleta]?.[catKey2] : undefined) ?? totalRemunerativoFinal;
   }
-  const excluirSCVO = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodo) < 30;
+  const excluirSCVO = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodo, emp.fecha_egreso) < 30;
   const patron = calcContribPatronal(
     basePatronal,
     basePatronalOS,
@@ -1108,8 +1111,7 @@ export async function calcularSACPreview(
 
   const totalBruto = sacBase + bonificacionSAC;
 
-  const excluirSCVOsacEmpleado = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodoSAC) < 30;
-  const desc = calcDescuentosEmpleado(totalBruto, esSuplente, 0, false, excluirSCVOsacEmpleado);
+  const desc = calcDescuentosEmpleado(totalBruto, esSuplente, 0, false);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = desc;
   const totalDescuentos = desc.total;
 
@@ -1141,7 +1143,7 @@ export async function calcularSACPreview(
     fateryhArt19bisSAC = Number(parametrosCctRow.rows[0]?.fateryh_art19bis ?? 0);
     scvoSAC = parametrosCctRow.rows[0]?.sv_costo_fijo != null ? Number(parametrosCctRow.rows[0].sv_costo_fijo) : null;
   }
-  const excluirSCVOsac = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodoSAC) < 30;
+  const excluirSCVOsac = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodoSAC, emp.fecha_egreso) < 30;
   const totalPatronal = cons
     ? calcContribPatronal(totalBruto, basePatronalSACOS, cons, emp.jornada, 0, fateryhArt19bisSAC, excluirSCVOsac ? 0 : scvoSAC).total
     : 0;
@@ -1377,7 +1379,7 @@ export async function calcularIndemnizacionPreview(
 
   const diasHastaEgreso = Math.max(0, Math.floor((egreso.getTime() - new Date(emp.fecha_ingreso).getTime()) / 86400000));
   const excluirSCVOegreso = esSuplente && diasHastaEgreso < 30;
-  const descResult = calcDescuentosEmpleado(totalRemunerativo, esSuplente, 0, false, excluirSCVOegreso);
+  const descResult = calcDescuentosEmpleado(totalRemunerativo, esSuplente, 0, false);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = descResult;
   const totalDesc = descResult.total;
 
