@@ -804,7 +804,9 @@ export async function calcularLiquidacion(
     const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion, emp.tiene_vivienda);
     basePatronalOS = (funcionCompleta ? escalaMap[funcionCompleta]?.[catKey2] : undefined) ?? totalRemunerativoFinal;
   }
-  const excluirSCVO = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodo) < 30;
+  const diasAnt = diasAntiguedad(emp.fecha_ingreso, periodo);
+  const excluirSCVO = esSuplente && diasAnt < 30;
+  console.log(`[SCVO-DEBUG] emp=${emp.nombre} esSuplente=${esSuplente} jornada=${emp.jornada} funcion=${emp.funcion} diasAnt=${diasAnt} excluirSCVO=${excluirSCVO} scvoFromParametros=${scvoFromParametros}`);
   const patron = calcContribPatronal(
     basePatronal,
     basePatronalOS,
