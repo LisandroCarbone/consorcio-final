@@ -66,6 +66,7 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
       cuota_grupo_id: string | null; cuota_nro: number | null; cuota_total: number | null;
       cuota_completa: boolean | null;
       unidad_id: number | null; unidad_uf: number | null;
+      pagado_por_uf: number | null;
     }>(
       `SELECT g.id, g.descripcion AS concepto, g.monto::numeric, g.tipo, g.categoria,
               g.pct_a::numeric,
@@ -80,7 +81,11 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
               CASE WHEN g.cuota_grupo_id IS NOT NULL THEN
                 (SELECT COUNT(*) FROM app.gastos_periodo g2 WHERE g2.cuota_grupo_id = g.cuota_grupo_id AND g2.periodo_id IS NOT NULL) = g.cuota_total
               ELSE NULL END AS cuota_completa,
-              g.unidad_id, u.uf AS unidad_uf
+              g.unidad_id, u.uf AS unidad_uf,
+              (SELECT cu_uf.uf FROM app.credito_unidad cu
+               JOIN app.unidades cu_uf ON cu_uf.id = cu.unidad_id
+               WHERE cu.origen = 'compensacion_gasto' AND cu.gasto_periodo_id = g.id
+               LIMIT 1) AS pagado_por_uf
        FROM app.gastos_periodo g
        LEFT JOIN app.liquidaciones_sueldo l ON l.id = g.liquidacion_id
        LEFT JOIN app.unidades u ON u.id = g.unidad_id

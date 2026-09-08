@@ -61,6 +61,7 @@ export async function addGasto(formData: FormData) {
   const categoria = Number(formData.get("categoria") || 10);
   const cuotas = Number(formData.get("cuotas") || 1);
   const pct_a = resolvePctA(formData, tipo);
+  const pagadoPorUf = formData.get("pagado_por_uf") as string;
 
   const period = await queryOne<{ consorcio_cuit: string; anio: number; mes: number }>(
     "SELECT consorcio_cuit, anio, mes FROM app.periodos_expensas WHERE id = $1",
@@ -82,6 +83,21 @@ export async function addGasto(formData: FormData) {
     }
   }
 
+  // Resolve the UF that fronted the expense (for A/B gastos compensated with
+  // a credit in cuenta corriente). Reuses the same UF→unidad_id resolution
+  // pattern used above for target_uf (Particular).
+  let pagadoPorUfUnidadId: number | null = null;
+  if (tipo !== "Particular" && pagadoPorUf) {
+    const pagadoUfNum = Number(pagadoPorUf.trim());
+    if (!isNaN(pagadoUfNum)) {
+      const unit = await queryOne<{ id: number }>(
+        "SELECT id FROM app.unidades WHERE consorcio_cuit = $1 AND uf = $2",
+        [period.consorcio_cuit, pagadoUfNum]
+      );
+      if (unit) pagadoPorUfUnidadId = unit.id;
+    }
+  }
+
   if (cuotas > 1) {
     const baseInstallment = round2(monto / cuotas);
     const lastInstallment = round2(monto - baseInstallment * (cuotas - 1));
@@ -93,13 +109,14 @@ export async function addGasto(formData: FormData) {
       // (periodo_id = NULL) until manually assigned to a period.
       const targetPeriodId = c === 1 ? periodo_id : null;
 
-      await queryOne(
+      const inserted = await queryOne<{ id: number }>(
         `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id, orden, pct_a, cuota_grupo_id, cuota_nro, cuota_total, consorcio_cuit)
          VALUES ($1, $2, $3, $4, $5, $6,
            CASE WHEN $1 IS NULL THEN 0
              ELSE COALESCE((SELECT MAX(orden) FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = $2), 0) + 1
            END,
-           $7, $8, $9, $10, $11)`,
+           $7, $8, $9, $10, $11)
+         RETURNING id`,
         [
           targetPeriodId,
           categoria,
@@ -114,13 +131,32 @@ export async function addGasto(formData: FormData) {
           period.consorcio_cuit,
         ]
       );
+
+      // Only compensate the installment actually charged into this period
+      // (cuota 1); later cuotas get compensated when assigned to a period.
+      if (c === 1 && pagadoPorUfUnidadId && inserted?.id) {
+        await query(
+          `INSERT INTO app.credito_unidad (unidad_id, consorcio_cuit, monto, origen, gasto_periodo_id, aplicado, created_at)
+           VALUES ($1, $2, $3, 'compensacion_gasto', $4, false, NOW())`,
+          [pagadoPorUfUnidadId, period.consorcio_cuit, currentMonto, inserted.id]
+        );
+      }
     }
   } else {
-    await queryOne(
+    const inserted = await queryOne<{ id: number }>(
       `INSERT INTO app.gastos_periodo (periodo_id, categoria, descripcion, monto, tipo, unidad_id, orden, pct_a, consorcio_cuit)
-       VALUES ($1, $2, $3, $4, $5, $6, COALESCE((SELECT MAX(orden) FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = $2), 0) + 1, $7, $8)`,
+       VALUES ($1, $2, $3, $4, $5, $6, COALESCE((SELECT MAX(orden) FROM app.gastos_periodo WHERE periodo_id = $1 AND categoria = $2), 0) + 1, $7, $8)
+       RETURNING id`,
       [periodo_id, categoria, concepto, monto, tipo, unidad_id, pct_a, period.consorcio_cuit]
     );
+
+    if (pagadoPorUfUnidadId && inserted?.id) {
+      await query(
+        `INSERT INTO app.credito_unidad (unidad_id, consorcio_cuit, monto, origen, gasto_periodo_id, aplicado, created_at)
+         VALUES ($1, $2, $3, 'compensacion_gasto', $4, false, NOW())`,
+        [pagadoPorUfUnidadId, period.consorcio_cuit, monto, inserted.id]
+      );
+    }
   }
 
   revalidatePath("/expensas");

@@ -24,6 +24,7 @@ export interface GastoRow {
   cuota_completa?: boolean | null;
   unidad_id?: number | null;
   unidad_uf?: number | null;
+  pagado_por_uf?: number | null;
 }
 
 export interface UF {
@@ -309,6 +310,11 @@ export function ExpensasTableClient({ gastos, periodoId, unidades }: Props) {
                               g.cuota_completa ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
                             }`}>
                               Cuota {g.cuota_nro}/{g.cuota_total}
+                            </span>
+                          )}
+                          {g.pagado_por_uf != null && (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0 bg-gray-100 text-gray-500">
+                              Pagado por UF {g.pagado_por_uf}
                             </span>
                           )}
                         </div>

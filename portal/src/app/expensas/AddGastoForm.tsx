@@ -20,6 +20,8 @@ export function AddGastoForm({
   const [aperturar, setAperturar] = useState(false);
   const [pctA, setPctA] = useState(100);
   const [ufsSel, setUfsSel] = useState<number[]>([]);
+  const [pagadoPorUf, setPagadoPorUf] = useState(false);
+  const [pagadoPorUfSel, setPagadoPorUfSel] = useState<number[]>([]);
 
   const [isPending, startTransition] = useTransition();
 
@@ -36,6 +38,7 @@ export function AddGastoForm({
   const conceptoRef = useRef<HTMLInputElement>(null);
 
   const particularUf = unidades.find((u) => ufsSel.includes(u.id));
+  const pagadoPorUfUnidad = unidades.find((u) => pagadoPorUfSel.includes(u.id));
 
   // Debounced autocomplete search
   const handleConceptoChange = (val: string) => {
@@ -89,6 +92,8 @@ export function AddGastoForm({
     setAperturar(false);
     setPctA(100);
     setUfsSel([]);
+    setPagadoPorUf(false);
+    setPagadoPorUfSel([]);
     setSuggestions([]);
   };
 
@@ -122,6 +127,9 @@ export function AddGastoForm({
       <input type="hidden" name="pct_a" value={aperturar ? pctA : (tipo === "B" ? 0 : 100)} />
       {tipo === "Particular" && particularUf && (
         <input type="hidden" name="target_uf" value={particularUf.uf} />
+      )}
+      {tipo !== "Particular" && pagadoPorUf && pagadoPorUfUnidad && (
+        <input type="hidden" name="pagado_por_uf" value={pagadoPorUfUnidad.uf} />
       )}
 
       {/* Row 1: Concepto full width */}
@@ -227,6 +235,8 @@ export function AddGastoForm({
             setUfsSel([]);
             setAperturar(false);
             setPctA(v === "B" ? 0 : 100);
+            setPagadoPorUf(false);
+            setPagadoPorUfSel([]);
           }}
           disabled={isPending}
         >
@@ -264,6 +274,41 @@ export function AddGastoForm({
                 disabled={isPending}
               />
               <p className="text-xs text-gray-400">({100 - pctA}% Coef B)</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tipo !== "Particular" && (
+        <div className="flex items-end gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-gray-600 pb-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={pagadoPorUf}
+              onChange={(e) => {
+                setPagadoPorUf(e.target.checked);
+                if (!e.target.checked) setPagadoPorUfSel([]);
+              }}
+              disabled={isPending}
+              className="rounded border-gray-300 text-brand-600"
+            />
+            Pagado por UF
+          </label>
+          {pagadoPorUf && (
+            <div className="w-36">
+              <label className="label text-xs">UF que pagó</label>
+              <select
+                className="input"
+                value={pagadoPorUfSel[0] ?? ""}
+                onChange={(e) => setPagadoPorUfSel(e.target.value ? [Number(e.target.value)] : [])}
+                required
+                disabled={isPending}
+              >
+                <option value="">— Elegir UF —</option>
+                {unidades.map((u) => (
+                  <option key={u.id} value={u.id}>UF {u.uf}</option>
+                ))}
+              </select>
             </div>
           )}
         </div>
