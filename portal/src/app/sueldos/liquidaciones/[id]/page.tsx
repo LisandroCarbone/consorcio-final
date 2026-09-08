@@ -186,7 +186,16 @@ export default async function ReciboPage({
   const pctObraSocial = Number(liq.pct_contrib_obra_social ?? 0.06);
   const pctART = Number(liq.art_pct_variable ?? 0);
   const artFijo = Number(liq.art_fijo ?? 0);
-  const scvo = Number(liq.parametros_sv_costo_fijo ?? liq.sv_costo_fijo ?? 0);
+  const esSuplementeDisplay = liq.jornada === "Suplente" || /suplente/i.test(liq.funcion ?? "");
+  const diasAntDisplay = (() => {
+    if (!liq.fecha_ingreso || !liq.periodo) return 999;
+    const [y2, m2] = liq.periodo.split("-").map(Number);
+    const lastDay = new Date(y2, m2, 0);
+    const ingreso = new Date(liq.fecha_ingreso);
+    return Math.max(0, Math.floor((lastDay.getTime() - ingreso.getTime()) / 86400000));
+  })();
+  const excluirSCVODisplay = esSuplementeDisplay && diasAntDisplay < 30;
+  const scvo = excluirSCVODisplay ? 0 : Number(liq.parametros_sv_costo_fijo ?? liq.sv_costo_fijo ?? 0);
   const pctSuterh = Number(liq.pct_cct_suterh ?? 0.015);
   const pctFateryh = Number(liq.pct_cct_fateryh ?? 0.0475);
   const pctSeracarh = Number(liq.pct_cct_seracarh ?? 0.005);

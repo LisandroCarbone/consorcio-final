@@ -182,7 +182,8 @@ function calcDescuentosEmpleado(
   base: number,
   esSuplente: boolean,
   difObraSocial = 0,
-  aplicarFondoEducacion = false
+  aplicarFondoEducacion = false,
+  excluirSCVO = false
 ): DescuentosEmpleado {
   const jubilacion    = base * 0.11;
   const pami          = base * 0.03;
@@ -190,7 +191,7 @@ function calcDescuentosEmpleado(
   const suterh        = !esSuplente ? base * 0.02 : 0;
   const cajaProtFlia  = base * 0.01;
   const fateryh       = !esSuplente ? base * 0.01 : 0;
-  const seguroVital   = base * 0.0075;
+  const seguroVital   = excluirSCVO ? 0 : base * 0.0075;
   const fondoEducacion = aplicarFondoEducacion && !esSuplente ? base * 0.02 : 0;
   const total = jubilacion + pami + obraSocial + difObraSocial + suterh + cajaProtFlia + fateryh + seguroVital + fondoEducacion;
   return { jubilacion, pami, obraSocial, difObraSocial, suterh, cajaProtFlia, fateryh, seguroVital, fondoEducacion, total };
@@ -788,7 +789,8 @@ export async function calcularLiquidacion(
   const embargo = novN.embargo;
   const anticipo = novN.anticipo;
 
-  const desc = calcDescuentosEmpleado(totalRemunerativoFinal, esSuplente, difObraSocial, aplicarFondoEducacion);
+  const excluirSCVOEmpleado = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodo) < 30;
+  const desc = calcDescuentosEmpleado(totalRemunerativoFinal, esSuplente, difObraSocial, aplicarFondoEducacion, excluirSCVOEmpleado);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital, fondoEducacion } = desc;
   const totalDescuentos = desc.total + descVivienda + embargo + anticipo + customDescuentos;
 
@@ -804,9 +806,7 @@ export async function calcularLiquidacion(
     const funcionCompleta = resolverFuncionCompletaEquivalente(emp.funcion, emp.tiene_vivienda);
     basePatronalOS = (funcionCompleta ? escalaMap[funcionCompleta]?.[catKey2] : undefined) ?? totalRemunerativoFinal;
   }
-  const diasAnt = diasAntiguedad(emp.fecha_ingreso, periodo);
-  const excluirSCVO = esSuplente && diasAnt < 30;
-  console.log(`[SCVO-DEBUG] emp=${emp.nombre} esSuplente=${esSuplente} jornada=${emp.jornada} funcion=${emp.funcion} diasAnt=${diasAnt} excluirSCVO=${excluirSCVO} scvoFromParametros=${scvoFromParametros}`);
+  const excluirSCVO = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodo) < 30;
   const patron = calcContribPatronal(
     basePatronal,
     basePatronalOS,
@@ -1102,7 +1102,8 @@ export async function calcularSACPreview(
 
   const totalBruto = sacBase + bonificacionSAC;
 
-  const desc = calcDescuentosEmpleado(totalBruto, esSuplente);
+  const excluirSCVOsacEmpleado = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodoSAC) < 30;
+  const desc = calcDescuentosEmpleado(totalBruto, esSuplente, 0, false, excluirSCVOsacEmpleado);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = desc;
   const totalDescuentos = desc.total;
 
@@ -1368,7 +1369,8 @@ export async function calcularIndemnizacionPreview(
   const totalNoRemunerativo = conceptos.filter((c) => !c.remunerativo).reduce((s, c) => s + c.importe, 0);
 
 
-  const descResult = calcDescuentosEmpleado(totalRemunerativo, esSuplente);
+  const excluirSCVOegreso = esSuplente && diasAntiguedad(emp.fecha_ingreso, `${egreso.getFullYear()}-${String(egreso.getMonth() + 1).padStart(2, "0")}-01`) < 30;
+  const descResult = calcDescuentosEmpleado(totalRemunerativo, esSuplente, 0, false, excluirSCVOegreso);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = descResult;
   const totalDesc = descResult.total;
 
@@ -1378,7 +1380,6 @@ export async function calcularIndemnizacionPreview(
   const pctFateryh = Number(cons?.pct_cct_fateryh ?? 0.0475);
   const pctSeracarh = Number(cons?.pct_cct_seracarh ?? 0.005);
   const pctART = Number(cons?.art_pct_variable ?? 0);
-  const excluirSCVOegreso = esSuplente && diasAntiguedad(emp.fecha_ingreso, `${egreso.getFullYear()}-${String(egreso.getMonth() + 1).padStart(2, "0")}-01`) < 30;
   const scvoFijo = excluirSCVOegreso ? 0 : (cons?.sv_costo_fijo ? Number(cons.sv_costo_fijo) : 0);
   const totalPatronal = totalRemunerativo * (pctJubilPatronal + pctOSPatronal + pctSuterh + pctFateryh + pctSeracarh + pctART) + scvoFijo;
 
