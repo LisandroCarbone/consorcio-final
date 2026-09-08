@@ -353,14 +353,14 @@ export default async function ReciboPage({
           </div>
 
           {/* Employee row */}
-          <div className="border-t border-gray-300 grid grid-cols-4 divide-x divide-gray-300 text-xs print:text-[8px]">
+          <div className="border-t border-gray-300 grid grid-cols-4 divide-x divide-gray-300 text-xs print:text-sm">
             <div className="p-2 print:p-0.5">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Legajo</p>
               <p className="font-semibold">{liq.legajo ?? "—"}</p>
             </div>
             <div className="p-2 print:p-0.5 col-span-1">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Apellido y Nombre</p>
-              <p className="font-semibold print:text-sm">{liq.empleado_nombre}</p>
+              <p className="font-semibold">{liq.empleado_nombre}</p>
             </div>
             <div className="p-2 print:p-0.5">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">CUIL</p>
