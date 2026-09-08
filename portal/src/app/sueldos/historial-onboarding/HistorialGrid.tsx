@@ -71,7 +71,15 @@ export function HistorialGrid({ empleadoId, meses }: Props) {
         .filter((e) => e.remuneracion_bruta > 0);
 
       if (entries.length === 0) {
-        setError("No hay filas nuevas para guardar.");
+        const tieneHESinBruto = meses
+          .filter((m) => !m.liquidacion_id)
+          .some((m) => {
+            const r = rows[m.periodo];
+            return (Number(r.he50) || Number(r.he100) || Number(r.feriado)) && !Number(r.bruto);
+          });
+        setError(tieneHESinBruto
+          ? "Debe cargar el Bruto (*) en los meses que tienen horas extras."
+          : "No hay filas nuevas para guardar.");
         return;
       }
 

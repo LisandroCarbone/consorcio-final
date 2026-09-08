@@ -171,7 +171,7 @@ export default async function SACPage({
                   </tr>
                 )}
                 <tr className="border-b border-gray-100">
-                  <td className="py-1.5 text-gray-500 pl-4">Seguro Colectivo de Vida Obligatorio (0.75%)</td>
+                  <td className="py-1.5 text-gray-500 pl-4">Seguro Vitalicio - Art.27 bis CCT 589/10 (0.75%)</td>
                   <td className="py-1.5 text-right font-mono text-red-600">- {formatMoney(preview.seguroVital)}</td>
                 </tr>
                 <tr className="border-t-2 border-gray-300">

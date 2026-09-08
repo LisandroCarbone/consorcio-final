@@ -178,7 +178,7 @@ export default async function DespidoPage({
                   {preview.descuentosSobreRem.suterh > 0 && <p>SUTERH: - {formatMoney(preview.descuentosSobreRem.suterh)}</p>}
                   {preview.descuentosSobreRem.cajaProtFlia > 0 && <p>CPF: - {formatMoney(preview.descuentosSobreRem.cajaProtFlia)}</p>}
                   {preview.descuentosSobreRem.fateryh > 0 && <p>FATERYH: - {formatMoney(preview.descuentosSobreRem.fateryh)}</p>}
-                  {preview.descuentosSobreRem.seguroVital > 0 && <p>SCVO: - {formatMoney(preview.descuentosSobreRem.seguroVital)}</p>}
+                  {preview.descuentosSobreRem.seguroVital > 0 && <p>Seg. Vitalicio: - {formatMoney(preview.descuentosSobreRem.seguroVital)}</p>}
                 </div>
               </div>
             )}

@@ -977,7 +977,7 @@ export async function calcularLiquidacion(
     addDescuento("5200", "SUTERH", suterh, 34);
     addDescuento("5250", "Caja Protección Familiar", cajaProtFlia, 35);
     addDescuento("5300", "FATERYH", fateryh, 36);
-    addDescuento("5350", "Seguro Colectivo de Vida Obligatorio", seguroVital, 37);
+    addDescuento("5350", "Seguro Vitalicio (Art.27 bis CCT 589/10)", seguroVital, 37);
     addDescuento("5360", "Fondo Educación y Comunicación", fondoEducacion, 38);
     addDescuento("5400", "Descuento Vivienda", descVivienda, 39);
 
@@ -1207,7 +1207,7 @@ export async function liquidarSAC(
     if (p.suterh > 0)        conceptos.push([liqId, "5200", "descuento", "SUTERH", safe(p.suterh), 34]);
     if (p.cajaProtFlia > 0)  conceptos.push([liqId, "5250", "descuento", "Caja Protección Familiar", safe(p.cajaProtFlia), 35]);
     if (p.fateryh > 0)       conceptos.push([liqId, "5300", "descuento", "FATERYH", safe(p.fateryh), 36]);
-    if (p.seguroVital > 0)   conceptos.push([liqId, "5350", "descuento", "Seguro Colectivo de Vida Obligatorio", safe(p.seguroVital), 37]);
+    if (p.seguroVital > 0)   conceptos.push([liqId, "5350", "descuento", "Seguro Vitalicio (Art.27 bis CCT 589/10)", safe(p.seguroVital), 37]);
 
     const placeholders = conceptos
       .map((_, i) => `($${i * 6 + 1},$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6})`)
@@ -1375,7 +1375,8 @@ export async function calcularIndemnizacionPreview(
   const totalNoRemunerativo = conceptos.filter((c) => !c.remunerativo).reduce((s, c) => s + c.importe, 0);
 
 
-  const excluirSCVOegreso = esSuplente && diasAntiguedad(emp.fecha_ingreso, `${egreso.getFullYear()}-${String(egreso.getMonth() + 1).padStart(2, "0")}-01`) < 30;
+  const diasHastaEgreso = Math.max(0, Math.floor((egreso.getTime() - new Date(emp.fecha_ingreso).getTime()) / 86400000));
+  const excluirSCVOegreso = esSuplente && diasHastaEgreso < 30;
   const descResult = calcDescuentosEmpleado(totalRemunerativo, esSuplente, 0, false, excluirSCVOegreso);
   const { jubilacion, pami, obraSocial, suterh, cajaProtFlia, fateryh, seguroVital } = descResult;
   const totalDesc = descResult.total;
@@ -1460,7 +1461,7 @@ export async function liquidarIndemnizacion(
     if (d.suterh > 0)       conceptos.push([liqId, "5200", "descuento", "SUTERH", safe(d.suterh), 34]);
     if (d.cajaProtFlia > 0) conceptos.push([liqId, "5250", "descuento", "Caja Protección Familiar", safe(d.cajaProtFlia), 35]);
     if (d.fateryh > 0)      conceptos.push([liqId, "5300", "descuento", "FATERYH", safe(d.fateryh), 36]);
-    if (d.seguroVital > 0)  conceptos.push([liqId, "5350", "descuento", "Seguro Colectivo de Vida Obligatorio", safe(d.seguroVital), 37]);
+    if (d.seguroVital > 0)  conceptos.push([liqId, "5350", "descuento", "Seguro Vitalicio (Art.27 bis CCT 589/10)", safe(d.seguroVital), 37]);
 
     if (conceptos.length > 0) {
       const ph = conceptos.map((_, i) => `($${i * 6 + 1},$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6})`).join(",");

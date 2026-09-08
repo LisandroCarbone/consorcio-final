@@ -8,7 +8,7 @@ export async function getLiquidacionDetalle(id: number) {
        l.base_patronal, l.neto_a_pagar, l.fecha_pago::text,
        e.cuil, e.nombre AS empleado_nombre, e.funcion, e.jornada,
        e.fecha_ingreso::text AS fecha_ingreso,
-       DATE_PART('year', AGE(l.periodo, e.fecha_ingreso))::int AS antiguedad_anios,
+       DATE_PART('year', AGE((date_trunc('month', l.periodo) + interval '1 month - 1 day')::date, e.fecha_ingreso))::int AS antiguedad_anios,
        e.obra_social, e.cbu, e.banco, e.legajo, e.email, e.whatsapp,
        c.nombre AS consorcio_nombre, c.cuit AS consorcio_cuit,
        c.direccion AS consorcio_direccion,

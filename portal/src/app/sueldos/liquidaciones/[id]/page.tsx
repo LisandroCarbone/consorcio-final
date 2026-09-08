@@ -360,7 +360,7 @@ export default async function ReciboPage({
             </div>
             <div className="p-2 print:p-0.5 col-span-1">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">Apellido y Nombre</p>
-              <p className="font-semibold">{liq.empleado_nombre}</p>
+              <p className="font-semibold print:text-sm">{liq.empleado_nombre}</p>
             </div>
             <div className="p-2 print:p-0.5">
               <p className="text-gray-400 uppercase text-[10px] font-semibold">CUIL</p>
