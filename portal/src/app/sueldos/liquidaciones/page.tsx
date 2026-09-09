@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { getLiquidacionesPeriodo } from "../actions";
 import { ConfirmarLiquidacionButton } from "./ConfirmarLiquidacionButton";
 import { RecalcularButton } from "./RecalcularButton";
+import { LimpiarPeriodoButton } from "./LimpiarPeriodoButton";
 import { LsdExportButton } from "./LsdExportButton";
 import { formatMoney0, cleanPeriodo } from "@/lib/format";
 import { EstadoBadge } from "@/components/ui/EstadoBadge";
@@ -194,6 +195,7 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
                   </>
                 )}
                 <RecalcularButton periodo={periodo} tipo={tipo} />
+                <LimpiarPeriodoButton periodo={periodo} tipo={tipo} borradorCount={borradores + pendientesEscala} />
               </div>
             </div>
 

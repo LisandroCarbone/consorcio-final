@@ -4,6 +4,7 @@ import { calcularLiquidacionesPeriodo, confirmarLiquidacion } from "../actions";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { pool } from "@/lib/db";
+import { logAudit } from "@/lib/audit";
 
 export async function recalcularPeriodoAction(formData: FormData) {
   const periodo = String(formData.get("periodo"));
@@ -54,6 +55,87 @@ export async function setUltimoDepositoManual(
     [consorcioCuit, anio, mes, banco || null, fecha || null]
   );
   revalidatePath(`/sueldos/liquidaciones/${liquidacionId}`);
+}
+
+// Deletes draft/pending-review liquidaciones for a periodo, so the period
+// can be recalculated from scratch. Never touches confirmed liquidaciones.
+//
+// Note: app.pagos (unidad payments) has no FK to liquidaciones_sueldo — it is
+// unrelated to payroll. The real "money already committed" signal for a
+// payroll liquidación is app.gastos_periodo.liquidacion_id, which only gets
+// set when a liquidación is confirmed (see confirmarLiquidacion in
+// ../actions.ts). Since this action only ever targets 'borrador' /
+// 'requiere_revision' rows, that link should never exist here — but we check
+// it defensively anyway before deleting.
+export async function limpiarPeriodoSueldos(
+  formData: FormData
+): Promise<{ ok: number; blocked: string | null }> {
+  const periodo = String(formData.get("periodo"));
+  const tipo = String(formData.get("tipo") ?? "mensual");
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const targetRes = await client.query(
+      `SELECT l.id
+         FROM app.liquidaciones_sueldo l
+         JOIN app.empleados e ON e.id = l.empleado_id
+        WHERE l.periodo = $1
+          AND l.tipo = $2
+          AND l.estado IN ('borrador', 'requiere_revision')`,
+      [periodo, tipo]
+    );
+    const ids: number[] = targetRes.rows.map((r) => r.id);
+
+    if (ids.length === 0) {
+      await client.query("ROLLBACK");
+      return { ok: 0, blocked: null };
+    }
+
+    // Defensive check: block if any of these liquidaciones already generated
+    // expensas (gastos_periodo). This should never happen for borrador /
+    // requiere_revision rows, but we refuse to delete if it does.
+    const gastosRes = await client.query(
+      `SELECT COUNT(*)::int AS count
+         FROM app.gastos_periodo
+        WHERE liquidacion_id = ANY($1::int[])`,
+      [ids]
+    );
+    if (gastosRes.rows[0].count > 0) {
+      await client.query("ROLLBACK");
+      return {
+        ok: 0,
+        blocked:
+          "No se puede limpiar el período: hay liquidaciones con expensas ya generadas.",
+      };
+    }
+
+    // conceptos_liquidacion has ON DELETE CASCADE on liquidacion_id, so
+    // deleting liquidaciones_sueldo removes its conceptos automatically.
+    const deleteRes = await client.query(
+      `DELETE FROM app.liquidaciones_sueldo
+        WHERE periodo = $1
+          AND tipo = $2
+          AND estado IN ('borrador', 'requiere_revision')`,
+      [periodo, tipo]
+    );
+
+    await client.query("COMMIT");
+
+    const count = deleteRes.rowCount ?? 0;
+    logAudit("delete", "liquidacion_periodo", null, {
+      after: { periodo, tipo, count },
+    });
+    revalidatePath("/sueldos/liquidaciones");
+
+    return { ok: count, blocked: null };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function clearUltimoDepositoManual(

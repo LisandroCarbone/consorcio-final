@@ -734,6 +734,63 @@ export async function regenerarGastosFijos(periodoId: number) {
   revalidatePath("/expensas");
 }
 
+// ─── Limpiar Período (delete calculated cuenta-corriente results) ───────────
+// Removes only the calculated res_cuenta_periodo rows for a period, keeping
+// gastos_periodo and the periodo itself intact. Blocked if downstream data
+// (pagos or applied credits) already depends on those calculated rows.
+export async function limpiarPeriodoExpensas(
+  formData: FormData
+): Promise<{ ok: number; blocked: string | null }> {
+  const periodo_id = Number(formData.get("periodo_id"));
+  if (!periodo_id) return { ok: 0, blocked: "Período inválido" };
+
+  const pagosExistentes = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) AS count FROM app.pagos pg
+     JOIN app.res_cuenta_periodo rcp ON rcp.id = pg.res_cuenta_id
+     WHERE rcp.periodo_id = $1`,
+    [periodo_id]
+  );
+  if (Number(pagosExistentes?.count || 0) > 0) {
+    return {
+      ok: 0,
+      blocked: "No se puede limpiar: hay pagos registrados contra las expensas calculadas de este período.",
+    };
+  }
+
+  const creditosAplicados = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) AS count FROM app.credito_unidad
+     WHERE aplicado = true AND aplicado_en_periodo_id = $1`,
+    [periodo_id]
+  );
+  if (Number(creditosAplicados?.count || 0) > 0) {
+    return {
+      ok: 0,
+      blocked: "No se puede limpiar: hay créditos ya aplicados contra este período.",
+    };
+  }
+
+  const client = await pool.connect();
+  let deletedCount = 0;
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      "DELETE FROM app.res_cuenta_periodo WHERE periodo_id = $1",
+      [periodo_id]
+    );
+    deletedCount = result.rowCount ?? 0;
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  logAudit("delete", "liquidacion_periodo", null, { after: { periodo_id, count: deletedCount } });
+  revalidatePath("/expensas");
+  return { ok: deletedCount, blocked: null };
+}
+
 export async function distribuirExpensasMasivo(periodoId: number) {
   const period = await queryOne<{ consorcio_cuit: string; anio: number; mes: number }>(
     "SELECT consorcio_cuit, anio, mes FROM app.periodos_expensas WHERE id = $1",

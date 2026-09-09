@@ -1,6 +1,7 @@
 import { query, queryOne } from "@/lib/db";
 import { formatMoney, formatMonth, formatDate, cleanPeriodo } from "@/lib/format";
 import { RecalcularButton } from "./RecalcularButton";
+import { LimpiarPeriodoButton } from "./LimpiarPeriodoButton";
 import { CreatePeriodoButton } from "./CreatePeriodoButton";
 import { SaveMontoFijoButton } from "./SaveMontoFijoButton";
 import MaskedInput from "@/components/ui/MaskedInput";
@@ -680,6 +681,10 @@ export default async function ExpensasPage({
                     <RecalcularButton
                       periodoId={selected.id}
                       isDesactualizado={checklist?.isProrrateoDesactualizado}
+                    />
+                    <LimpiarPeriodoButton
+                      periodoId={selected.id}
+                      resultCount={Number(selected.total_expensas)}
                     />
                   </div>
                 </div>
