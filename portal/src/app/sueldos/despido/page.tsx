@@ -46,6 +46,15 @@ export default async function DespidoPage({
   const allEmpleados = await getEmpleados();
   const empleados = allEmpleados.filter((e) => e.consorcio_cuit === activeCuit);
 
+  const { rows: egresados } = await pool.query(
+    `SELECT e.id, e.nombre, e.apellido, e.cuil, e.categoria, e.fecha_ingreso, e.fecha_egreso, e.tipo_egreso
+       FROM app.empleados e
+      WHERE e.consorcio_cuit = $1
+        AND e.fecha_egreso IS NOT NULL
+      ORDER BY e.fecha_egreso DESC`,
+    [activeCuit]
+  );
+
   const empleadoId = sp.empleado_id ? Number(sp.empleado_id) : null;
   const fechaEgreso = sp.fecha_egreso ?? new Date().toISOString().slice(0, 10);
   const tipoEgreso = sp.tipo_egreso ?? "despido_sin_causa";
@@ -202,6 +211,44 @@ export default async function DespidoPage({
             tipoEgreso={tipoEgreso}
           />
         </>
+      )}
+
+      {egresados.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">Egresos registrados</h3>
+          <div className="card overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="th">Empleado</th>
+                  <th className="th">CUIL</th>
+                  <th className="th">Categoría</th>
+                  <th className="th text-center">Ingreso</th>
+                  <th className="th text-center">Egreso</th>
+                  <th className="th">Tipo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {egresados.map((eg: any) => (
+                  <tr key={eg.id} className="border-b border-gray-50">
+                    <td className="td font-medium text-gray-700">{eg.apellido}, {eg.nombre}</td>
+                    <td className="td font-mono text-gray-500">{eg.cuil}</td>
+                    <td className="td text-gray-600">{eg.categoria}</td>
+                    <td className="td text-center text-gray-500">
+                      {new Date(eg.fecha_ingreso).toLocaleDateString("es-AR")}
+                    </td>
+                    <td className="td text-center text-gray-700 font-medium">
+                      {new Date(eg.fecha_egreso).toLocaleDateString("es-AR")}
+                    </td>
+                    <td className="td text-gray-600">
+                      {TIPOS_EGRESO.find((t) => t.value === eg.tipo_egreso)?.label ?? eg.tipo_egreso ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   );
