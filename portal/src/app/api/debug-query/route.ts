@@ -14,6 +14,11 @@ export async function POST(req: NextRequest) {
   if (!/^\s*SELECT\b/i.test(sql)) {
     return NextResponse.json({ error: "only SELECT allowed" }, { status: 400 });
   }
-  const result = await pool.query(sql, params || []);
-  return NextResponse.json({ rows: result.rows, rowCount: result.rowCount });
+  try {
+    const result = await pool.query(sql, params || []);
+    return NextResponse.json({ rows: result.rows, rowCount: result.rowCount });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
