@@ -47,7 +47,7 @@ export default async function DespidoPage({
   const empleados = allEmpleados.filter((e) => e.consorcio_cuit === activeCuit);
 
   const { rows: egresados } = await pool.query(
-    `SELECT e.id, e.nombre, e.apellido, e.cuil, e.categoria, e.fecha_ingreso, e.fecha_egreso, e.tipo_egreso
+    `SELECT e.id, e.nombre, e.cuil, e.funcion, e.fecha_ingreso, e.fecha_egreso, e.tipo_egreso
        FROM app.empleados e
       WHERE e.consorcio_cuit = $1
         AND e.fecha_egreso IS NOT NULL
@@ -222,7 +222,7 @@ export default async function DespidoPage({
                 <tr>
                   <th className="th">Empleado</th>
                   <th className="th">CUIL</th>
-                  <th className="th">Categoría</th>
+                  <th className="th">Función</th>
                   <th className="th text-center">Ingreso</th>
                   <th className="th text-center">Egreso</th>
                   <th className="th">Tipo</th>
@@ -231,9 +231,9 @@ export default async function DespidoPage({
               <tbody>
                 {egresados.map((eg: any) => (
                   <tr key={eg.id} className="border-b border-gray-50">
-                    <td className="td font-medium text-gray-700">{eg.apellido}, {eg.nombre}</td>
+                    <td className="td font-medium text-gray-700">{eg.nombre}</td>
                     <td className="td font-mono text-gray-500">{eg.cuil}</td>
-                    <td className="td text-gray-600">{eg.categoria}</td>
+                    <td className="td text-gray-600">{eg.funcion}</td>
                     <td className="td text-center text-gray-500">
                       {new Date(eg.fecha_ingreso).toLocaleDateString("es-AR")}
                     </td>

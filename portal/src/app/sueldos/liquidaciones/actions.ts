@@ -124,7 +124,7 @@ export async function limpiarPeriodoSueldos(
     await client.query("COMMIT");
 
     const count = deleteRes.rowCount ?? 0;
-    logAudit("delete", "liquidacion_periodo", null, {
+    logAudit("delete", "liquidacion_periodo", 0, {
       after: { periodo, tipo, count },
     });
     revalidatePath("/sueldos/liquidaciones");

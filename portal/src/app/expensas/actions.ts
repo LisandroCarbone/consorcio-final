@@ -786,7 +786,7 @@ export async function limpiarPeriodoExpensas(
     client.release();
   }
 
-  logAudit("delete", "liquidacion_periodo", null, { after: { periodo_id, count: deletedCount } });
+  logAudit("delete", "liquidacion_periodo", periodo_id, { after: { periodo_id, count: deletedCount } });
   revalidatePath("/expensas");
   return { ok: deletedCount, blocked: null };
 }
