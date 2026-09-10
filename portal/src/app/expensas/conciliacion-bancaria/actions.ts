@@ -254,7 +254,7 @@ function parseExtractoXls(buffer: ArrayBuffer): ParsedExtracto {
   let headerIdx = -1;
   for (let i = 0; i < Math.min(20, rawRows.length); i++) {
     const cells = rawRows[i].map((c) => String(c ?? "").toLowerCase().trim());
-    if (cells.some((c) => c === "fecha")) {
+    if (cells.some((c) => c === "fecha" || c === "fecha contable" || c === "fecha valor")) {
       headerIdx = i;
       break;
     }
