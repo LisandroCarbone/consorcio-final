@@ -306,6 +306,9 @@ export async function GET(
     { saldo_anterior: 0, su_pago: 0, expensas_a: 0, expensas_b: 0, fondo_obra: 0, total_mes: 0, deuda: 0, intereses: 0, credito_aplicado: 0, total_pagar: 0 }
   );
 
+  const showB = totales.expensas_b !== 0 || ufRows.some(r => Number(r.coef_b) > 0);
+  const showFondoObra = totales.fondo_obra !== 0;
+
   const ufTableRows = ufRows.map(r => `
     <tr>
       <td class="c mono">${r.uf_numero ?? "—"}</td>
@@ -315,13 +318,11 @@ export async function GET(
       <td class="r mono">${moneyCompact(r.su_pago)}</td>
       <td class="r mono">${pct(r.coef_a)}</td>
       <td class="r mono">${moneyCompact(r.expensas_a)}</td>
-      <td class="r mono">${pct(r.coef_b)}</td>
-      <td class="r mono">${moneyCompact(r.expensas_b)}</td>
-      <td class="r mono">${moneyCompact(r.fondo_obra)}</td>
+      ${showB ? `<td class="r mono">${pct(r.coef_b)}</td><td class="r mono">${moneyCompact(r.expensas_b)}</td>` : ""}
+      ${showFondoObra ? `<td class="r mono">${moneyCompact(r.fondo_obra)}</td>` : ""}
       <td class="r mono">${moneyCompact(r.total_mes)}</td>
-      <td class="r mono">${moneyCompact(r.deuda)}</td>
+      <td class="r mono">${moneyCompact(Number(r.deuda) - Number(r.credito_aplicado))}</td>
       <td class="r mono">${moneyCompact(r.intereses)}</td>
-      <td class="r mono">${Number(r.credito_aplicado) > 0 ? `-${moneyCompact(r.credito_aplicado)}` : "—"}</td>
       <td class="r mono total-col">${moneyCompact(r.total_pagar)}</td>
     </tr>`).join("");
 
@@ -603,31 +604,27 @@ export async function GET(
         <th class="r">Su Pago</th>
         <th class="r">% A</th>
         <th class="r">Exp. A</th>
-        <th class="r">% B</th>
-        <th class="r">Exp. B</th>
-        <th class="r">Fondo de Obra</th>
+        ${showB ? '<th class="r">% B</th><th class="r">Exp. B</th>' : ''}
+        ${showFondoObra ? '<th class="r">Fondo de Obra</th>' : ''}
         <th class="r">Total Mes</th>
         <th class="r">Deuda</th>
         <th class="r">Intereses</th>
-        <th class="r">Saldo a Favor</th>
         <th class="r">Total</th>
       </tr>
     </thead>
     <tbody>
-      ${ufTableRows || `<tr><td colspan="15">Sin unidades liquidadas</td></tr>`}
+      ${ufTableRows || `<tr><td colspan="${11 + (showB ? 2 : 0) + (showFondoObra ? 1 : 0)}">Sin unidades liquidadas</td></tr>`}
       <tr class="totales-row">
         <td colspan="3">TOTALES</td>
         <td class="r mono">${moneyCompact(totales.saldo_anterior)}</td>
         <td class="r mono">${moneyCompact(totales.su_pago)}</td>
         <td></td>
         <td class="r mono">${moneyCompact(totales.expensas_a)}</td>
-        <td></td>
-        <td class="r mono">${moneyCompact(totales.expensas_b)}</td>
-        <td class="r mono">${moneyCompact(totales.fondo_obra)}</td>
+        ${showB ? `<td></td><td class="r mono">${moneyCompact(totales.expensas_b)}</td>` : ""}
+        ${showFondoObra ? `<td class="r mono">${moneyCompact(totales.fondo_obra)}</td>` : ""}
         <td class="r mono">${moneyCompact(totales.total_mes)}</td>
-        <td class="r mono">${moneyCompact(totales.deuda)}</td>
+        <td class="r mono">${moneyCompact(totales.deuda - totales.credito_aplicado)}</td>
         <td class="r mono">${moneyCompact(totales.intereses)}</td>
-        <td class="r mono">${totales.credito_aplicado > 0 ? `-${moneyCompact(totales.credito_aplicado)}` : "—"}</td>
         <td class="r mono">${moneyCompact(totales.total_pagar)}</td>
       </tr>
     </tbody>

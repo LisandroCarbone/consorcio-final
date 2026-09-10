@@ -393,7 +393,7 @@ export default async function ExpensasPage({
 
   return (
     <div className="w-full">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Expensas</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">{selected ? "Liquidación de Expensas" : "Expensas"}</h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Períodos */}
