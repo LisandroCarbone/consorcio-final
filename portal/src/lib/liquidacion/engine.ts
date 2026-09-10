@@ -684,10 +684,10 @@ export async function calcularLiquidacion(
     promedioVariablesSemestre = (sumaFeriados + sumaHE) / 6;
   }
 
-  const baseVacacional = haberesFijos - adicionalRemEfectivo + promedioVariablesSemestre;
+  const baseFijaVacacional = haberesFijos - adicionalRemEfectivo;
   const plusVacacional =
     novN.plus_vacaciones_dias > 0
-      ? baseVacacional * (1 / 25 - 1 / 30) * novN.plus_vacaciones_dias
+      ? ((baseFijaVacacional + promedioVariablesSemestre) / 25 - baseFijaVacacional / 30) * novN.plus_vacaciones_dias
       : 0;
 
   // ---------------------------------------------------------------------------
