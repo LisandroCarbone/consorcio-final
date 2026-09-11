@@ -1497,7 +1497,7 @@ export async function calcularPeriodo(
           WHERE ls.empleado_id = e.id AND ls.periodo = $1
             AND ls.tipo = 'mensual' AND ls.estado = 'borrador'
         )`,
-    [`${periodo}-01`]
+    [periodo.length === 7 ? `${periodo}-01` : periodo]
   );
 
   const empleados = result.rows;
