@@ -1490,7 +1490,14 @@ export async function calcularPeriodo(
   periodo: string
 ): Promise<{ ok: number; errores: string[] }> {
   const result = await pool.query<{ id: number; cuil: string; nombre: string }>(
-    `SELECT id, cuil, nombre FROM app.empleados WHERE estado = 'activo'`
+    `SELECT DISTINCT e.id, e.cuil, e.nombre FROM app.empleados e
+     WHERE e.estado = 'activo'
+        OR EXISTS (
+          SELECT 1 FROM app.liquidaciones_sueldo ls
+          WHERE ls.empleado_id = e.id AND ls.periodo = $1
+            AND ls.tipo = 'mensual' AND ls.estado = 'borrador'
+        )`,
+    [`${periodo}-01`]
   );
 
   const empleados = result.rows;
