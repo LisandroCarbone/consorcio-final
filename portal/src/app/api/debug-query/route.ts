@@ -10,9 +10,9 @@ export async function POST(req: NextRequest) {
   if (!sql || typeof sql !== "string") {
     return NextResponse.json({ error: "sql required" }, { status: 400 });
   }
-  // Only allow SELECT and ALTER (for migrations)
-  if (!/^\s*(SELECT|ALTER)\b/i.test(sql)) {
-    return NextResponse.json({ error: "only SELECT/ALTER allowed" }, { status: 400 });
+  // Only allow SELECT
+  if (!/^\s*SELECT\b/i.test(sql)) {
+    return NextResponse.json({ error: "only SELECT allowed" }, { status: 400 });
   }
   try {
     const result = await pool.query(sql, params || []);
