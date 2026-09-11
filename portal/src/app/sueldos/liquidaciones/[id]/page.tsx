@@ -190,9 +190,13 @@ export default async function ReciboPage({
   const diasAntDisplay = (() => {
     if (!liq.fecha_ingreso || !liq.periodo) return 999;
     const [y2, m2] = liq.periodo.split("-").map(Number);
-    const lastDay = new Date(y2, m2, 0);
+    let tope = new Date(y2, m2, 0);
+    if (liq.fecha_egreso) {
+      const egreso = new Date(liq.fecha_egreso);
+      if (egreso < tope) tope = egreso;
+    }
     const ingreso = new Date(liq.fecha_ingreso);
-    return Math.max(0, Math.floor((lastDay.getTime() - ingreso.getTime()) / 86400000));
+    return Math.max(0, Math.floor((tope.getTime() - ingreso.getTime()) / 86400000));
   })();
   const excluirSCVODisplay = esSuplementeDisplay && diasAntDisplay < 30;
   const scvo = excluirSCVODisplay ? 0 : Number(liq.parametros_sv_costo_fijo ?? liq.sv_costo_fijo ?? 0);
