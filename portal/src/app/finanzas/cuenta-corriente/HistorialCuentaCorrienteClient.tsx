@@ -41,7 +41,6 @@ interface ComputedRow extends HistorialRow {
   pago: number;
   interesesCalc: number;
   saldoCalc: number;
-  dias: number;
 }
 
 export default function HistorialCuentaCorrienteClient({
@@ -60,67 +59,15 @@ export default function HistorialCuentaCorrienteClient({
   const historialUrl = `/finanzas/cuenta-corriente?consorcio=${consorcioCuit}&ver_historial=${unidadId}`;
 
   const computed = useMemo<ComputedRow[]>(() => {
-    const result: ComputedRow[] = [];
-    let deudasVivas: { capital: number; meses: number }[] = [];
-
-    if (saldoInicial > 0) {
-      deudasVivas.push({ capital: saldoInicial, meses: 0 });
-    }
-
-    let prevSaldo = saldoInicial;
-
-    for (let i = 0; i < historialRows.length; i++) {
-      const row = historialRows[i];
-      const expensas = Number(row.total_mes);
-      const pago = Number(row.su_pago);
-
-      const saldoAnteriorCalc = prevSaldo;
-
-      for (const d of deudasVivas) {
-        d.meses++;
-      }
-
-      if (expensas > 0) {
-        deudasVivas.push({ capital: expensas, meses: 0 });
-      }
-
-      // Apply payment FIFO BEFORE calculating interest
-      let pagoRestante = pago;
-      while (pagoRestante > 0 && deudasVivas.length > 0) {
-        if (pagoRestante >= deudasVivas[0].capital) {
-          pagoRestante -= deudasVivas[0].capital;
-          deudasVivas.shift();
-        } else {
-          deudasVivas[0].capital -= pagoRestante;
-          pagoRestante = 0;
-        }
-      }
-
-      const interesesReal = deudasVivas.reduce(
-        (sum, d) => sum + d.capital * tasaVigente * d.meses,
-        0
-      );
-
-      const capitalPostPago = deudasVivas.reduce((s, d) => s + d.capital, 0);
-      const saldoCalc = capitalPostPago + interesesReal;
-      prevSaldo = saldoCalc;
-      const diasMax = deudasVivas.length > 0
-        ? Math.max(...deudasVivas.map(d => d.meses)) * 30
-        : 0;
-
-      result.push({
-        ...row,
-        saldoAnteriorCalc,
-        expensas,
-        pago,
-        interesesCalc: interesesReal,
-        saldoCalc,
-        dias: diasMax,
-      });
-    }
-
-    return result;
-  }, [historialRows, saldoInicial, tasaVigente]);
+    return historialRows.map((row) => ({
+      ...row,
+      saldoAnteriorCalc: Number(row.saldo_anterior),
+      expensas: Number(row.total_mes),
+      pago: Number(row.su_pago),
+      interesesCalc: Number(row.intereses),
+      saldoCalc: Number(row.deuda),
+    }));
+  }, [historialRows]);
 
   async function handleSubmit(action: (fd: FormData) => Promise<void>, form: HTMLFormElement) {
     setLoading(true);
@@ -154,7 +101,6 @@ export default function HistorialCuentaCorrienteClient({
       "Saldo Anterior": Number(r.saldoAnteriorCalc.toFixed(2)),
       "Expensas del Mes": Number(r.expensas.toFixed(2)),
       "Su Pago": Number(r.pago.toFixed(2)),
-      Días: r.dias,
       Intereses: Number(r.interesesCalc.toFixed(2)),
       Saldo: Number(r.saldoCalc.toFixed(2)),
     }));
@@ -280,7 +226,6 @@ export default function HistorialCuentaCorrienteClient({
                 <th className="py-2.5 px-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Saldo Anterior</th>
                 <th className="py-2.5 px-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Expensas</th>
                 <th className="py-2.5 px-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Su Pago</th>
-                <th className="py-2.5 px-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Días</th>
                 <th className="py-2.5 px-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Intereses</th>
                 <th className="py-2.5 px-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Saldo</th>
                 <th className="py-2.5 px-3 w-16"></th>
@@ -341,9 +286,6 @@ export default function HistorialCuentaCorrienteClient({
                       <td className="py-2 px-3 text-right font-mono text-green-700">
                         {r.pago > 0 ? `(${formatMoney(r.pago)})` : formatMoney(0)}
                       </td>
-                      <td className="py-2 px-3 text-center font-mono text-gray-400 text-xs">
-                        {r.dias}
-                      </td>
                       <td className="py-2 px-3 text-right font-mono text-amber-700">
                         {r.interesesCalc > 0 ? formatMoney(r.interesesCalc) : formatMoney(0)}
                       </td>
@@ -384,7 +326,7 @@ export default function HistorialCuentaCorrienteClient({
               ))}
               {computed.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-gray-400 text-sm">
+                  <td colSpan={7} className="py-8 text-center text-gray-400 text-sm">
                     No hay períodos cargados. Usá el formulario de abajo para agregar el historial.
                   </td>
                 </tr>
