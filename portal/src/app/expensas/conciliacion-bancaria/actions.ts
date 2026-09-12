@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { categorizeBankCharge, type BankChargeCategoria } from "@/lib/conciliacion/categorizeBankCharge";
 import { runCalculateExpenses } from "@/lib/expenses/engine";
 import { logAudit } from "@/lib/audit";
+import { checkDuplicatePago, type DuplicatePagoResult } from "@/app/finanzas/actions";
 
 const BASE_PATH = "/expensas/conciliacion-bancaria";
 const RUBRO_GASTOS_BANCARIOS = 6;
@@ -925,10 +926,16 @@ function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+export type PagoDuplicadoWarning = {
+  unidadId: number;
+  monto: number;
+  existingPago: NonNullable<DuplicatePagoResult["existingPago"]>;
+};
+
 export async function asignarSplit(
   movimientoId: number,
   splits: { unidadId: number; monto: number }[]
-) {
+): Promise<{ warnings: PagoDuplicadoWarning[] }> {
   if (!splits || splits.length === 0) {
     throw new Error("Debe indicar al menos una unidad para dividir el depósito.");
   }
@@ -959,6 +966,7 @@ export async function asignarSplit(
   if (!extracto) throw new Error("Extracto no encontrado");
 
   const client = await pool.connect();
+  const warnings: PagoDuplicadoWarning[] = [];
   try {
     await client.query("BEGIN");
 
@@ -970,6 +978,12 @@ export async function asignarSplit(
       const refSplit = mov.referencia
         ? `${mov.referencia}-uf${s.unidadId}`
         : `split_${movimientoId}_${s.unidadId}`;
+
+      // Cross-flow duplicate-payment check (warning only, never blocks).
+      const dup = await checkDuplicatePago(client, s.unidadId, montoSplit, mov.fecha);
+      if (dup.isDuplicate && dup.existingPago) {
+        warnings.push({ unidadId: s.unidadId, monto: montoSplit, existingPago: dup.existingPago });
+      }
 
       // Link the pago to the specific res_cuenta_periodo row for this unidad
       // + periodo (when the extracto is tied to a periodo) so su_pago can be
@@ -1028,6 +1042,8 @@ export async function asignarSplit(
   revalidatePath("/expensas");
   revalidatePath("/finanzas/cuenta-corriente");
   logAudit("create", "extracto_bancario", movimientoId, { after: { splits } }, extracto.consorcio_cuit);
+
+  return { warnings };
 }
 
 export async function marcarGastoBancario(movimientoId: number, categoria: BankChargeCategoria) {
@@ -1052,7 +1068,7 @@ export async function marcarGastoBancario(movimientoId: number, categoria: BankC
 // Apply reconciliation — credits
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function aplicarCreditos(extractoId: number) {
+export async function aplicarCreditos(extractoId: number): Promise<{ count: number; warnings: PagoDuplicadoWarning[] }> {
   const extracto = await queryOne<{ consorcio_cuit: string; estado: string; periodo_id: number | null }>(
     "SELECT consorcio_cuit, estado, periodo_id FROM app.extractos_bancarios WHERE id = $1",
     [extractoId]
@@ -1060,6 +1076,7 @@ export async function aplicarCreditos(extractoId: number) {
   if (!extracto) throw new Error("Extracto no encontrado");
 
   let count = 0;
+  const warnings: PagoDuplicadoWarning[] = [];
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -1100,6 +1117,12 @@ export async function aplicarCreditos(extractoId: number) {
       [extractoId]
     );
     for (const m of confirmados) {
+      // Cross-flow duplicate-payment check (warning only, never blocks).
+      const dup = await checkDuplicatePago(client, m.match_id, Number(m.monto), m.fecha);
+      if (dup.isDuplicate && dup.existingPago) {
+        warnings.push({ unidadId: m.match_id, monto: Number(m.monto), existingPago: dup.existingPago });
+      }
+
       // Link the pago to the specific res_cuenta_periodo row for this unidad
       // + periodo (when the extracto is tied to a periodo) so su_pago can be
       // recomputed by the real engine instead of a lifetime SUM.
@@ -1147,7 +1170,7 @@ export async function aplicarCreditos(extractoId: number) {
   revalidatePath("/expensas");
   revalidatePath("/finanzas/cuenta-corriente");
   logAudit("confirm", "extracto_bancario", extractoId, { after: { pagosAplicados: count } }, extracto.consorcio_cuit);
-  return count;
+  return { count, warnings };
 }
 
 // Backwards-compatible alias kept during the route rename transition period.

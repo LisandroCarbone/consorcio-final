@@ -1,11 +1,62 @@
 "use server";
 
 import { pool, withTransaction } from "@/lib/db";
+import type { PoolClient } from "pg";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { runCalculateExpenses } from "@/lib/expenses/engine";
 import { logAudit } from "@/lib/audit";
+
+// Cross-flow duplicate-payment detection. Used by registrarPago (manual
+// "Cobrar" flow) and by the conciliación bancaria flows (aplicarCreditos,
+// asignarSplit) so two independent insert paths into app.pagos both warn
+// when a similar payment already exists. This is a WARNING only — it never
+// blocks the insert; callers decide whether to skip or force it.
+export type DuplicatePagoResult = {
+  isDuplicate: boolean;
+  existingPago?: { id: number; fecha: string; monto: number; medio_pago: string };
+};
+
+export async function checkDuplicatePago(
+  client: PoolClient,
+  unidadId: number,
+  monto: number,
+  fecha: string,
+  excludePagoId?: number
+): Promise<DuplicatePagoResult> {
+  const result = await client.query<{
+    id: number;
+    fecha: string;
+    monto: string;
+    medio_pago: string;
+  }>(
+    `SELECT id, fecha::text, monto::numeric AS monto, medio_pago
+     FROM app.pagos
+     WHERE unidad_id = $1
+       AND monto = $2
+       AND fecha BETWEEN $3::date - INTERVAL '3 days' AND $3::date + INTERVAL '3 days'
+       AND ($4::int IS NULL OR id != $4)
+     ORDER BY fecha
+     LIMIT 1`,
+    [unidadId, monto, fecha, excludePagoId ?? null]
+  );
+
+  if (result.rowCount === 0) {
+    return { isDuplicate: false };
+  }
+
+  const row = result.rows[0];
+  return {
+    isDuplicate: true,
+    existingPago: {
+      id: row.id,
+      fecha: row.fecha,
+      monto: Number(row.monto),
+      medio_pago: row.medio_pago,
+    },
+  };
+}
 
 // Motor de Intereses Real: registrarPago/editarPago/eliminarPago no longer
 // write app.res_cuenta_periodo.estado directly. `estado` (and the whole
@@ -20,7 +71,11 @@ function logWarnings(context: string, warnings: string[]) {
   }
 }
 
-export async function registrarPago(formData: FormData) {
+export type RegistrarPagoResult =
+  | { ok: true }
+  | { ok: false; warning: true; existingPago: NonNullable<DuplicatePagoResult["existingPago"]>; message: string };
+
+export async function registrarPago(formData: FormData): Promise<RegistrarPagoResult> {
   const consorcio_cuit = formData.get("consorcio_id") as string;
   const unidad_id    = Number(formData.get("unidad_id"));
   const res_cuenta_id = formData.get("expensa_id") ? Number(formData.get("expensa_id")) : null;
@@ -29,6 +84,7 @@ export async function registrarPago(formData: FormData) {
   const medio_pago   = String(formData.get("medio_pago"));
   const referencia   = formData.get("referencia")?.toString() || null;
   const notas        = formData.get("notas")?.toString() || null;
+  const force        = formData.get("force") === "true";
 
   if (!consorcio_cuit) throw new Error("Consorcio CUIT requerido");
   if (!unidad_id || unidad_id <= 0) throw new Error("Unidad inválida");
@@ -36,7 +92,22 @@ export async function registrarPago(formData: FormData) {
   if (!monto || isNaN(monto) || monto <= 0) throw new Error("Monto inválido");
   if (!medio_pago) throw new Error("Medio de pago requerido");
 
+  let duplicateWarning: RegistrarPagoResult | null = null;
+
   await withTransaction(async (client) => {
+    if (!force) {
+      const dup = await checkDuplicatePago(client, unidad_id, monto, fecha);
+      if (dup.isDuplicate && dup.existingPago) {
+        duplicateWarning = {
+          ok: false,
+          warning: true,
+          existingPago: dup.existingPago,
+          message: `Ya existe un pago similar para esta unidad: ${dup.existingPago.fecha} $${dup.existingPago.monto} vía ${dup.existingPago.medio_pago}.`,
+        };
+        return;
+      }
+    }
+
     await client.query(
       `INSERT INTO app.pagos (consorcio_cuit, unidad_id, res_cuenta_id, fecha, monto, medio_pago, referencia, notas)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
@@ -74,8 +145,13 @@ export async function registrarPago(formData: FormData) {
     }
   });
 
+  if (duplicateWarning) {
+    return duplicateWarning;
+  }
+
   revalidatePath("/finanzas/cuenta-corriente");
   logAudit("create", "pago", unidad_id, { after: { monto, medio_pago, fecha } }, consorcio_cuit);
+  return { ok: true };
 }
 
 export async function editarPago(formData: FormData) {

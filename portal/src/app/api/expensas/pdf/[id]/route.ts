@@ -166,6 +166,12 @@ export async function GET(
     [receipt.unidad_id, receipt.consorcio_cuit]
   );
 
+  // Only show the "Gastos B" breakdown (Coef. B, Extraordinario (B) line,
+  // per-item B column) when this period actually has tipo='B' gastos.
+  // Otherwise a B=$0 line is pure noise for consorcios that never had
+  // extraordinary expenses.
+  const hasGastosB = gastos.some(g => g.tipo === "B") || Number(receipt.expensas_b) > 0;
+
   const gastosPorCategoria = new Map<number, GastoRow[]>();
   for (const g of gastos) {
     const list = gastosPorCategoria.get(g.categoria) ?? [];
@@ -181,12 +187,12 @@ export async function GET(
         <tr>
           <td class="gasto-desc">${esc(g.descripcion)}</td>
           <td class="r mono">${g.tipo === "A" ? money(g.monto) : ""}</td>
-          <td class="r mono">${g.tipo === "B" ? money(g.monto) : ""}</td>
+          ${hasGastosB ? `<td class="r mono">${g.tipo === "B" ? money(g.monto) : ""}</td>` : ""}
         </tr>`).join("");
       return `
         <tr class="cat-row">
           <td><strong>${categoria}. ${esc(CATEGORIAS[categoria] ?? "Otros")}</strong></td>
-          <td class="r mono" colspan="2"><strong>${money(subtotal)}</strong></td>
+          <td class="r mono" colspan="${hasGastosB ? 2 : 1}"><strong>${money(subtotal)}</strong></td>
         </tr>
         ${itemRows}`;
     }).join("");
@@ -398,7 +404,7 @@ export async function GET(
     <div><span class="lbl">UF:</span> <span class="val">${receipt.uf_numero ?? "—"}</span></div>
     <div><span class="lbl">Unidad:</span> <span class="val">${esc(receipt.uf)}</span></div>
     <div><span class="lbl">Propietario:</span> <span class="val">${esc(receipt.propietario) || "—"}</span></div>
-    <div><span class="lbl">Coef. A:</span> <span class="val">${(Number(receipt.coef_a) * 100).toFixed(2)}%</span> · <span class="lbl">Coef. B:</span> <span class="val">${(Number(receipt.coef_b) * 100).toFixed(2)}%</span></div>
+    <div><span class="lbl">Coef. A:</span> <span class="val">${(Number(receipt.coef_a) * 100).toFixed(2)}%</span>${hasGastosB ? ` · <span class="lbl">Coef. B:</span> <span class="val">${(Number(receipt.coef_b) * 100).toFixed(2)}%</span>` : ""}</div>
   </div>
 
   <div class="section-title">RESUMEN DE CUENTA</div>
@@ -407,7 +413,7 @@ export async function GET(
       <tr><td>Saldo anterior</td><td class="r mono">${money(receipt.saldo_anterior)}</td></tr>
       <tr><td>Su pago del mes</td><td class="r mono">${money(receipt.su_pago)}</td></tr>
       <tr><td>Ordinario (A)</td><td class="r mono">${money(receipt.expensas_a)}</td></tr>
-      <tr><td>Extraordinario (B)</td><td class="r mono">${money(receipt.expensas_b)}</td></tr>
+      ${hasGastosB ? `<tr><td>Extraordinario (B)</td><td class="r mono">${money(receipt.expensas_b)}</td></tr>` : ""}
       <tr><td>Fondo / Otros</td><td class="r mono">${money(receipt.fondo_otros)}</td></tr>
       ${Number(receipt.fondo_obra) > 0 ? `<tr><td>Fondo de Obra</td><td class="r mono">${money(receipt.fondo_obra)}</td></tr>` : ""}
       <tr><td>Deuda</td><td class="r mono">${money(receipt.deuda)}</td></tr>
@@ -428,11 +434,11 @@ export async function GET(
       <tr>
         <th style="width:60%">Descripción</th>
         <th class="r">Gastos "A"</th>
-        <th class="r">Gastos "B"</th>
+        ${hasGastosB ? `<th class="r">Gastos "B"</th>` : ""}
       </tr>
     </thead>
     <tbody>
-      ${categoriaRows || `<tr><td colspan="3">Sin gastos registrados</td></tr>`}
+      ${categoriaRows || `<tr><td colspan="${hasGastosB ? 3 : 2}">Sin gastos registrados</td></tr>`}
     </tbody>
   </table>
 

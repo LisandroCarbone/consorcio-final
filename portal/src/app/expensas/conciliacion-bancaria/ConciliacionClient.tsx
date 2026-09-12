@@ -32,7 +32,17 @@ import {
   eliminarExtracto,
   type PendingDebit,
   type ReconciliacionSummary,
+  type PagoDuplicadoWarning,
 } from "./actions";
+
+function formatDuplicateWarnings(warnings: PagoDuplicadoWarning[]): string {
+  return warnings
+    .map(
+      (w) =>
+        `Unidad ${w.unidadId}: ya existe un pago similar (${w.existingPago.fecha} · ${formatMoney(w.existingPago.monto)} vía ${w.existingPago.medio_pago}).`
+    )
+    .join("\n");
+}
 
 type Extracto = {
   id: number;
@@ -192,10 +202,14 @@ export function ConciliacionClient({
     }
   }
 
-  async function withPending(id: number, fn: () => Promise<void>, updater?: (m: Movimiento) => Movimiento) {
+  async function withPending(
+    id: number,
+    fn: () => Promise<{ warnings?: PagoDuplicadoWarning[] } | void>,
+    updater?: (m: Movimiento) => Movimiento
+  ) {
     setPendingIds((prev) => new Set(prev).add(id));
     try {
-      await fn();
+      const result = await fn();
       setPendingIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -203,6 +217,9 @@ export function ConciliacionClient({
       });
       if (updater) {
         setLocalMovimientos((prev) => prev.map((m) => (m.id === id ? updater(m) : m)));
+      }
+      if (result && result.warnings && result.warnings.length > 0) {
+        alert(`Atención — posibles pagos duplicados:\n${formatDuplicateWarnings(result.warnings)}`);
       }
       router.refresh();
     } catch (e) {
@@ -486,8 +503,13 @@ export function ConciliacionClient({
                       const extractoIds = Array.from(new Set(confirmedCobranzas.map((m) => m.extracto_id)));
                       setIsApplyingCreditos(true);
                       try {
+                        const allWarnings: PagoDuplicadoWarning[] = [];
                         for (const id of extractoIds) {
-                          await aplicarCreditos(id);
+                          const { warnings } = await aplicarCreditos(id);
+                          allWarnings.push(...warnings);
+                        }
+                        if (allWarnings.length > 0) {
+                          alert(`Atención — posibles pagos duplicados:\n${formatDuplicateWarnings(allWarnings)}`);
                         }
                         window.location.reload();
                       } catch (e) {
@@ -693,7 +715,11 @@ function MovimientosTable({
   assignOpenFor: number | null;
   setAssignOpenFor: (id: number | null) => void;
   assignTriggerRef: React.RefObject<HTMLButtonElement | null>;
-  withPending: (id: number, fn: () => Promise<void>, updater?: (m: Movimiento) => Movimiento) => Promise<void>;
+  withPending: (
+    id: number,
+    fn: () => Promise<{ warnings?: PagoDuplicadoWarning[] } | void>,
+    updater?: (m: Movimiento) => Movimiento
+  ) => Promise<void>;
   confianzaColor: (conf: string | null) => string;
   matchLabel: (m: Movimiento) => string;
   unidades: Unidad[];

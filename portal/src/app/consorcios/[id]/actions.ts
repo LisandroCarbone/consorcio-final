@@ -28,6 +28,75 @@ export async function updatePersonaField(formData: FormData) {
   revalidateDetail(consorcio_cuit);
 }
 
+// ---- Phase 2b: Inline consorcio-level field editing ----
+
+type ConsorcioFieldKind = "text" | "number" | "percent" | "boolean";
+
+const CONSORCIO_FIELD_MAP: Record<string, { column: string; kind: ConsorcioFieldKind }> = {
+  nombre: { column: "nombre", kind: "text" },
+  direccion: { column: "direccion", kind: "text" },
+  codigo_postal: { column: "codigo_postal", kind: "text" },
+  banco: { column: "banco", kind: "text" },
+  nro_cta_suterh: { column: "suterh_key", kind: "text" },
+  clave_suterh: { column: "clave_suterh", kind: "text" },
+  categoria_edificio: { column: "categoria_edificio", kind: "text" },
+  cant_uf: { column: "cant_uf", kind: "number" },
+  uf_retiro_residuos: { column: "uf_retiro_residuos", kind: "number" },
+  monto_fijo_default: { column: "monto_fijo_default", kind: "number" },
+  fondo_obra: { column: "fondo_obra", kind: "number" },
+  intereses_mora_pct: { column: "interest_rate", kind: "percent" },
+  pct_expensa_a: { column: "pct_expensa_a", kind: "percent" },
+  tipo_expensas: { column: "tipo_expensas", kind: "text" },
+  formato_cobro: { column: "formato_cobro", kind: "text" },
+  fondo_obra_activo: { column: "fondo_obra_activo", kind: "boolean" },
+  zona_desfavorable: { column: "zona_desfavorable", kind: "boolean" },
+  tiene_cochera: { column: "tiene_cochera", kind: "boolean" },
+  tiene_ascensor: { column: "tiene_ascensor", kind: "boolean" },
+  tiene_pileta: { column: "tiene_pileta", kind: "boolean" },
+  tiene_caldera: { column: "tiene_caldera", kind: "boolean" },
+  tiene_agua_caliente_central: { column: "tiene_agua_caliente_central", kind: "boolean" },
+  tiene_calefaccion_central: { column: "tiene_calefaccion_central", kind: "boolean" },
+  tiene_aire_acondicionado_central: { column: "tiene_aire_acondicionado_central", kind: "boolean" },
+  tiene_grupo_electrogeno: { column: "tiene_grupo_electrogeno", kind: "boolean" },
+  tiene_seguridad_centralizada: { column: "tiene_seguridad_centralizada", kind: "boolean" },
+  tiene_compactador: { column: "tiene_compactador", kind: "boolean" },
+  tiene_montacargas: { column: "tiene_montacargas", kind: "boolean" },
+  tiene_movimiento_coches: { column: "tiene_movimiento_coches", kind: "boolean" },
+  tiene_jardin: { column: "tiene_jardin", kind: "boolean" },
+  tiene_otros_servicios_centrales: { column: "tiene_otros_servicios_centrales", kind: "boolean" },
+};
+
+export async function updateConsorcioField(formData: FormData) {
+  const cuit = formData.get("cuit") as string;
+  const field = formData.get("field") as string;
+  const rawValue = formData.get("value") as string | null;
+
+  const mapping = CONSORCIO_FIELD_MAP[field];
+  if (!mapping) {
+    throw new Error(`Field "${field}" is not editable`);
+  }
+
+  let value: string | number | boolean | null;
+  const trimmed = (rawValue ?? "").trim();
+  switch (mapping.kind) {
+    case "boolean":
+      value = rawValue === "true";
+      break;
+    case "number":
+      value = trimmed === "" ? null : Number(trimmed);
+      break;
+    case "percent":
+      value = trimmed === "" ? null : Number(trimmed) / 100;
+      break;
+    default:
+      value = trimmed === "" ? null : trimmed;
+  }
+
+  await query(`UPDATE app.consorcios SET ${mapping.column} = $1 WHERE cuit = $2`, [value, cuit]);
+  revalidateDetail(cuit);
+  revalidatePath("/consorcios");
+}
+
 // ---- Phase 3: Ocupante lifecycle ----
 
 export async function replacePropietario(formData: FormData) {

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { IMaskInput } from "react-imask";
 import { formatMoney } from "@/lib/format";
-import { registrarPago, guardarSaldosIniciales } from "../actions";
+import { registrarPago, guardarSaldosIniciales, type RegistrarPagoResult } from "../actions";
 
 export interface CuentaCorrienteRow {
   unidad_id: number;
@@ -72,6 +72,12 @@ export function CuentaCorrienteTableClient({
   const [editandoSaldos, setEditandoSaldos] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [saldosEdit, setSaldosEdit] = useState<Record<number, number>>({});
+  const [registrandoPago, setRegistrandoPago] = useState(false);
+  const [duplicadoPago, setDuplicadoPago] = useState<{
+    formData: FormData;
+    existingPago: NonNullable<Extract<RegistrarPagoResult, { warning: true }>["existingPago"]>;
+    message: string;
+  } | null>(null);
 
   const totals = data.reduce(
     (acc, r) => ({
@@ -327,7 +333,25 @@ export function CuentaCorrienteTableClient({
               </button>
             </div>
             <div className="p-6">
-              <form action={registrarPago} className="grid grid-cols-2 gap-4">
+              <form
+                className="grid grid-cols-2 gap-4"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  setRegistrandoPago(true);
+                  try {
+                    const result = await registrarPago(formData);
+                    if (!result.ok && result.warning) {
+                      setDuplicadoPago({ formData, existingPago: result.existingPago, message: result.message });
+                      return;
+                    }
+                    setPagoUnidad(null);
+                    router.refresh();
+                  } finally {
+                    setRegistrandoPago(false);
+                  }
+                }}
+              >
                 <input type="hidden" name="consorcio_id" value={consorcioCuit} />
                 <input type="hidden" name="unidad_id" value={pagoUnidad.unidad_id} />
                 {pagoUnidad.expensa_pendiente_id && (
@@ -394,14 +418,69 @@ export function CuentaCorrienteTableClient({
                   <textarea name="notas" rows={2} className="input text-sm resize-none" placeholder="Opcional..." />
                 </div>
                 <div className="col-span-2 pt-2 flex gap-2 justify-end">
-                  <button type="button" onClick={() => setPagoUnidad(null)} className="btn-secondary text-sm">
+                  <button type="button" onClick={() => setPagoUnidad(null)} className="btn-secondary text-sm" disabled={registrandoPago}>
                     Cancelar
                   </button>
-                  <button type="submit" className="btn-primary text-sm">
-                    Registrar Cobranza
+                  <button type="submit" className="btn-primary text-sm" disabled={registrandoPago}>
+                    {registrandoPago ? "Registrando..." : "Registrar Cobranza"}
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmación de pago duplicado */}
+      {duplicadoPago && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <button
+            type="button"
+            onClick={() => setDuplicadoPago(null)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+          />
+          <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col z-10 border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 bg-amber-50 border-b border-amber-100">
+              <h3 className="text-lg font-bold text-gray-900">⚠️ Posible pago duplicado</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-700">
+                Ya existe un pago similar para esta unidad: {duplicadoPago.existingPago.fecha} · {money(duplicadoPago.existingPago.monto)} vía {duplicadoPago.existingPago.medio_pago}.
+                ¿Desea registrar de todas formas?
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setDuplicadoPago(null)}
+                  className="btn-secondary text-sm"
+                  disabled={registrandoPago}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary text-sm"
+                  disabled={registrandoPago}
+                  onClick={async () => {
+                    if (!duplicadoPago) return;
+                    const formData = duplicadoPago.formData;
+                    formData.set("force", "true");
+                    setRegistrandoPago(true);
+                    try {
+                      const result = await registrarPago(formData);
+                      if (result.ok) {
+                        setDuplicadoPago(null);
+                        setPagoUnidad(null);
+                        router.refresh();
+                      }
+                    } finally {
+                      setRegistrandoPago(false);
+                    }
+                  }}
+                >
+                  Registrar de todas formas
+                </button>
+              </div>
             </div>
           </div>
         </div>

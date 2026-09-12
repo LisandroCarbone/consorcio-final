@@ -100,7 +100,7 @@ const columns: ColumnDef<ConsorcioRow>[] = [
           Ver
         </Link>
         <Link
-          href={`/consorcios/${row.original.cuit}/editar`}
+          href={`/consorcios/${row.original.cuit}`}
           className="p-1.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors"
           title="Editar"
         >

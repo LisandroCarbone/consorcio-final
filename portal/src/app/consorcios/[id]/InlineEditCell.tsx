@@ -4,6 +4,7 @@ import { useRef } from "react";
 
 export function InlineEditCell({
   entityId,
+  idFieldName = "persona_id",
   field,
   defaultValue,
   action,
@@ -11,26 +12,30 @@ export function InlineEditCell({
   type = "text",
   placeholder,
   className,
+  step,
 }: {
-  entityId: number;
+  entityId: number | string;
+  idFieldName?: string;
   field: string;
   defaultValue: string | null;
   action: (formData: FormData) => void | Promise<void>;
   consorcioCuit: string;
-  type?: "text" | "email" | "tel";
+  type?: "text" | "email" | "tel" | "number";
   placeholder?: string;
   className?: string;
+  step?: string;
 }) {
   const original = useRef(defaultValue ?? "");
 
   return (
     <form action={action}>
-      <input type="hidden" name="persona_id" value={entityId} />
+      <input type="hidden" name={idFieldName} value={entityId} />
       <input type="hidden" name="field" value={field} />
       <input type="hidden" name="consorcio_cuit" value={consorcioCuit} />
       <input
         name="value"
         type={type}
+        step={step}
         defaultValue={defaultValue ?? ""}
         placeholder={placeholder}
         className={

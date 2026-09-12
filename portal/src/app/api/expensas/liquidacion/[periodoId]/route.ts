@@ -99,6 +99,7 @@ type GastoRow = {
 
 type UfRow = {
   id: number;
+  unidad_id: number;
   uf: string;
   uf_numero: number | null;
   propietario: string | null;
@@ -151,7 +152,7 @@ export async function GET(
     });
   }
 
-  const [gastos, ufRows] = await Promise.all([
+  const [gastos, ufRows, creditosGasto] = await Promise.all([
     query<GastoRow>(
       `SELECT g.descripcion, g.monto::numeric, g.tipo, g.pct_a::numeric, g.categoria,
               g.liquidacion_id,
@@ -175,7 +176,7 @@ export async function GET(
       [id]
     ),
     query<UfRow>(
-      `SELECT rcp.id, u.uf, u.uf_numero,
+      `SELECT rcp.id, u.id AS unidad_id, u.uf, u.uf_numero,
               NULLIF(TRIM(COALESCE(per.nombre,'') || ' ' || COALESCE(per.apellido,'')), '') AS propietario,
               rcp.saldo_anterior::numeric, rcp.su_pago::numeric,
               rcp.coef_a::numeric, rcp.expensas_a::numeric,
@@ -192,7 +193,28 @@ export async function GET(
        ORDER BY u.uf_numero NULLS LAST, u.uf`,
       [id]
     ),
+    // Credits applied THIS period that come from an expense paid directly by
+    // a propietario (origen='compensacion_gasto'). Shown as a separate,
+    // explicit line — never silently netted into the "Deuda" figure — per
+    // domain review (revisor-liquidacion): propietarios need to see why
+    // their expensa differs.
+    query<{ unidad_id: number; uf: string; monto: string; descripcion: string }>(
+      `SELECT cu.unidad_id, u.uf, cu.monto::numeric, g.descripcion
+       FROM app.credito_unidad cu
+       JOIN app.unidades u ON u.id = cu.unidad_id
+       JOIN app.gastos_periodo g ON g.id = cu.gasto_periodo_id
+       WHERE cu.origen = 'compensacion_gasto' AND cu.aplicado_en_periodo_id = $1
+       ORDER BY u.uf_numero NULLS LAST, u.uf`,
+      [id]
+    ),
   ]);
+
+  const creditosPorUnidad = new Map<number, { monto: number; descripcion: string }[]>();
+  for (const c of creditosGasto) {
+    const list = creditosPorUnidad.get(c.unidad_id) ?? [];
+    list.push({ monto: Number(c.monto), descripcion: c.descripcion });
+    creditosPorUnidad.set(c.unidad_id, list);
+  }
 
   // Group gastos by category
   const gastosPorCategoria = new Map<number, GastoRow[]>();
@@ -306,7 +328,10 @@ export async function GET(
     { saldo_anterior: 0, su_pago: 0, expensas_a: 0, expensas_b: 0, fondo_obra: 0, total_mes: 0, deuda: 0, intereses: 0, credito_aplicado: 0, total_pagar: 0 }
   );
 
-  const showB = totales.expensas_b !== 0 || ufRows.some(r => Number(r.coef_b) > 0);
+  // Show the B breakdown only when there are actual gastos B in the period
+  // (totales.expensas_b !== 0). A unit merely having coef_b > 0 with no B
+  // gastos would otherwise show a noisy all-zero B column.
+  const showB = totales.expensas_b !== 0;
   const showFondoObra = totales.fondo_obra !== 0;
 
   const ufTableRows = ufRows.map(r => `
@@ -321,10 +346,44 @@ export async function GET(
       ${showB ? `<td class="r mono">${pct(r.coef_b)}</td><td class="r mono">${moneyCompact(r.expensas_b)}</td>` : ""}
       ${showFondoObra ? `<td class="r mono">${moneyCompact(r.fondo_obra)}</td>` : ""}
       <td class="r mono">${moneyCompact(r.total_mes)}</td>
-      <td class="r mono">${moneyCompact(Number(r.deuda) - Number(r.credito_aplicado))}</td>
+      <td class="r mono">${moneyCompact(r.deuda)}</td>
+      <td class="r mono">${Number(r.credito_aplicado) > 0 ? "-" + moneyCompact(r.credito_aplicado) : "—"}</td>
       <td class="r mono">${moneyCompact(r.intereses)}</td>
       <td class="r mono total-col">${moneyCompact(r.total_pagar)}</td>
     </tr>`).join("");
+
+  // Explicit, separate line item per credit-by-expense — per domain review
+  // (revisor-liquidacion), never silently netted, always naming the gasto.
+  const creditosGastoRows = ufRows
+    .filter(r => creditosPorUnidad.has(r.unidad_id))
+    .flatMap(r => (creditosPorUnidad.get(r.unidad_id) ?? []).map(c => ({ ...c, r })))
+    .map(({ r, monto, descripcion }) => `
+    <tr>
+      <td class="c mono">${r.uf_numero ?? "—"}</td>
+      <td>${esc(r.uf)}</td>
+      <td>${esc(r.propietario) || "—"}</td>
+      <td>${esc(descripcion)}</td>
+      <td class="r mono">-${moneyCompact(monto)}</td>
+    </tr>`).join("");
+
+  const creditosGastoSection = creditosGastoRows.length > 0
+    ? `
+    <div class="section-title">CRÉDITO POR GASTO ABONADO DIRECTAMENTE POR EL PROPIETARIO</div>
+    <table class="prorrateo-table">
+      <thead>
+        <tr>
+          <th class="c">UF</th>
+          <th>Unidad</th>
+          <th>Propietario</th>
+          <th>Concepto del gasto abonado</th>
+          <th class="r">Crédito</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${creditosGastoRows}
+      </tbody>
+    </table>`
+    : "";
 
   const deudores = ufRows.filter(r => Number(r.total_pagar) > 0 && Number(r.deuda) > 0);
   const deudoresRows = deudores.map(r => `
@@ -608,12 +667,13 @@ export async function GET(
         ${showFondoObra ? '<th class="r">Fondo de Obra</th>' : ''}
         <th class="r">Total Mes</th>
         <th class="r">Deuda</th>
+        <th class="r">Crédito Aplicado</th>
         <th class="r">Intereses</th>
         <th class="r">Total</th>
       </tr>
     </thead>
     <tbody>
-      ${ufTableRows || `<tr><td colspan="${11 + (showB ? 2 : 0) + (showFondoObra ? 1 : 0)}">Sin unidades liquidadas</td></tr>`}
+      ${ufTableRows || `<tr><td colspan="${12 + (showB ? 2 : 0) + (showFondoObra ? 1 : 0)}">Sin unidades liquidadas</td></tr>`}
       <tr class="totales-row">
         <td colspan="3">TOTALES</td>
         <td class="r mono">${moneyCompact(totales.saldo_anterior)}</td>
@@ -623,12 +683,15 @@ export async function GET(
         ${showB ? `<td></td><td class="r mono">${moneyCompact(totales.expensas_b)}</td>` : ""}
         ${showFondoObra ? `<td class="r mono">${moneyCompact(totales.fondo_obra)}</td>` : ""}
         <td class="r mono">${moneyCompact(totales.total_mes)}</td>
-        <td class="r mono">${moneyCompact(totales.deuda - totales.credito_aplicado)}</td>
+        <td class="r mono">${moneyCompact(totales.deuda)}</td>
+        <td class="r mono">${totales.credito_aplicado > 0 ? "-" + moneyCompact(totales.credito_aplicado) : "—"}</td>
         <td class="r mono">${moneyCompact(totales.intereses)}</td>
         <td class="r mono">${moneyCompact(totales.total_pagar)}</td>
       </tr>
     </tbody>
   </table>
+
+  ${creditosGastoSection}
 
   ${deudoresSection}
 

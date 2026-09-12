@@ -1,10 +1,12 @@
 export const dynamic = 'force-dynamic';
 
-import Link from "next/link";
 import { query, queryOne } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { createUnidad, createPersonaAndOcupante } from "../actions";
 import { UnidadRow } from "./UnidadRow";
+import { InlineEditCell } from "./InlineEditCell";
+import { ConsorcioToggleField, ConsorcioSelectField } from "./ConsorcioFieldControls";
+import { updateConsorcioField } from "./actions";
 import { formatCuit } from "@/lib/format";
 
 interface Props {
@@ -35,9 +37,46 @@ interface CbuEntry {
   nombre_referencia: string | null;
 }
 
+interface ConsorcioDetalle {
+  [key: string]: unknown;
+  cuit: string;
+  nombre: string;
+  direccion: string;
+  codigo_postal: string | null;
+  suterh_key: string | null;
+  clave_suterh: string | null;
+  cant_uf: number | null;
+  uf_retiro_residuos: number | null;
+  categoria_edificio: string | null;
+  banco: string | null;
+  tiene_cochera: boolean;
+  tiene_movimiento_coches: boolean;
+  tiene_jardin: boolean;
+  zona_desfavorable: boolean;
+  tiene_pileta: boolean;
+  tiene_caldera: boolean;
+  tiene_ascensor: boolean;
+  tiene_agua_caliente_central: boolean;
+  tiene_calefaccion_central: boolean;
+  tiene_aire_acondicionado_central: boolean;
+  tiene_grupo_electrogeno: boolean;
+  tiene_seguridad_centralizada: boolean;
+  tiene_compactador: boolean;
+  tiene_montacargas: boolean;
+  tiene_otros_servicios_centrales: boolean;
+  interest_rate: string | null;
+  tipo_expensas: string;
+  formato_cobro: string;
+  monto_fijo_default: string | null;
+  pct_expensa_a: string;
+  fondo_obra: string | null;
+  fondo_obra_activo: boolean;
+  divisor_b: string | null;
+}
+
 async function getData(cuit: string) {
   const [consorcio, unidades] = await Promise.all([
-    queryOne<{ cuit: string; nombre: string; direccion: string; cbu: string | null }>(
+    queryOne<ConsorcioDetalle>(
       "SELECT * FROM app.consorcios WHERE cuit=$1",
       [cuit]
     ),
@@ -99,6 +138,51 @@ export default async function ConsorcioDetailPage({ params }: Props) {
   const coefATotal = unidades.reduce((acc, u) => acc + parseFloat(u.coef_a), 0);
   const coefBTotal = unidades.reduce((acc, u) => acc + parseFloat(u.coef_b), 0);
 
+  // Config inconsistency: divisor_b is set (B expenses would be prorated)
+  // but no unit actually has a coef_b — every B gasto would end up
+  // distributed as $0 to everyone. Almost always a missing-data mistake.
+  const divisorB = Number(consorcio.divisor_b ?? 0);
+  const hasDivisorBInconsistency = divisorB > 0 && coefBTotal === 0;
+
+  const interesesPct = consorcio.interest_rate ? (Number(consorcio.interest_rate) * 100).toFixed(2) : "";
+  const pctExpensaA = consorcio.pct_expensa_a ? (Number(consorcio.pct_expensa_a) * 100).toFixed(2) : "100";
+
+  const SERVICIOS_CENTRALES: { field: string; label: string; checked: boolean }[] = [
+    { field: "tiene_ascensor", label: "Ascensor", checked: consorcio.tiene_ascensor },
+    { field: "tiene_agua_caliente_central", label: "Agua caliente central", checked: consorcio.tiene_agua_caliente_central },
+    { field: "tiene_calefaccion_central", label: "Calefacción central", checked: consorcio.tiene_calefaccion_central },
+    { field: "tiene_aire_acondicionado_central", label: "Aire acondicionado central", checked: consorcio.tiene_aire_acondicionado_central },
+    { field: "tiene_cochera", label: "Cocheras", checked: consorcio.tiene_cochera },
+    { field: "tiene_movimiento_coches", label: "Movimiento de coches", checked: consorcio.tiene_movimiento_coches },
+    { field: "tiene_grupo_electrogeno", label: "Grupo electrógeno", checked: consorcio.tiene_grupo_electrogeno },
+    { field: "tiene_pileta", label: "Pileta", checked: consorcio.tiene_pileta },
+    { field: "tiene_caldera", label: "Caldera", checked: consorcio.tiene_caldera },
+    { field: "tiene_jardin", label: "Jardín", checked: consorcio.tiene_jardin },
+    { field: "tiene_seguridad_centralizada", label: "Seguridad centralizada", checked: consorcio.tiene_seguridad_centralizada },
+    { field: "tiene_compactador", label: "Compactador", checked: consorcio.tiene_compactador },
+    { field: "tiene_montacargas", label: "Montacargas", checked: consorcio.tiene_montacargas },
+    { field: "tiene_otros_servicios_centrales", label: "Otros servicios centrales", checked: consorcio.tiene_otros_servicios_centrales },
+  ];
+
+  const inlineField = (
+    field: string,
+    defaultValue: string | number | null,
+    opts?: { type?: "text" | "email" | "tel" | "number"; step?: string; placeholder?: string }
+  ) => (
+    <InlineEditCell
+      entityId={id}
+      idFieldName="cuit"
+      field={field}
+      defaultValue={defaultValue === null || defaultValue === undefined ? null : String(defaultValue)}
+      action={updateConsorcioField}
+      consorcioCuit={id}
+      type={opts?.type ?? "text"}
+      step={opts?.step}
+      placeholder={opts?.placeholder}
+      className="input"
+    />
+  );
+
   return (
     <div className="w-full">
       <div className="mb-6">
@@ -107,13 +191,193 @@ export default async function ConsorcioDetailPage({ params }: Props) {
           {" / "}
           <span>Detalle</span>
         </p>
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-bold text-gray-900">{consorcio.nombre}</h2>
-          <Link href={`/consorcios/${id}/editar`} className="btn-secondary text-sm px-3 py-1">
-            Editar
-          </Link>
-        </div>
+        <h2 className="text-2xl font-bold text-gray-900">{consorcio.nombre}</h2>
         <p className="text-gray-500 text-sm">{consorcio.direccion}{consorcio.cuit ? ` · CUIT: ${formatCuit(consorcio.cuit)}` : ""}</p>
+      </div>
+
+      {hasDivisorBInconsistency && (
+        <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs flex items-start gap-2">
+          <span className="text-base leading-none">⚠️</span>
+          <div>
+            <p className="font-bold">Configuración de Coeficiente B inconsistente</p>
+            <p className="mt-0.5 text-amber-700">
+              Este consorcio tiene divisor de Coef. B configurado ({divisorB}), pero ninguna unidad
+              tiene coeficiente B asignado (total = 0). Cualquier gasto extraordinario (B) se prorrateará
+              en $0 para todas las unidades. Verifique los coeficientes B de las unidades.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Consorcio configuration — collapsible sections */}
+      <div className="space-y-3 mb-6">
+        <details className="card overflow-hidden" open>
+          <summary className="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800 cursor-pointer select-none flex items-center justify-between bg-gray-50">
+            Datos Fiscales
+            <span className="text-gray-400 text-xs">▾</span>
+          </summary>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Nombre</label>
+              {inlineField("nombre", consorcio.nombre)}
+            </div>
+            <div>
+              <label className="label">Dirección</label>
+              {inlineField("direccion", consorcio.direccion)}
+            </div>
+            <div>
+              <label className="label">Código Postal</label>
+              {inlineField("codigo_postal", consorcio.codigo_postal)}
+            </div>
+            <div>
+              <label className="label">Banco</label>
+              {inlineField("banco", consorcio.banco)}
+            </div>
+          </div>
+        </details>
+
+        <details className="card overflow-hidden">
+          <summary className="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800 cursor-pointer select-none flex items-center justify-between bg-gray-50">
+            SUTERH
+            <span className="text-gray-400 text-xs">▾</span>
+          </summary>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">N° Cta. SUTERH</label>
+              {inlineField("nro_cta_suterh", consorcio.suterh_key)}
+            </div>
+            <div>
+              <label className="label">Clave SUTERH</label>
+              {inlineField("clave_suterh", consorcio.clave_suterh)}
+            </div>
+          </div>
+        </details>
+
+        <details className="card overflow-hidden">
+          <summary className="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800 cursor-pointer select-none flex items-center justify-between bg-gray-50">
+            Configuración Edificio
+            <span className="text-gray-400 text-xs">▾</span>
+          </summary>
+          <div className="p-5 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="label">Categoría edificio</label>
+                <ConsorcioSelectField
+                  cuit={id}
+                  field="categoria_edificio"
+                  defaultValue={consorcio.categoria_edificio ?? ""}
+                  action={updateConsorcioField}
+                  options={[
+                    { value: "", label: "— seleccionar —" },
+                    { value: "1° Cat.", label: "1° Cat." },
+                    { value: "2° Cat.", label: "2° Cat." },
+                    { value: "3° Cat.", label: "3° Cat." },
+                    { value: "4° Cat.", label: "4° Cat." },
+                  ]}
+                />
+                <p className="text-xs text-gray-400 mt-0.5">Según Art. 6 CCT 589/10</p>
+              </div>
+              <div>
+                <label className="label">Cantidad de UF</label>
+                {inlineField("cant_uf", consorcio.cant_uf, { type: "number" })}
+              </div>
+              <div>
+                <label className="label">UF p/ Retiro de Residuos</label>
+                {inlineField("uf_retiro_residuos", consorcio.uf_retiro_residuos, { type: "number" })}
+              </div>
+            </div>
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Servicios centrales</p>
+              <p className="text-xs text-gray-400 mb-3">Art. 6 CCT 589/10 — determinan la categoría del edificio</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {SERVICIOS_CENTRALES.map((f) => (
+                  <ConsorcioToggleField
+                    key={f.field}
+                    cuit={id}
+                    field={f.field}
+                    label={f.label}
+                    defaultChecked={f.checked}
+                    action={updateConsorcioField}
+                  />
+                ))}
+                <ConsorcioToggleField
+                  cuit={id}
+                  field="zona_desfavorable"
+                  label="Zona desfavorable"
+                  defaultChecked={consorcio.zona_desfavorable}
+                  action={updateConsorcioField}
+                />
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details className="card overflow-hidden">
+          <summary className="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800 cursor-pointer select-none flex items-center justify-between bg-gray-50">
+            Configuración Expensas
+            <span className="text-gray-400 text-xs">▾</span>
+          </summary>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Tipo de expensas</label>
+              <ConsorcioSelectField
+                cuit={id}
+                field="tipo_expensas"
+                defaultValue={consorcio.tipo_expensas ?? "variable"}
+                action={updateConsorcioField}
+                options={[
+                  { value: "variable", label: "Variable" },
+                  { value: "fija", label: "Fija" },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="label">Formato de cobro</label>
+              <ConsorcioSelectField
+                cuit={id}
+                field="formato_cobro"
+                defaultValue={consorcio.formato_cobro ?? "exacto"}
+                action={updateConsorcioField}
+                options={[
+                  { value: "exacto", label: "Monto exacto" },
+                  { value: "identificacion_uf", label: "Identificación por UF (centavos = N° UF)" },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="label">Intereses por mora (%)</label>
+              {inlineField("intereses_mora_pct", interesesPct, { type: "number", step: "0.01", placeholder: "Ej: 3.5" })}
+              <p className="text-xs text-gray-400 mt-0.5">Porcentaje mensual definido en asamblea</p>
+            </div>
+            <div>
+              <label className="label">% Coeficiente A</label>
+              {inlineField("pct_expensa_a", pctExpensaA, { type: "number", step: "0.01" })}
+              <p className="text-xs text-gray-400 mt-0.5">El resto se asigna a Coef. B</p>
+            </div>
+            {consorcio.tipo_expensas === "fija" && (
+              <div>
+                <label className="label">Monto fijo mensual default</label>
+                {inlineField("monto_fijo_default", consorcio.monto_fijo_default ? Number(consorcio.monto_fijo_default) : null, { type: "number", step: "0.01" })}
+              </div>
+            )}
+            <div className="flex items-end pb-1">
+              <ConsorcioToggleField
+                cuit={id}
+                field="fondo_obra_activo"
+                label="Fondo de obra activo"
+                defaultChecked={consorcio.fondo_obra_activo}
+                action={updateConsorcioField}
+              />
+            </div>
+            {consorcio.fondo_obra_activo && (
+              <div>
+                <label className="label">Monto total fondo de obra</label>
+                {inlineField("fondo_obra", consorcio.fondo_obra ? Number(consorcio.fondo_obra) : null, { type: "number", step: "0.01" })}
+                <p className="text-xs text-gray-400 mt-0.5">Se prorratea por Coef. A de cada unidad</p>
+              </div>
+            )}
+          </div>
+        </details>
       </div>
 
       {/* Unidades */}

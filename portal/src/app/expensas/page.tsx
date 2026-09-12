@@ -114,8 +114,8 @@ async function getPeriodoDetail(periodoId: number, consorcioCuit: string) {
        ORDER BY g.categoria, g.orden, g.descripcion`,
       [periodoId]
     ),
-    query<{ id: number; uf: number }>(
-      "SELECT id, uf FROM app.unidades WHERE consorcio_cuit=$1 ORDER BY uf",
+    query<{ id: number; uf: number; coef_b: string }>(
+      "SELECT id, uf, coef_b::text FROM app.unidades WHERE consorcio_cuit=$1 ORDER BY uf",
       [consorcioCuit]
     ),
   ]);
@@ -348,6 +348,15 @@ export default async function ExpensasPage({
     : null;
 
   const pendingCuotas = activeCuit ? await getPendingCuotas(activeCuit) : [];
+
+  // Coef B data-entry warning: gastos tipo B exist in this period but some
+  // units have coef_b = 0, so they will not pay any part of those B gastos.
+  // Distribution by coef_b is correct — this is just a visibility check for
+  // what is almost always a missing-coefficient mistake.
+  const hasGastosB = (detail?.gastos ?? []).some((g) => g.tipo === "B");
+  const unidadesCoefBCero = hasGastosB
+    ? (detail?.unidades ?? []).filter((u) => Number(u.coef_b) === 0)
+    : [];
 
   const resCuentaRows = selected
     ? await query<{
@@ -738,6 +747,22 @@ export default async function ExpensasPage({
                   </div>
                 )}
               </div>
+
+              {/* Coef B = 0 warning */}
+              {unidadesCoefBCero.length > 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs flex items-start gap-2">
+                  <span className="text-base leading-none">⚠️</span>
+                  <div>
+                    <p className="font-bold">
+                      Hay gastos extraordinarios (B) pero las siguientes unidades tienen coeficiente B = 0:{" "}
+                      {unidadesCoefBCero.map((u) => u.uf).join(", ")}.
+                    </p>
+                    <p className="mt-0.5 text-amber-700">
+                      Estas unidades no pagarán gastos B. Verifique los coeficientes.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Gastos */}
               <div className="card overflow-hidden">

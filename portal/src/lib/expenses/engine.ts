@@ -365,6 +365,21 @@ async function _runCalculateExpenses(
   const totalBAndPart = isFija ? 0 : Array.from(unitBMap.values()).reduce((sum, v) => sum + v, 0);
   const totalProrrateoAyB = round2(totalProrrateoA + totalProrrateoB + totalBAndPart);
 
+  // Warning-only check (does NOT change the distribution): flag units that
+  // have coef_b = 0 while there ARE gastos tipo B in this period. Distributing
+  // by coef_b/divisor_b is correct — a unit with coef_b = 0 legitimately pays
+  // $0 of B — but coef_b = 0 is almost always a data entry error, so this
+  // must be surfaced instead of silently producing a $0 B charge.
+  const hasGastosB = expenses.some(e => e.tipo === "B") || totalProrrateoB > 0;
+  if (hasGastosB) {
+    const unitsWithZeroCoefB = units.filter(u => Number(u.coef_b) === 0);
+    if (unitsWithZeroCoefB.length > 0) {
+      const lista = unitsWithZeroCoefB.map(u => u.uf).join(", ");
+      const msg = `Hay gastos extraordinarios (B) en este período pero las siguientes unidades tienen coeficiente B = 0: ${lista}. Estas unidades no pagarán gastos B. Verifique los coeficientes.`;
+      warnings.push(msg);
+    }
+  }
+
   // 8. Fetch payments in app.pagos for each unit in this period
   // We can query payments registered for this consorcio in this month
   const startDate = `${periodo.anio}-${String(periodo.mes).padStart(2, '0')}-01`;
@@ -549,11 +564,23 @@ async function _runCalculateExpenses(
     // total_pagar > 0 but smaller than the accumulated credit).
     let creditoAplicado = 0;
     if (totalPagar > 0) {
-      const creditosRows = await query<{ id: number; monto: string }>(
-        `SELECT id, monto::text AS monto FROM app.credito_unidad
-         WHERE unidad_id = $1 AND consorcio_cuit = $2 AND aplicado = false
-         ORDER BY created_at ASC`,
-        [u.id, cuit]
+      // Credits from an expense paid directly by this unit in THIS same
+      // period (origen='compensacion_gasto', its gasto's periodo_id = the
+      // period being calculated now) MUST be consumed first, ahead of any
+      // older unapplied 'sobrepago' credit — otherwise, under plain FIFO by
+      // created_at, an older sobrepago credit could exhaust total_pagar and
+      // defer the just-created compensación to next period, which the
+      // domain rule forbids (confirmed with revisor-liquidacion). The
+      // `es_gasto_periodo_actual` flag makes this priority explicit and
+      // auditable instead of hiding it in ORDER BY expression logic.
+      const creditosRows = await query<{ id: number; monto: string; es_gasto_periodo_actual: boolean }>(
+        `SELECT cu.id, cu.monto::text AS monto,
+                (cu.origen = 'compensacion_gasto' AND g.periodo_id = $3) AS es_gasto_periodo_actual
+         FROM app.credito_unidad cu
+         LEFT JOIN app.gastos_periodo g ON g.id = cu.gasto_periodo_id
+         WHERE cu.unidad_id = $1 AND cu.consorcio_cuit = $2 AND cu.aplicado = false
+         ORDER BY es_gasto_periodo_actual DESC, cu.created_at ASC`,
+        [u.id, cuit, periodoId]
       );
       let remaining = round2(Math.min(totalPagar, creditosRows.reduce((s, c) => s + Number(c.monto), 0)));
       creditoAplicado = remaining;
@@ -580,6 +607,26 @@ async function _runCalculateExpenses(
           remaining = 0;
         }
       }
+
+      // Anomaly guard: a compensación-de-gasto credit for THIS period should
+      // never end up unconsumed/partial, since it was created alongside the
+      // very gasto that raised totalPagar. If it happens anyway, surface it
+      // loudly instead of silently deferring it — per revisor-liquidacion.
+      const currentPeriodCredits = creditosRows.filter(c => c.es_gasto_periodo_actual);
+      if (currentPeriodCredits.length > 0) {
+        const totalCurrentPeriodCredit = round2(
+          currentPeriodCredits.reduce((s, c) => s + Number(c.monto), 0)
+        );
+        if (creditoAplicado < totalCurrentPeriodCredit) {
+          console.warn(
+            `[expenses/engine] Anomalía: unidad ${u.id} (consorcio ${cuit}, periodo ${periodoId}) ` +
+            `tiene crédito por gasto pagado en este mismo período por $${totalCurrentPeriodCredit} ` +
+            `que no pudo aplicarse completo (aplicado total: $${creditoAplicado}, total_pagar disponible: $${totalPagar}). ` +
+            `El crédito por gasto pagado directamente NO debe diferirse a otro período — revisar manualmente.`
+          );
+        }
+      }
+
       if (creditoAplicado > 0) {
         totalPagar = round2(totalPagar - creditoAplicado);
       }
