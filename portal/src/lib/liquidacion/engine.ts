@@ -98,11 +98,15 @@ const VALOR_VIVIENDA = 0;
 // Helpers
 // ---------------------------------------------------------------------------
 
-function safe(v: number, fallback = 0): number {
+// NOTE: the functions below are exported only so unit tests can import
+// them directly (src/lib/liquidacion/__tests__/engine.test.ts). They are
+// internal implementation details of the liquidación engine — not a public
+// API — do not import/use them from other modules without review.
+export function safe(v: number, fallback = 0): number {
   return isNaN(v) || !isFinite(v) ? fallback : v;
 }
 
-function calcAniosAntigüedad(fechaIngreso: string, periodo: string): number {
+export function calcAniosAntigüedad(fechaIngreso: string, periodo: string): number {
   // Use last day of the period month so anniversaries within the month are credited
   const [y, m] = periodo.split("-").map(Number);
   const lastDay = new Date(y, m, 0); // day 0 of next month = last day of current month
@@ -112,7 +116,7 @@ function calcAniosAntigüedad(fechaIngreso: string, periodo: string): number {
   return Math.max(0, diff);
 }
 
-function diasAntiguedad(fechaIngreso: string, periodo: string, fechaEgreso?: string | null): number {
+export function diasAntiguedad(fechaIngreso: string, periodo: string, fechaEgreso?: string | null): number {
   const [y, m] = periodo.split("-").map(Number);
   let tope = new Date(y, m, 0);
   if (fechaEgreso) {
@@ -158,7 +162,7 @@ function resolverFuncionCompletaEquivalente(funcion: string, tieneVivienda = fal
 // Shared descuentos / contribuciones helpers
 // ---------------------------------------------------------------------------
 
-interface DescuentosEmpleado {
+export interface DescuentosEmpleado {
   jubilacion: number;
   pami: number;
   obraSocial: number;
@@ -171,7 +175,7 @@ interface DescuentosEmpleado {
   total: number;
 }
 
-interface ContribPatronal {
+export interface ContribPatronal {
   jubilacion: number;
   obraSocial: number;
   suterh: number;
@@ -183,7 +187,7 @@ interface ContribPatronal {
   total: number;
 }
 
-function calcDescuentosEmpleado(
+export function calcDescuentosEmpleado(
   base: number,
   esSuplente: boolean,
   difObraSocial = 0,
@@ -201,7 +205,7 @@ function calcDescuentosEmpleado(
   return { jubilacion, pami, obraSocial, difObraSocial, suterh, cajaProtFlia, fateryh, seguroVital, fondoEducacion, total };
 }
 
-function calcContribPatronal(
+export function calcContribPatronal(
   base: number,
   baseOS: number,
   cons: Consorcio,
@@ -1232,21 +1236,21 @@ export async function liquidarSAC(
 // Indemnización por egreso
 // ---------------------------------------------------------------------------
 
-function diasVacacionesPorAntigüedad(anios: number): number {
+export function diasVacacionesPorAntigüedad(anios: number): number {
   if (anios < 5) return 12;
   if (anios < 10) return 20;
   if (anios < 20) return 24;
   return 28;
 }
 
-function diasPreaviso(anios: number): number {
+export function diasPreaviso(anios: number): number {
   if (anios < 1) return 15;
   if (anios < 5) return 30;
   return 60;
 }
 
 // Art. 245 LCT: fraction > 3 months counts as a full year for severance
-function aniosParaIndemnizacion(fechaIngreso: string, fechaEgreso: string): number {
+export function aniosParaIndemnizacion(fechaIngreso: string, fechaEgreso: string): number {
   const ingreso = new Date(fechaIngreso);
   const egreso = new Date(fechaEgreso);
   let anios = egreso.getFullYear() - ingreso.getFullYear();
