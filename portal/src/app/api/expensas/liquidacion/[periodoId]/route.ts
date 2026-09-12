@@ -331,7 +331,7 @@ export async function GET(
   // Show the B breakdown only when there are actual gastos B in the period
   // (totales.expensas_b !== 0). A unit merely having coef_b > 0 with no B
   // gastos would otherwise show a noisy all-zero B column.
-  const showB = totales.expensas_b !== 0;
+  const showB = totales.expensas_b !== 0 || gastos.some((g: { tipo: string }) => g.tipo === "B");
   const showFondoObra = totales.fondo_obra !== 0;
 
   const ufTableRows = ufRows.map(r => `

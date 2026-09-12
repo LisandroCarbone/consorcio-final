@@ -82,12 +82,21 @@ export async function updateConsorcioField(formData: FormData) {
     case "boolean":
       value = rawValue === "true";
       break;
-    case "number":
-      value = trimmed === "" ? null : Number(trimmed);
+    case "number": {
+      if (trimmed === "") { value = null; break; }
+      const n = Number(trimmed);
+      if (isNaN(n)) throw new Error(`Invalid number for field "${field}"`);
+      if (n < 0 && !field.startsWith("zona_")) throw new Error(`Field "${field}" cannot be negative`);
+      value = n;
       break;
-    case "percent":
-      value = trimmed === "" ? null : Number(trimmed) / 100;
+    }
+    case "percent": {
+      if (trimmed === "") { value = null; break; }
+      const p = Number(trimmed);
+      if (isNaN(p) || p < 0 || p > 100) throw new Error(`Invalid percentage for field "${field}"`);
+      value = p / 100;
       break;
+    }
     default:
       value = trimmed === "" ? null : trimmed;
   }

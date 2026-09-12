@@ -34,7 +34,7 @@ export async function checkDuplicatePago(
     `SELECT id, fecha::text, monto::numeric AS monto, medio_pago
      FROM app.pagos
      WHERE unidad_id = $1
-       AND monto = $2
+       AND ABS(monto - $2) < 0.01
        AND fecha BETWEEN $3::date - INTERVAL '3 days' AND $3::date + INTERVAL '3 days'
        AND ($4::int IS NULL OR id != $4)
      ORDER BY fecha

@@ -573,8 +573,8 @@ async function _runCalculateExpenses(
       // domain rule forbids (confirmed with revisor-liquidacion). The
       // `es_gasto_periodo_actual` flag makes this priority explicit and
       // auditable instead of hiding it in ORDER BY expression logic.
-      const creditosRows = await query<{ id: number; monto: string; es_gasto_periodo_actual: boolean }>(
-        `SELECT cu.id, cu.monto::text AS monto,
+      const creditosRows = await query<{ id: number; monto: string; es_gasto_periodo_actual: boolean; gasto_periodo_id: number | null }>(
+        `SELECT cu.id, cu.monto::text AS monto, cu.gasto_periodo_id,
                 (cu.origen = 'compensacion_gasto' AND g.periodo_id = $3) AS es_gasto_periodo_actual
          FROM app.credito_unidad cu
          LEFT JOIN app.gastos_periodo g ON g.id = cu.gasto_periodo_id
@@ -587,22 +587,20 @@ async function _runCalculateExpenses(
       for (const c of creditosRows) {
         if (remaining <= 0) break;
         const montoC = round2(Number(c.monto));
+        await query(
+          `UPDATE app.credito_unidad SET aplicado = true, aplicado_en_periodo_id = $1 WHERE id = $2`,
+          [periodoId, c.id]
+        );
         if (montoC <= remaining) {
-          await query(
-            `UPDATE app.credito_unidad SET aplicado = true, aplicado_en_periodo_id = $1 WHERE id = $2`,
-            [periodoId, c.id]
-          );
           remaining = round2(remaining - montoC);
         } else {
-          await query(
-            `UPDATE app.credito_unidad SET aplicado = true, aplicado_en_periodo_id = $1 WHERE id = $2`,
-            [periodoId, c.id]
-          );
           const leftover = round2(montoC - remaining);
           await query(
-            `INSERT INTO app.credito_unidad (unidad_id, consorcio_cuit, monto, origen, aplicado)
-             VALUES ($1, $2, $3, 'sobrepago', false)`,
-            [u.id, cuit, leftover]
+            `INSERT INTO app.credito_unidad (unidad_id, consorcio_cuit, monto, origen, aplicado, gasto_periodo_id)
+             VALUES ($1, $2, $3, $4, false, $5)`,
+            [u.id, cuit, leftover,
+             c.gasto_periodo_id ? 'compensacion_gasto' : 'sobrepago',
+             c.gasto_periodo_id]
           );
           remaining = 0;
         }
@@ -618,12 +616,9 @@ async function _runCalculateExpenses(
           currentPeriodCredits.reduce((s, c) => s + Number(c.monto), 0)
         );
         if (creditoAplicado < totalCurrentPeriodCredit) {
-          console.warn(
-            `[expenses/engine] Anomalía: unidad ${u.id} (consorcio ${cuit}, periodo ${periodoId}) ` +
-            `tiene crédito por gasto pagado en este mismo período por $${totalCurrentPeriodCredit} ` +
-            `que no pudo aplicarse completo (aplicado total: $${creditoAplicado}, total_pagar disponible: $${totalPagar}). ` +
-            `El crédito por gasto pagado directamente NO debe diferirse a otro período — revisar manualmente.`
-          );
+          const warnMsg = `Unidad ${u.id}: crédito por gasto pagado en este período por $${totalCurrentPeriodCredit} no pudo aplicarse completo (aplicado: $${creditoAplicado}, total_pagar: $${totalPagar}). Revisar manualmente.`;
+          console.warn(`[expenses/engine] ${warnMsg}`);
+          warnings.push(warnMsg);
         }
       }
 
