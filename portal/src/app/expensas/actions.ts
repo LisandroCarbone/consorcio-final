@@ -595,19 +595,22 @@ export async function regenerarGastosFijos(periodoId: number) {
       [usedPeriodStr]
     );
     const cct = cctRes.rows[0];
-    const detraccionBase = Number(cct?.detraccion_fija_mensual || 12003.68);
-    const detraccionEmpleador = Number(cct?.detraccion_fija_empleador || 0);
-    const suterhPct = Number(cct?.pct_suterh || 0.045);
-    const faterhPct = Number(cct?.pct_fateryh || 0.065);
-    const seracarhPct = Number(cct?.pct_seracarh || 0.005);
-    const svFijo = Number(cct?.sv_costo_fijo || 424.62);
-    const pctAportesSS = Number(cct?.pct_aportes_ss || 0.1445);
-    const pctAportesOS = Number(cct?.pct_aportes_os || 0.0255);
-    const pctContribOS = Number(cct?.pct_contrib_os || 0.051);
-    const pctContribSS = Number(cct?.pct_contrib_ss || 0.18);
-    const pctContribANSSAL = Number(cct?.pct_contrib_anssal || 0.009);
+    if (!cct) {
+      throw new Error(`No hay parámetros CCT cargados para el período ${usedPeriodStr}. Cargá los parámetros en Configuración > Parámetros CCT.`);
+    }
+    const detraccionBase = Number(cct.detraccion_fija_mensual);
+    const detraccionEmpleador = Number(cct.detraccion_fija_empleador || 0);
+    const suterhPct = Number(cct.pct_suterh);
+    const faterhPct = Number(cct.pct_fateryh);
+    const seracarhPct = Number(cct.pct_seracarh);
+    const svFijo = Number(cct.sv_costo_fijo);
+    const pctAportesSS = Number(cct.pct_aportes_ss || 0.1445);
+    const pctAportesOS = Number(cct.pct_aportes_os || 0.0255);
+    const pctContribOS = Number(cct.pct_contrib_os || 0.051);
+    const pctContribSS = Number(cct.pct_contrib_ss || 0.18);
+    const pctContribANSSAL = Number(cct.pct_contrib_anssal || 0.009);
 
-    const art19bis = Number(cct?.fateryh_art19bis || 0);
+    const art19bis = Number(cct.fateryh_art19bis || 0);
 
     // SCVO annual renewal
     const consRes = await client.query(
@@ -625,8 +628,11 @@ export async function regenerarGastosFijos(periodoId: number) {
        ORDER BY fecha_desde DESC LIMIT 1`,
       [consorcio_cuit, usedPeriodStr]
     );
-    const artPct = Number(artRes.rows[0]?.art_pct_variable || 0.0639);
-    const artCostoFijo = Number(artRes.rows[0]?.art_costo_fijo || 0);
+    if (!artRes.rows[0]) {
+      throw new Error(`Consorcio ${consorcio_cuit} no tiene parámetros de ART configurados. Cargá la alícuota en Configuración.`);
+    }
+    const artPct = Number(artRes.rows[0].art_pct_variable);
+    const artCostoFijo = Number(artRes.rows[0].art_costo_fijo || 0);
 
     // SAC months (June=6, December=12): F931 detracción × 1.5
     const usedMes = usedPeriodStr === prevPeriodStr ? prevMes : mes;
