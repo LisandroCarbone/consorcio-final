@@ -4,6 +4,7 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import { Nav } from "@/components/ui/Nav";
 import { TopBar } from "@/components/ui/TopBar";
+import { ToastProvider } from "@/components/ui/Toast";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -26,7 +27,7 @@ export function AppShell({
   }
 
   return (
-    <>
+    <ToastProvider>
       <div className="print:hidden">
         <Nav />
       </div>
@@ -42,6 +43,6 @@ export function AppShell({
           {children}
         </main>
       </div>
-    </>
+    </ToastProvider>
   );
 }
