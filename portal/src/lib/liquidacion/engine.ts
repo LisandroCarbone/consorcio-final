@@ -241,9 +241,24 @@ export function calcContribPatronal(
 // Core calculation
 // ---------------------------------------------------------------------------
 
+// Prefetched data shared across employees in a calcularPeriodo batch, to avoid
+// re-querying the same period-level / consorcio-level rows once per employee.
+// Optional — when omitted, calcularLiquidacion falls back to querying itself
+// (used when called standalone, e.g. from a single-employee recalculation).
+export interface CalcularLiquidacionPrefetch {
+  escalaRows: EscalaRow[];
+  parametrosCctRow: { fateryh_art19bis: string; sv_costo_fijo: string } | null;
+  consorciosMap: Map<string, Consorcio>;
+  conceptosAdicionalesMap: Map<
+    string,
+    { concepto: string; tipo: string; importe: number; es_porcentaje: boolean }[]
+  >;
+}
+
 export async function calcularLiquidacion(
   empleadoId: number,
-  periodo: string
+  periodo: string,
+  prefetch?: CalcularLiquidacionPrefetch
 ): Promise<void> {
   // 1. Load master data in parallel
   const [empRows, adicionalesRows, novedadesRows] = await Promise.all([
@@ -268,40 +283,63 @@ export async function calcularLiquidacion(
 
   const emp = empRows.rows[0];
 
-  // Load consorcio, escalas, custom period adicionales and parametros_cct in parallel
-  const [consRow, escalaRows, customAdicionalesRows, parametrosCctRow] = await Promise.all([
-    pool.query<Consorcio>(
-      `SELECT * FROM app.consorcios WHERE cuit = $1`,
-      [emp.consorcio_cuit]
-    ),
-    pool.query<EscalaRow>(
-      `SELECT funcion, cat_1::numeric, cat_2::numeric, cat_3::numeric, cat_4::numeric
-       FROM app.escalas_suterh WHERE periodo = $1`,
-      [periodo]
-    ),
-    pool.query<{ concepto: string; tipo: string; importe: number; es_porcentaje: boolean }>(
-      `SELECT concepto, tipo, importe::numeric AS importe, es_porcentaje
-       FROM app.conceptos_adicionales_periodo
-       WHERE periodo = $1 AND consorcio_cuit = $2`,
-      [periodo, emp.consorcio_cuit]
-    ),
-    pool.query<{ fateryh_art19bis: string; sv_costo_fijo: string }>(
-      `SELECT fateryh_art19bis::numeric, sv_costo_fijo::numeric
-       FROM app.parametros_cct
-       WHERE fecha_desde <= $1
-       ORDER BY fecha_desde DESC LIMIT 1`,
-      [periodo]
-    ),
-  ]);
+  // Load consorcio, escalas, custom period adicionales and parametros_cct.
+  // When prefetch is provided (calcularPeriodo batch), reuse the already-fetched
+  // global/per-consorcio data instead of re-querying per employee.
+  let consRows: Consorcio[];
+  let escalaRowsData: EscalaRow[];
+  let customAdicionalesRowsData: { concepto: string; tipo: string; importe: number; es_porcentaje: boolean }[];
+  let parametrosCctData: { fateryh_art19bis: string; sv_costo_fijo: string } | null;
 
-  if (consRow.rows.length === 0) {
-    throw new Error(`Consorcio con CUIT ${emp.consorcio_cuit} no encontrado`);
+  if (prefetch) {
+    const consPrefetched = prefetch.consorciosMap.get(emp.consorcio_cuit);
+    if (!consPrefetched) {
+      throw new Error(`Consorcio con CUIT ${emp.consorcio_cuit} no encontrado`);
+    }
+    consRows = [consPrefetched];
+    escalaRowsData = prefetch.escalaRows;
+    customAdicionalesRowsData = prefetch.conceptosAdicionalesMap.get(emp.consorcio_cuit) ?? [];
+    parametrosCctData = prefetch.parametrosCctRow;
+  } else {
+    const [consRow, escalaRows, customAdicionalesRows, parametrosCctRow] = await Promise.all([
+      pool.query<Consorcio>(
+        `SELECT * FROM app.consorcios WHERE cuit = $1`,
+        [emp.consorcio_cuit]
+      ),
+      pool.query<EscalaRow>(
+        `SELECT funcion, cat_1::numeric, cat_2::numeric, cat_3::numeric, cat_4::numeric
+         FROM app.escalas_suterh WHERE periodo = $1`,
+        [periodo]
+      ),
+      pool.query<{ concepto: string; tipo: string; importe: number; es_porcentaje: boolean }>(
+        `SELECT concepto, tipo, importe::numeric AS importe, es_porcentaje
+         FROM app.conceptos_adicionales_periodo
+         WHERE periodo = $1 AND consorcio_cuit = $2`,
+        [periodo, emp.consorcio_cuit]
+      ),
+      pool.query<{ fateryh_art19bis: string; sv_costo_fijo: string }>(
+        `SELECT fateryh_art19bis::numeric, sv_costo_fijo::numeric
+         FROM app.parametros_cct
+         WHERE fecha_desde <= $1
+         ORDER BY fecha_desde DESC LIMIT 1`,
+        [periodo]
+      ),
+    ]);
+
+    if (consRow.rows.length === 0) {
+      throw new Error(`Consorcio con CUIT ${emp.consorcio_cuit} no encontrado`);
+    }
+
+    consRows = consRow.rows;
+    escalaRowsData = escalaRows.rows;
+    customAdicionalesRowsData = customAdicionalesRows.rows;
+    parametrosCctData = parametrosCctRow.rows[0] ?? null;
   }
 
-  const cons = consRow.rows[0];
-  const fateryh_art19bis = Number(parametrosCctRow.rows[0]?.fateryh_art19bis ?? 0);
-  const scvoFromParametros = parametrosCctRow.rows[0]?.sv_costo_fijo != null
-    ? Number(parametrosCctRow.rows[0].sv_costo_fijo)
+  const cons = consRows[0];
+  const fateryh_art19bis = Number(parametrosCctData?.fateryh_art19bis ?? 0);
+  const scvoFromParametros = parametrosCctData?.sv_costo_fijo != null
+    ? Number(parametrosCctData.sv_costo_fijo)
     : null;
 
   // Build lookup maps: by concepto_key (stable) and by concepto name (legacy fallback)
@@ -316,7 +354,7 @@ export async function calcularLiquidacion(
   const adic = (key: string, fallback: number) => adicionalesByKey[key] ?? adicionales[key] ?? fallback;
 
   const escalaMap: Record<string, Record<string, number>> = {};
-  for (const row of escalaRows.rows) {
+  for (const row of escalaRowsData) {
     const entry = {
       cat_1: Number(row.cat_1),
       cat_2: Number(row.cat_2),
@@ -699,10 +737,10 @@ export async function calcularLiquidacion(
   // ---------------------------------------------------------------------------
 
   // Custom period adicionales — fixed amounts only for now; % descuentos resolved after totalRemunerativoFinal
-  const customHaberes = customAdicionalesRows.rows
+  const customHaberes = customAdicionalesRowsData
     .filter(r => r.tipo === "haber")
     .reduce((s, r) => s + Number(r.importe), 0);
-  const customDescuentosFijos = customAdicionalesRows.rows
+  const customDescuentosFijos = customAdicionalesRowsData
     .filter(r => r.tipo === "descuento" && !r.es_porcentaje)
     .reduce((s, r) => s + Number(r.importe), 0);
 
@@ -756,7 +794,7 @@ export async function calcularLiquidacion(
   const totalRemunerativoFinal = totalRemunerativo + diferenciaSAC;
 
   // Percentage-based custom descuentos — resolved against totalRemunerativoFinal
-  const customDescuentosPct = customAdicionalesRows.rows
+  const customDescuentosPct = customAdicionalesRowsData
     .filter(r => r.tipo === "descuento" && r.es_porcentaje)
     .reduce((s, r) => s + totalRemunerativoFinal * (Number(r.importe) / 100), 0);
   const customDescuentos = customDescuentosFijos + customDescuentosPct;
@@ -989,7 +1027,7 @@ export async function calcularLiquidacion(
     addDescuento("5400", "Descuento Vivienda", descVivienda, 39);
 
     // Custom period adicionales
-    customAdicionalesRows.rows.forEach((r, i) => {
+    customAdicionalesRowsData.forEach((r, i) => {
       if (r.tipo === "haber") {
         addHaber(null, r.concepto, Number(r.importe), 23 + i);
       } else {
@@ -1493,8 +1531,8 @@ export async function liquidarIndemnizacion(
 export async function calcularPeriodo(
   periodo: string
 ): Promise<{ ok: number; errores: string[] }> {
-  const result = await pool.query<{ id: number; cuil: string; nombre: string }>(
-    `SELECT DISTINCT e.id, e.cuil, e.nombre FROM app.empleados e
+  const result = await pool.query<{ id: number; cuil: string; nombre: string; consorcio_cuit: string }>(
+    `SELECT DISTINCT e.id, e.cuil, e.nombre, e.consorcio_cuit FROM app.empleados e
      WHERE e.estado = 'activo'
         OR EXISTS (
           SELECT 1 FROM app.liquidaciones_sueldo ls
@@ -1506,6 +1544,68 @@ export async function calcularPeriodo(
 
   const empleados = result.rows;
 
+  if (empleados.length === 0) {
+    return { ok: 0, errores: [] };
+  }
+
+  // Global prefetch (same for every employee in this periodo) + per-consorcio
+  // prefetch (batched across the unique consorcio_cuits present in this batch),
+  // so calcularLiquidacion doesn't re-query these per employee.
+  const consorcioCuits = Array.from(new Set(empleados.map((e) => e.consorcio_cuit)));
+
+  const [escalaRowsResult, parametrosCctResult, consorciosResult, conceptosAdicionalesResult] =
+    await Promise.all([
+      pool.query<EscalaRow>(
+        `SELECT funcion, cat_1::numeric, cat_2::numeric, cat_3::numeric, cat_4::numeric
+         FROM app.escalas_suterh WHERE periodo = $1`,
+        [periodo]
+      ),
+      pool.query<{ fateryh_art19bis: string; sv_costo_fijo: string }>(
+        `SELECT fateryh_art19bis::numeric, sv_costo_fijo::numeric
+         FROM app.parametros_cct
+         WHERE fecha_desde <= $1
+         ORDER BY fecha_desde DESC LIMIT 1`,
+        [periodo]
+      ),
+      pool.query<Consorcio>(
+        `SELECT * FROM app.consorcios WHERE cuit = ANY($1)`,
+        [consorcioCuits]
+      ),
+      pool.query<{ concepto: string; tipo: string; importe: number; es_porcentaje: boolean; consorcio_cuit: string }>(
+        `SELECT concepto, tipo, importe::numeric AS importe, es_porcentaje, consorcio_cuit
+         FROM app.conceptos_adicionales_periodo
+         WHERE periodo = $1 AND consorcio_cuit = ANY($2)`,
+        [periodo, consorcioCuits]
+      ),
+    ]);
+
+  const consorciosMap = new Map<string, Consorcio>();
+  for (const row of consorciosResult.rows) {
+    consorciosMap.set(row.cuit, row);
+  }
+
+  const conceptosAdicionalesMap = new Map<
+    string,
+    { concepto: string; tipo: string; importe: number; es_porcentaje: boolean }[]
+  >();
+  for (const row of conceptosAdicionalesResult.rows) {
+    const arr = conceptosAdicionalesMap.get(row.consorcio_cuit) ?? [];
+    arr.push({
+      concepto: row.concepto,
+      tipo: row.tipo,
+      importe: row.importe,
+      es_porcentaje: row.es_porcentaje,
+    });
+    conceptosAdicionalesMap.set(row.consorcio_cuit, arr);
+  }
+
+  const prefetch: CalcularLiquidacionPrefetch = {
+    escalaRows: escalaRowsResult.rows,
+    parametrosCctRow: parametrosCctResult.rows[0] ?? null,
+    consorciosMap,
+    conceptosAdicionalesMap,
+  };
+
   // Process in batches of 5 to avoid exhausting the pg connection pool
   const BATCH_SIZE = 5;
   let ok = 0;
@@ -1513,7 +1613,7 @@ export async function calcularPeriodo(
   for (let i = 0; i < empleados.length; i += BATCH_SIZE) {
     const batch = empleados.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.allSettled(
-      batch.map((emp) => calcularLiquidacion(emp.id, periodo))
+      batch.map((emp) => calcularLiquidacion(emp.id, periodo, prefetch))
     );
     batchResults.forEach((r, j) => {
       const emp = batch[j];

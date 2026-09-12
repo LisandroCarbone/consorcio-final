@@ -377,26 +377,45 @@ async function regenerateCategory1Expenses(
   let fateryhTotal = 0;
   let seracarhTotal = 0;
 
+  // Batch-fetch novedades and conceptos_liquidacion for all liquidaciones in this
+  // batch instead of querying once per liquidación inside the loop (N+1 fix).
+  const empleadoIds = Array.from(new Set(obligationsLiqsRes.rows.map((l: any) => l.empleado_id)));
+  const liquidacionIds = obligationsLiqsRes.rows.map((l: any) => l.id);
+
+  const novedadesMap = new Map<number, number>();
+  if (empleadoIds.length > 0) {
+    const novRes = await client.query(`
+      SELECT empleado_id, dias_trabajados_suplente::numeric AS dias_trabajados_suplente
+      FROM app.novedades_sueldo
+      WHERE empleado_id = ANY($1) AND periodo = $2
+    `, [empleadoIds, usedPeriodStr]);
+    for (const row of novRes.rows) {
+      novedadesMap.set(row.empleado_id, Number(row.dias_trabajados_suplente));
+    }
+  }
+
+  const diffOsMap = new Map<number, number>();
+  if (liquidacionIds.length > 0) {
+    const diffOsRes = await client.query(`
+      SELECT DISTINCT ON (liquidacion_id) liquidacion_id, importe::numeric AS importe
+      FROM app.conceptos_liquidacion
+      WHERE liquidacion_id = ANY($1) AND (code = '5150' OR concepto LIKE '%Diferencia Obra Social%')
+      ORDER BY liquidacion_id, id
+    `, [liquidacionIds]);
+    for (const row of diffOsRes.rows) {
+      // Keep first match per liquidación, matching the original LIMIT 1 behavior
+      if (!diffOsMap.has(row.liquidacion_id)) {
+        diffOsMap.set(row.liquidacion_id, Number(row.importe));
+      }
+    }
+  }
+
   for (const liq of obligationsLiqsRes.rows) {
     const bruto = Number(liq.remuneracion_bruta || 0);
 
-    // Query novedades for this employee in the used period
-    const novRes = await client.query(`
-      SELECT dias_trabajados_suplente::numeric AS dias_trabajados_suplente
-      FROM app.novedades_sueldo
-      WHERE empleado_id = $1 AND periodo = $2
-      LIMIT 1
-    `, [liq.empleado_id, usedPeriodStr]);
-    const diasSuplente = novRes.rows.length > 0 ? Number(novRes.rows[0].dias_trabajados_suplente) : 30;
+    const diasSuplente = novedadesMap.has(liq.empleado_id) ? novedadesMap.get(liq.empleado_id)! : 30;
 
-    // Query concept '5150' or Difference OS Ley 26475 for this liquidación
-    const diffOsRes = await client.query(`
-      SELECT importe::numeric AS importe
-      FROM app.conceptos_liquidacion
-      WHERE liquidacion_id = $1 AND (code = '5150' OR concepto LIKE '%Diferencia Obra Social%')
-      LIMIT 1
-    `, [liq.id]);
-    const diffOsVal = diffOsRes.rows.length > 0 ? Number(diffOsRes.rows[0].importe) : 0;
+    const diffOsVal = diffOsMap.get(liq.id) ?? 0;
 
     // Calculate employer obligations
     const ob = calculateEmployerObligations(
