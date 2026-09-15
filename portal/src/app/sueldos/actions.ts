@@ -52,6 +52,8 @@ export interface NovedadesForm {
   anticipo: number;
   muerte: number;
   observaciones?: string;
+  fecha_inicio_reemplazo?: string;
+  fecha_fin_reemplazo?: string;
 }
 
 // ─── Empleados ────────────────────────────────────────────────────────────────
@@ -137,8 +139,8 @@ export async function upsertNovedades(data: NovedadesForm) {
         horas_extras_50, horas_extras_100, feriados_trabajados_hs,
         suplencia_100_hs, plus_vacaciones_dias, dias_no_trabajados,
         licencia_enfermedad, adicional_voluntario, embargo, anticipo,
-        muerte, observaciones)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        muerte, observaciones, fecha_inicio_reemplazo, fecha_fin_reemplazo)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
      ON CONFLICT (empleado_id, periodo)
      DO UPDATE SET
        dias_trabajados_suplente = EXCLUDED.dias_trabajados_suplente,
@@ -155,6 +157,8 @@ export async function upsertNovedades(data: NovedadesForm) {
        anticipo                 = EXCLUDED.anticipo,
        muerte                   = EXCLUDED.muerte,
        observaciones            = EXCLUDED.observaciones,
+       fecha_inicio_reemplazo   = EXCLUDED.fecha_inicio_reemplazo,
+       fecha_fin_reemplazo      = EXCLUDED.fecha_fin_reemplazo,
        updated_at               = now()`,
     [
       data.empleado_id, data.periodo, data.dias_trabajados_suplente,
@@ -162,6 +166,7 @@ export async function upsertNovedades(data: NovedadesForm) {
       data.feriados_trabajados_hs, data.suplencia_100_hs, data.plus_vacaciones_dias,
       data.dias_no_trabajados, data.licencia_enfermedad, data.adicional_voluntario,
       data.embargo, data.anticipo, data.muerte, data.observaciones ?? null,
+      data.fecha_inicio_reemplazo ?? null, data.fecha_fin_reemplazo ?? null,
     ]
   );
   revalidatePath("/sueldos/novedades");

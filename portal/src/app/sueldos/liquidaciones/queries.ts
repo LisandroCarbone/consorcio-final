@@ -24,6 +24,9 @@ export async function getLiquidacionDetalle(id: number) {
        n.horas_jornada::numeric AS novedad_horas_jornada,
        n.dias_trabajados_suplente::numeric AS novedad_dias_trabajados_suplente,
        n.suplencia_100_hs::numeric AS novedad_suplencia_100_hs,
+       n.observaciones AS novedad_observaciones,
+       n.fecha_inicio_reemplazo::text AS novedad_fecha_inicio_reemplazo,
+       n.fecha_fin_reemplazo::text AS novedad_fecha_fin_reemplazo,
        (SELECT p.fateryh_art19bis::numeric FROM app.parametros_cct p WHERE p.fecha_desde <= l.periodo ORDER BY p.fecha_desde DESC LIMIT 1) AS fateryh_art19bis,
        (SELECT p.sv_costo_fijo::numeric FROM app.parametros_cct p WHERE p.fecha_desde <= l.periodo ORDER BY p.fecha_desde DESC LIMIT 1) AS parametros_sv_costo_fijo
      FROM app.liquidaciones_sueldo l

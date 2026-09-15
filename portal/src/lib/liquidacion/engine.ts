@@ -517,8 +517,14 @@ export async function calcularLiquidacion(
 
   let clasifResiduos = 0;
   if (emp.clasificacion_residuos) {
+    if (cons.uf_retiro_residuos == null) {
+      throw new Error(
+        `El consorcio "${cons.nombre}" no tiene definida la cantidad de UF para residuos. ` +
+        `Cargue el dato en la ficha del consorcio antes de liquidar.`
+      );
+    }
     const base = adic("clasif_residuos", adicionales[clasifResKey] ?? 0);
-    const uf = cons.cant_uf ?? 0;
+    const uf = cons.uf_retiro_residuos;
     clasifResiduos =
       uf <= 25 ? base : base + (base / 3 / 25) * (uf - 25);
   }

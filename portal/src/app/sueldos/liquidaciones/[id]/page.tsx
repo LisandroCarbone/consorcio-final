@@ -123,7 +123,8 @@ export default async function ReciboPage({
       return { unidad, valorUnit: unitVal };
     }
     if (c.includes("clasificación de residuos") || c.includes("clasificacion")) {
-      return { unidad: "—", valorUnit: fmt(i) };
+      const uf = opts.ufRetiroResiduos ?? opts.cantUf ?? opts.totalUnidades;
+      return { unidad: uf ? `${uf} unidades` : "—", valorUnit: fmt(i) };
     }
     if (c.includes("vivienda")) {
       return { unidad: "—", valorUnit: fmt(i) };
@@ -623,14 +624,35 @@ export default async function ReciboPage({
         })()}
 
         {/* ══════════════════════════════════════════════════
+            BLOQUE 4b — OBSERVACIONES (suplentes eventuales)
+        ══════════════════════════════════════════════════ */}
+        {(liq.novedad_fecha_inicio_reemplazo || liq.novedad_observaciones) && (
+          <div className="border-2 border-gray-800 border-t-0 px-3 py-2 print:px-1 print:py-0.5 text-xs print:text-[7px] space-y-0.5">
+            {liq.novedad_fecha_inicio_reemplazo && (
+              <p className="text-gray-700">
+                <span className="font-semibold">Reemplazo: </span>
+                {new Date(liq.novedad_fecha_inicio_reemplazo).toLocaleDateString("es-AR", { timeZone: "UTC" })}
+                {liq.novedad_fecha_fin_reemplazo ? ` al ${new Date(liq.novedad_fecha_fin_reemplazo).toLocaleDateString("es-AR", { timeZone: "UTC" })}` : " (en curso)"}
+              </p>
+            )}
+            {liq.novedad_observaciones && (
+              <p className="text-gray-600">
+                <span className="font-semibold text-gray-700">Observaciones: </span>
+                {liq.novedad_observaciones}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════
             BLOQUE 5 — FIRMAS
         ══════════════════════════════════════════════════ */}
         <div className="border-2 border-gray-800 border-t-0 grid grid-cols-2 divide-x divide-gray-300 print:break-inside-avoid">
           {/* Firma empleador */}
           <div className="p-3 print:px-1 print:py-0.5 text-center">
-            <div className="h-16 print:h-10 flex items-end justify-center pb-1 print:pb-0">
+            <div className="h-20 print:h-14 flex items-end justify-center pb-1 print:pb-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/firma-empleador.png" alt="" className="print:!h-8" style={{ height: 60, maxWidth: 240, objectFit: "contain" }} />
+              <img src="/firma-empleador.png" alt="" className="print:!h-14" style={{ height: 80, maxWidth: 300, objectFit: "contain" }} />
             </div>
             <div className="border-t border-gray-400 pt-1 print:pt-0 text-xs print:text-[7px] print:leading-tight">
               <p className="font-semibold text-gray-800">{liq.consorcio_nombre}</p>
@@ -642,7 +664,7 @@ export default async function ReciboPage({
 
           {/* Firma empleado */}
           <div className="p-3 print:px-1 print:py-0.5 text-center">
-            <div className="h-16 print:h-10" />
+            <div className="h-20 print:h-14" />
             <div className="border-t border-gray-400 pt-1 print:pt-0 text-xs print:text-[7px] print:leading-tight">
               <p className="font-semibold text-gray-800">{liq.empleado_nombre}</p>
               <p className="text-gray-500">CUIL: {formatCuit(liq.cuil)}</p>

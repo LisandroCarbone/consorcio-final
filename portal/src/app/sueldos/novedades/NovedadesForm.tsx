@@ -48,6 +48,8 @@ export default function NovedadesForm({ empleado, periodo, novedades }: Props) {
         anticipo: n("anticipo"),
         muerte: n("muerte"),
         observaciones: fd.get("observaciones") as string | undefined,
+        fecha_inicio_reemplazo: (fd.get("fecha_inicio_reemplazo") as string) || undefined,
+        fecha_fin_reemplazo: (fd.get("fecha_fin_reemplazo") as string) || undefined,
       });
       setSaved(true);
       setOpen(false);
@@ -87,6 +89,14 @@ export default function NovedadesForm({ empleado, periodo, novedades }: Props) {
               <>
                 <Field label="Días trabajados" name="dias_trabajados_suplente" defaultValue={def("dias_trabajados_suplente")} step="0.5" max={31} />
                 <Field label="Hs por jornada (máx. 18 — Art. 7 inc. P)" name="horas_jornada" defaultValue={def("horas_jornada", 8)} step="0.5" max={18} />
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Inicio reemplazo</label>
+                  <input type="date" name="fecha_inicio_reemplazo" defaultValue={(novedades?.fecha_inicio_reemplazo as string) ?? ""} className="input w-full text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Fin reemplazo</label>
+                  <input type="date" name="fecha_fin_reemplazo" defaultValue={(novedades?.fecha_fin_reemplazo as string) ?? ""} className="input w-full text-sm" />
+                </div>
               </>
             )}
             <Field label="Hs extras 50%" name="horas_extras_50" defaultValue={def("horas_extras_50")} step="0.5" max={200} />
