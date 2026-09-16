@@ -551,7 +551,7 @@ export async function confirmarLiquidacion(liquidacionId: number) {
 export async function calcularLiquidacionesPeriodo(periodo: string) {
   const result = await calcularPeriodo(periodo);
   revalidatePath("/sueldos/liquidaciones");
-  logAudit("create", "liquidacion", null, { after: { periodo, ok: result.ok, errores: result.errores.length } });
+  logAudit("create", "liquidacion_periodo", periodo, { after: { ok: result.ok, errores: result.errores.length } });
   return result;
 }
 

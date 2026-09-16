@@ -326,6 +326,12 @@ export default async function SueldosPage() {
                 desc="Cálculo de indemnización y liquidación final."
                 icon={UserMinus}
               />
+              <QuickActionLink
+                href="/sueldos/lsd"
+                title="Libro de Sueldos Digital (LSD)"
+                desc="Exportar el TXT del Libro de Sueldos para ARCA."
+                icon={ShieldCheck}
+              />
             </div>
           </div>
 

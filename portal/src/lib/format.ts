@@ -15,7 +15,11 @@ export function formatPhone(v: string | null | undefined): string {
 
 export function formatCbu(v: string | null | undefined): string {
   if (!v) return "—";
-  return v.replace(/\D/g, "");
+  const d = v.replace(/\D/g, "");
+  if (d.length === 22) {
+    return `${d.slice(0, 4)} ${d.slice(4, 8)} ${d.slice(8, 12)} ${d.slice(12, 16)} ${d.slice(16, 20)} ${d.slice(20)}`;
+  }
+  return d;
 }
 
 export function formatMoney(n: number | string): string {
