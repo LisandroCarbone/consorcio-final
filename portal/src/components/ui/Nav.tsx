@@ -23,7 +23,7 @@ const sueldosSublinks = [
 ];
 
 const expensasSublinks = [
-  { href: "/expensas", label: "Expensas" },
+  { href: "/expensas", label: "Liquidación" },
   { href: "/expensas/conciliacion-bancaria", label: "Conciliación Bancaria" },
 ];
 

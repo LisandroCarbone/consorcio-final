@@ -203,8 +203,16 @@ export default async function ConsorcioDetailPage({ params }: Props) {
             <p className="mt-0.5 text-amber-700">
               Este consorcio tiene divisor de Coef. B configurado ({divisorB}), pero ninguna unidad
               tiene coeficiente B asignado (total = 0). Cualquier gasto extraordinario (B) se prorrateará
-              en $0 para todas las unidades. Verifique los coeficientes B de las unidades.
+              en $0 para todas las unidades. Verifique los coeficientes B de las unidades o limpie el divisor B.
             </p>
+            <form action={updateConsorcioField} className="mt-1">
+              <input type="hidden" name="cuit" value={id} />
+              <input type="hidden" name="field" value="divisor_b" />
+              <input type="hidden" name="value" value="" />
+              <button type="submit" className="text-amber-800 underline hover:text-amber-900 font-medium">
+                Limpiar divisor B
+              </button>
+            </form>
           </div>
         </div>
       )}

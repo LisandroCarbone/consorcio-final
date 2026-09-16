@@ -104,7 +104,7 @@ export function AddGastoForm({
       setSubmitError(null);
       try {
         const rawMonto = fd.get("monto") as string;
-        if (!rawMonto || isNaN(Number(rawMonto)) || Number(rawMonto) === 0) {
+        if (!rawMonto || isNaN(Number(rawMonto)) || Number(rawMonto) < 0) {
           setSubmitError("Ingrese un monto válido");
           return;
         }

@@ -382,7 +382,7 @@ export async function agregarPeriodoHistorial(formData: FormData) {
           saldo_anterior, intereses, deuda, expensas_b, s_asamblea, otros, gast_part)
        VALUES ($1, $2, 0, 0, $3, $3, $4, 0, 0, 0, 0, 0, 0, 0)
        ON CONFLICT (periodo_id, unidad_id) DO UPDATE SET
-         expensas_a = $3, total_mes = $3, su_pago = $4`,
+         expensas_a = $3, total_mes = $3, su_pago = $4, saldo_anterior = EXCLUDED.saldo_anterior`,
       [periodoId, unidad_id, expensas, pago]
     );
 

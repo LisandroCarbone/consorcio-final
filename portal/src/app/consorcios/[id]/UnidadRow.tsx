@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { UfNumeroCell } from "./UfNumeroCell";
+import { UfLabelCell } from "./UfLabelCell";
 import { InlineEditCell } from "./InlineEditCell";
 import { CbuToggle, CbuExpandRow } from "./CbuExpandRow";
 import { ReplacePropietarioButton, RemoveInquilinoButton } from "./OcupanteActions";
@@ -62,7 +63,9 @@ export function UnidadRow({
         <td className="td font-mono text-gray-500 text-sm text-center w-16 p-0">
           <UfNumeroCell id={id} consorcioCuit={consorcioCuit} defaultValue={uf_numero} />
         </td>
-        <td className="td font-medium">{uf}</td>
+        <td className="td font-medium p-0">
+          <UfLabelCell id={id} consorcioCuit={consorcioCuit} defaultValue={uf} />
+        </td>
         <td className="td text-gray-500 capitalize">{tipo}</td>
         <td className="td text-right font-mono text-sm">{parseFloat(coefA).toFixed(4)}</td>
         <td className="td text-right font-mono text-sm">{parseFloat(coefB).toFixed(4)}</td>

@@ -1,5 +1,18 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "if": "Write|Edit(.env*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo {\"decision\":\"block\",\"reason\":\"Env files are managed in Railway dashboard. Do not edit .env files directly.\"}",
+            "statusMessage": "Blocking .env edit..."
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Bash",
@@ -10,6 +23,18 @@
             "command": "cd \"C:/Users/Ignacio/OneDrive/Escritorio/Proyectaso/consorcio-final\" && railway redeploy --yes 2>/dev/null || true",
             "timeout": 120,
             "statusMessage": "Railway redeploy triggered..."
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "if": "Write|Edit(*.ts)|Write|Edit(*.tsx)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"C:/Users/Ignacio/OneDrive/Escritorio/Proyectaso/consorcio-final/portal\" && npx tsc --noEmit --pretty 2>&1 | tail -20 || true",
+            "timeout": 30,
+            "statusMessage": "Type-checking..."
           }
         ]
       }

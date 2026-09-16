@@ -48,6 +48,7 @@ const CONSORCIO_FIELD_MAP: Record<string, { column: string; kind: ConsorcioField
   pct_expensa_a: { column: "pct_expensa_a", kind: "percent" },
   tipo_expensas: { column: "tipo_expensas", kind: "text" },
   formato_cobro: { column: "formato_cobro", kind: "text" },
+  divisor_b: { column: "divisor_b", kind: "number" },
   fondo_obra_activo: { column: "fondo_obra_activo", kind: "boolean" },
   zona_desfavorable: { column: "zona_desfavorable", kind: "boolean" },
   tiene_cochera: { column: "tiene_cochera", kind: "boolean" },

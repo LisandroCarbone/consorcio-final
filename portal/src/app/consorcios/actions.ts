@@ -155,6 +155,15 @@ export async function updateUfNumero(formData: FormData) {
   revalidatePath(`/consorcios/${consorcio_cuit}`);
 }
 
+export async function updateUfLabel(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const uf = (formData.get("uf") as string ?? "").trim();
+  const consorcio_cuit = formData.get("consorcio_cuit") as string;
+  if (!uf) return;
+  await query("UPDATE app.unidades SET uf = $1 WHERE id = $2", [uf, id]);
+  revalidatePath(`/consorcios/${consorcio_cuit}`);
+}
+
 export async function createUnidad(formData: FormData) {
   const consorcio_cuit = formData.get("consorcio_cuit") as string;
   const uf_numero_raw = formData.get("uf_numero");

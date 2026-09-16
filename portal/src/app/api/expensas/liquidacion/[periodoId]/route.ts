@@ -331,7 +331,7 @@ export async function GET(
   // Show the B breakdown only when there are actual gastos B in the period
   // (totales.expensas_b !== 0). A unit merely having coef_b > 0 with no B
   // gastos would otherwise show a noisy all-zero B column.
-  const showB = totales.expensas_b !== 0 || gastos.some((g: { tipo: string }) => g.tipo === "B");
+  const showB = totales.expensas_b !== 0;
   const showFondoObra = totales.fondo_obra !== 0;
 
   const ufTableRows = ufRows.map(r => `
@@ -652,7 +652,8 @@ export async function GET(
     </tbody>
   </table>
 
-  <div class="section-title">Estado de Cuentas y Prorrateo de Gastos al ${formatDate(periodo.fecha_vencimiento)}</div>
+  <div class="section-title">ESTADO DE CUENTAS Y PRORRATEO DE GASTOS AL ${formatDate(periodo.fecha_vencimiento).toUpperCase()}</div>
+  <div style="text-align:center;font-size:11px;font-weight:700;margin-bottom:8px;">AVISO DE PAGO — FECHA DE VENCIMIENTO: ${formatDate(periodo.fecha_vencimiento)}</div>
   <table class="prorrateo-table">
     <thead>
       <tr>

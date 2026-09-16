@@ -301,7 +301,15 @@ export async function deletePeriodo(periodoId: number) {
      WHERE consorcio_cuit = $1 AND (anio > $2 OR (anio = $2 AND mes > $3)) LIMIT 1`,
     [periodo.consorcio_cuit, periodo.anio, periodo.mes]
   );
-  if (later.length > 0) throw new Error("Solo se puede eliminar el último período del consorcio.");
+  if (later.length > 0) {
+    const laterHasGastos = await query<{ cnt: string }>(
+      `SELECT COUNT(*)::text AS cnt FROM app.gastos_expensas ge
+       JOIN app.periodos_expensas pe ON pe.id = ge.periodo_id
+       WHERE pe.consorcio_cuit = $1 AND (pe.anio > $2 OR (pe.anio = $2 AND pe.mes > $3))`,
+      [periodo.consorcio_cuit, periodo.anio, periodo.mes]
+    );
+    if (Number(laterHasGastos[0]?.cnt) > 0) throw new Error("No se puede eliminar: existen períodos posteriores con gastos cargados.");
+  }
 
   const extractoIds = (await query<{ id: number }>(
     "SELECT id FROM app.extractos_bancarios WHERE periodo_id = $1", [periodoId]
