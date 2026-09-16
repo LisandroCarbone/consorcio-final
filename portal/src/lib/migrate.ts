@@ -128,8 +128,12 @@ export async function runMigrations(): Promise<void> {
       continue;
     }
 
-    const client = await pool.connect();
+    // `pool.connect()` itself can reject (for example while Railway is
+    // establishing the private Postgres connection). Keep that failure
+    // non-fatal too: this runner is deliberately best-effort at startup.
+    let client: import("pg").PoolClient | undefined;
     try {
+      client = await pool.connect();
       await client.query("BEGIN");
       await client.query(sql);
       await client.query(
@@ -138,10 +142,16 @@ export async function runMigrations(): Promise<void> {
       );
       await client.query("COMMIT");
     } catch (err) {
-      await client.query("ROLLBACK");
+      if (client) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackErr) {
+          console.error(`[migrate] Rollback for ${migration.name} failed:`, rollbackErr);
+        }
+      }
       console.error(`[migrate] Migration ${migration.name} failed (non-fatal):`, err);
     } finally {
-      client.release();
+      client?.release();
     }
   }
 }

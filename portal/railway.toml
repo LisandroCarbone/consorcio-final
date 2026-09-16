@@ -1,0 +1,13 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# This endpoint is intentionally unauthenticated and returns 2xx only once the
+# application can reach Postgres. These settings override stale dashboard
+# values for each deployment.
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+startCommand = "node server.js"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
