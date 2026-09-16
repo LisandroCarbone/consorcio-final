@@ -1,6 +1,7 @@
 "use server";
 
 import { pool } from "@/lib/db";
+import { revalidatePath } from "next/cache";
 
 const MESES: Record<string, string> = {
   enero: "01", febrero: "02", marzo: "03", abril: "04",
@@ -139,6 +140,7 @@ export async function scrapeEscalasSuterh(): Promise<{
       savedAdicionales++;
     }
 
+    revalidatePath("/sueldos/escalas");
     return { ok: true, savedEscalas, savedAdicionales, periodo };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
