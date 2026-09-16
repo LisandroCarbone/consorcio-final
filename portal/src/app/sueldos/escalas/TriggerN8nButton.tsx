@@ -1,28 +1,33 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { scrapeEscalasSuterh } from "./actions";
 
-export function TriggerN8nButton({ periodo }: { periodo: string }) {
+export function ActualizarEscalasButton() {
+  const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [message, setMessage] = useState<string>("");
 
   async function trigger() {
     setStatus("loading");
     try {
-      const res = await fetch("/api/sueldos/trigger-escalas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ periodo }),
-      });
-      setStatus(res.ok ? "ok" : "error");
-      if (res.ok) setTimeout(() => {
-        setStatus("idle");
-        const url = new URL(window.location.href);
-        if (periodo) url.searchParams.set('periodo', periodo);
-        url.searchParams.delete('periodo');
-        window.location.href = url.toString();
-      }, 3000);
-    } catch {
+      const result = await scrapeEscalasSuterh();
+      if (result.ok) {
+        setStatus("ok");
+        setMessage(`${result.savedEscalas ?? 0} escalas y ${result.savedAdicionales ?? 0} adicionales actualizados.`);
+        router.refresh();
+        setTimeout(() => {
+          setStatus("idle");
+          setMessage("");
+        }, 4000);
+      } else {
+        setStatus("error");
+        setMessage(result.error ?? "Error desconocido");
+      }
+    } catch (err) {
       setStatus("error");
+      setMessage(err instanceof Error ? err.message : "Error desconocido");
     }
   }
 
@@ -33,13 +38,13 @@ export function TriggerN8nButton({ periodo }: { periodo: string }) {
         disabled={status === "loading"}
         className="btn-primary text-sm"
       >
-        {status === "loading" ? "Actualizando…" : "Actualizar escalas desde n8n"}
+        {status === "loading" ? "Actualizando escalas..." : "Actualizar Escalas"}
       </button>
       {status === "ok" && (
-        <span className="text-xs text-green-600">Workflow ejecutado. Las escalas se actualizaron.</span>
+        <span className="text-xs text-green-600">{message}</span>
       )}
       {status === "error" && (
-        <span className="text-xs text-red-600">Error al ejecutar el workflow. Revisá n8n.</span>
+        <span className="text-xs text-red-600">Error: {message}</span>
       )}
     </div>
   );

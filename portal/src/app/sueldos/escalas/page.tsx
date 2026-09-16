@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { pool } from "@/lib/db";
 import { PeriodoSelect } from "./PeriodoSelect";
-import { TriggerN8nButton } from "./TriggerN8nButton";
+import { ActualizarEscalasButton } from "./TriggerN8nButton";
 import { cleanPeriodo } from "@/lib/format";
 import { cookies } from "next/headers";
 
@@ -58,7 +58,7 @@ export default async function EscalasPage({
           )}
         </div>
         <div className="flex items-center gap-3">
-          <TriggerN8nButton periodo={cleanedPeriodo ?? selected ?? ''} />
+          <ActualizarEscalasButton />
           <a
             href="https://suterh.org.ar/planillas-salariales/"
             target="_blank"
@@ -74,9 +74,7 @@ export default async function EscalasPage({
         <div className="card text-center py-12 text-gray-500">
           <p className="mb-2">No hay escalas cargadas todavía.</p>
           <p className="text-sm">
-            Se actualizan automáticamente el día 1 de cada mes vía el workflow de n8n.
-            <br />
-            Para cargar manualmente, activá el workflow "Actualizar Escalas SUTERH" en n8n.
+            Usá el botón "Actualizar Escalas" para traer los últimos valores publicados por SUTERH.
           </p>
         </div>
       ) : (
