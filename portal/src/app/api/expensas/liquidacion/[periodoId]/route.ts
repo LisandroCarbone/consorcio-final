@@ -227,9 +227,9 @@ export async function GET(
   let totalGastosA = 0;
   let totalGastosB = 0;
 
-  const categoriaSubtotals = [...gastosPorCategoria.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([categoria, items]) => {
+  const allCategorias = Object.keys(CATEGORIAS).map(Number).sort((a, b) => a - b);
+  const categoriaSubtotals = allCategorias.map(categoria => {
+      const items = gastosPorCategoria.get(categoria) ?? [];
       const itemsAB = items.filter(g => g.tipo !== "Particular");
       const subtotalA = itemsAB.reduce((s, g) => s + Math.round(Number(g.monto) * (Number(g.pct_a ?? 100) / 100) * 100) / 100, 0);
       const subtotalB = itemsAB.reduce((s, g) => s + Math.round(Number(g.monto) * (1 - Number(g.pct_a ?? 100) / 100) * 100) / 100, 0);
@@ -346,8 +346,7 @@ export async function GET(
       ${showB ? `<td class="r mono">${pct(r.coef_b)}</td><td class="r mono">${moneyCompact(r.expensas_b)}</td>` : ""}
       ${showFondoObra ? `<td class="r mono">${moneyCompact(r.fondo_obra)}</td>` : ""}
       <td class="r mono">${moneyCompact(r.total_mes)}</td>
-      <td class="r mono">${moneyCompact(r.deuda)}</td>
-      <td class="r mono">${Number(r.credito_aplicado) > 0 ? "-" + moneyCompact(r.credito_aplicado) : "—"}</td>
+      <td class="r mono">${moneyCompact(Number(r.deuda) - Number(r.credito_aplicado))}</td>
       <td class="r mono">${moneyCompact(r.intereses)}</td>
       <td class="r mono total-col">${moneyCompact(r.total_pagar)}</td>
     </tr>`).join("");
@@ -652,7 +651,7 @@ export async function GET(
     </tbody>
   </table>
 
-  <div class="section-title">ESTADO DE CUENTAS Y PRORRATEO DE GASTOS AL ${formatDate(periodo.fecha_vencimiento).toUpperCase()}</div>
+  <div class="section-title">ESTADO DE CUENTAS Y PRORRATEO DE GASTOS AL ${new Date(periodo.anio, periodo.mes, 0).toLocaleDateString("es-AR", { timeZone: "UTC" }).toUpperCase()}</div>
   <div style="text-align:center;font-size:11px;font-weight:700;margin-bottom:8px;">AVISO DE PAGO — FECHA DE VENCIMIENTO: ${formatDate(periodo.fecha_vencimiento)}</div>
   <table class="prorrateo-table">
     <thead>
@@ -668,13 +667,12 @@ export async function GET(
         ${showFondoObra ? '<th class="r">Fondo de Obra</th>' : ''}
         <th class="r">Total Mes</th>
         <th class="r">Deuda</th>
-        <th class="r">Crédito Aplicado</th>
         <th class="r">Intereses</th>
         <th class="r">Total</th>
       </tr>
     </thead>
     <tbody>
-      ${ufTableRows || `<tr><td colspan="${12 + (showB ? 2 : 0) + (showFondoObra ? 1 : 0)}">Sin unidades liquidadas</td></tr>`}
+      ${ufTableRows || `<tr><td colspan="${11 + (showB ? 2 : 0) + (showFondoObra ? 1 : 0)}">Sin unidades liquidadas</td></tr>`}
       <tr class="totales-row">
         <td colspan="3">TOTALES</td>
         <td class="r mono">${moneyCompact(totales.saldo_anterior)}</td>
@@ -684,8 +682,7 @@ export async function GET(
         ${showB ? `<td></td><td class="r mono">${moneyCompact(totales.expensas_b)}</td>` : ""}
         ${showFondoObra ? `<td class="r mono">${moneyCompact(totales.fondo_obra)}</td>` : ""}
         <td class="r mono">${moneyCompact(totales.total_mes)}</td>
-        <td class="r mono">${moneyCompact(totales.deuda)}</td>
-        <td class="r mono">${totales.credito_aplicado > 0 ? "-" + moneyCompact(totales.credito_aplicado) : "—"}</td>
+        <td class="r mono">${moneyCompact(totales.deuda - totales.credito_aplicado)}</td>
         <td class="r mono">${moneyCompact(totales.intereses)}</td>
         <td class="r mono">${moneyCompact(totales.total_pagar)}</td>
       </tr>
