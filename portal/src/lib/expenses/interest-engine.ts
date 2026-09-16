@@ -215,8 +215,8 @@ export function revertirImputacion(
     const imp = porDeuda.get(deuda.id);
     if (!imp) return deuda;
 
-    const montoCapitalPendiente = round2(deuda.montoCapitalPendiente + imp.montoACapital);
-    const montoInteresesPendiente = round2(deuda.montoInteresesPendiente + imp.montoAInteres);
+    const montoCapitalPendiente = Math.max(0, round2(deuda.montoCapitalPendiente + imp.montoACapital));
+    const montoInteresesPendiente = Math.max(0, round2(deuda.montoInteresesPendiente + imp.montoAInteres));
     const montoInteresesAcumulado = round2(deuda.montoInteresesAcumulado); // unchanged; accrual is independent of imputation
 
     return {
@@ -261,8 +261,8 @@ export function reimputarTodosPagos(
     deudas = deudas.map(d => {
       const imp = porDeuda.get(d.id);
       if (!imp) return d;
-      const montoCapitalPendiente = round2(d.montoCapitalPendiente - imp.montoACapital);
-      const montoInteresesPendiente = round2(d.montoInteresesPendiente - imp.montoAInteres);
+      const montoCapitalPendiente = Math.max(0, round2(d.montoCapitalPendiente - imp.montoACapital));
+      const montoInteresesPendiente = Math.max(0, round2(d.montoInteresesPendiente - imp.montoAInteres));
       return {
         ...d,
         montoCapitalPendiente,
