@@ -159,12 +159,16 @@ async function _runCalculateExpenses(
     formato_cobro: string;
     fondo_obra: number;
     fondo_obra_activo: boolean;
+    cuota_extra: number;
+    cuota_extra_activo: boolean;
   }>(
     `SELECT cuit, divisor_a, divisor_b, interest_rate, tipo_expensas,
             COALESCE(pct_expensa_a, 1)::numeric AS pct_expensa_a,
             COALESCE(formato_cobro, 'exacto') AS formato_cobro,
             CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='consorcios' AND column_name='fondo_obra') THEN COALESCE(fondo_obra, 0)::numeric ELSE 0 END AS fondo_obra,
-            CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='consorcios' AND column_name='fondo_obra_activo') THEN COALESCE(fondo_obra_activo, false) ELSE false END AS fondo_obra_activo
+            CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='consorcios' AND column_name='fondo_obra_activo') THEN COALESCE(fondo_obra_activo, false) ELSE false END AS fondo_obra_activo,
+            COALESCE(cuota_extra, 0)::numeric AS cuota_extra,
+            COALESCE(cuota_extra_activo, false) AS cuota_extra_activo
      FROM app.consorcios WHERE cuit = $1`,
     [cuit]
   );
@@ -413,6 +417,7 @@ async function _runCalculateExpenses(
 
   // 9. Calculate prorrateo for each unit and save to res_cuenta_periodo
   const fondoObraTotal = consorcio.fondo_obra_activo ? Number(consorcio.fondo_obra || 0) : 0;
+  const cuotaExtraTotal = consorcio.cuota_extra_activo ? Number(consorcio.cuota_extra || 0) : 0;
 
   for (const u of units) {
     const expensasA = round2(totalProrrateoA * Number(u.coef_a) / divisorA) + (isFija ? 0 : round2(unitAMap.get(u.id) || 0));
@@ -421,6 +426,7 @@ async function _runCalculateExpenses(
     // F3: Fondo de obra — fixed total amount prorated by the unit's Coef. A,
     // stored as a separate line item (not folded into expensas_a).
     const fondoObra = fondoObraTotal > 0 ? round2(fondoObraTotal * Number(u.coef_a) / divisorA) : 0;
+    const cuotaExtra = cuotaExtraTotal > 0 ? round2(cuotaExtraTotal * Number(u.coef_a) / divisorA) : 0;
 
     const exist = existingMap.get(u.id);
     const sAsamblea = exist ? Number(exist.s_asamblea || 0) : 0;
@@ -545,12 +551,14 @@ async function _runCalculateExpenses(
 
     const deuda = round2(saldoAnterior - suPago);
 
-    const totalMes = round2(expensasA + expensasB + sAsamblea + otros + gastPart + fondoObra);
+    const totalMes = round2(expensasA + expensasB + sAsamblea + otros + gastPart + fondoObra + cuotaExtra);
     let totalPagar = round2(totalMes + deuda + intereses);
 
     if (consorcio.formato_cobro === 'identificacion_uf' && u.uf_numero && totalPagar > 0) {
       const ufNum = u.uf_numero % 100;
       totalPagar = Math.floor(totalPagar) + ufNum / 100;
+    } else if (consorcio.formato_cobro === 'exacto') {
+      totalPagar = Math.round(totalPagar);
     }
 
     // F4 — Compensación automática de crédito en cuenta corriente: any
@@ -632,8 +640,8 @@ async function _runCalculateExpenses(
     await query(
       `INSERT INTO app.res_cuenta_periodo
          (periodo_id, unidad_id, coef_a, coef_b, saldo_anterior, su_pago,
-          expensas_a, expensas_b, s_asamblea, otros, gast_part, fondo_obra, deuda, intereses, total_mes, total_pagar, estado, credito_aplicado)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+          expensas_a, expensas_b, s_asamblea, otros, gast_part, fondo_obra, cuota_extra, deuda, intereses, total_mes, total_pagar, estado, credito_aplicado)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        ON CONFLICT (periodo_id, unidad_id) DO UPDATE SET
          coef_a = EXCLUDED.coef_a,
          coef_b = EXCLUDED.coef_b,
@@ -645,6 +653,7 @@ async function _runCalculateExpenses(
          otros = EXCLUDED.otros,
          gast_part = EXCLUDED.gast_part,
          fondo_obra = EXCLUDED.fondo_obra,
+         cuota_extra = EXCLUDED.cuota_extra,
          deuda = EXCLUDED.deuda,
          intereses = EXCLUDED.intereses,
          total_mes = EXCLUDED.total_mes,
@@ -654,7 +663,7 @@ async function _runCalculateExpenses(
          updated_at = now()`,
       [
         periodoId, u.id, u.coef_a, u.coef_b, saldoAnterior, suPago,
-        expensasA, expensasB, sAsamblea, otros, gastPart, fondoObra, deuda, intereses, totalMes, totalPagar, estado, creditoAplicado
+        expensasA, expensasB, sAsamblea, otros, gastPart, fondoObra, cuotaExtra, deuda, intereses, totalMes, totalPagar, estado, creditoAplicado
       ]
     );
 

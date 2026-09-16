@@ -110,6 +110,7 @@ type UfRow = {
   coef_b: string;
   expensas_b: string;
   fondo_obra: string;
+  cuota_extra: string;
   total_mes: string;
   deuda: string;
   intereses: string;
@@ -182,6 +183,7 @@ export async function GET(
               rcp.coef_a::numeric, rcp.expensas_a::numeric,
               rcp.coef_b::numeric, rcp.expensas_b::numeric,
               CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='res_cuenta_periodo' AND column_name='fondo_obra') THEN COALESCE(rcp.fondo_obra, 0)::numeric ELSE 0 END AS fondo_obra,
+              COALESCE(rcp.cuota_extra, 0)::numeric AS cuota_extra,
               rcp.total_mes::numeric, rcp.deuda::numeric, rcp.intereses::numeric,
               CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='app' AND table_name='res_cuenta_periodo' AND column_name='credito_aplicado') THEN COALESCE(rcp.credito_aplicado, 0)::numeric ELSE 0 END AS credito_aplicado,
               rcp.total_pagar::numeric
@@ -319,13 +321,14 @@ export async function GET(
       expensas_a: acc.expensas_a + Number(r.expensas_a),
       expensas_b: acc.expensas_b + Number(r.expensas_b),
       fondo_obra: acc.fondo_obra + Number(r.fondo_obra),
+      cuota_extra: acc.cuota_extra + Number(r.cuota_extra),
       total_mes: acc.total_mes + Number(r.total_mes),
       deuda: acc.deuda + Number(r.deuda),
       intereses: acc.intereses + Number(r.intereses),
       credito_aplicado: acc.credito_aplicado + Number(r.credito_aplicado),
       total_pagar: acc.total_pagar + Number(r.total_pagar),
     }),
-    { saldo_anterior: 0, su_pago: 0, expensas_a: 0, expensas_b: 0, fondo_obra: 0, total_mes: 0, deuda: 0, intereses: 0, credito_aplicado: 0, total_pagar: 0 }
+    { saldo_anterior: 0, su_pago: 0, expensas_a: 0, expensas_b: 0, fondo_obra: 0, cuota_extra: 0, total_mes: 0, deuda: 0, intereses: 0, credito_aplicado: 0, total_pagar: 0 }
   );
 
   // Show the B breakdown only when there are actual gastos B in the period
@@ -333,6 +336,7 @@ export async function GET(
   // gastos would otherwise show a noisy all-zero B column.
   const showB = totales.expensas_b !== 0;
   const showFondoObra = totales.fondo_obra !== 0;
+  const showCuotaExtra = totales.cuota_extra !== 0;
 
   const ufTableRows = ufRows.map(r => `
     <tr>
@@ -345,6 +349,7 @@ export async function GET(
       <td class="r mono">${moneyCompact(r.expensas_a)}</td>
       ${showB ? `<td class="r mono">${pct(r.coef_b)}</td><td class="r mono">${moneyCompact(r.expensas_b)}</td>` : ""}
       ${showFondoObra ? `<td class="r mono">${moneyCompact(r.fondo_obra)}</td>` : ""}
+      ${showCuotaExtra ? `<td class="r mono">${moneyCompact(r.cuota_extra)}</td>` : ""}
       <td class="r mono">${moneyCompact(r.total_mes)}</td>
       <td class="r mono">${moneyCompact(Number(r.deuda) - Number(r.credito_aplicado))}</td>
       <td class="r mono">${moneyCompact(r.intereses)}</td>
@@ -665,6 +670,7 @@ export async function GET(
         <th class="r">Exp. A</th>
         ${showB ? '<th class="r">% B</th><th class="r">Exp. B</th>' : ''}
         ${showFondoObra ? '<th class="r">Fondo de Obra</th>' : ''}
+        ${showCuotaExtra ? '<th class="r">Cuota Extra</th>' : ''}
         <th class="r">Total Mes</th>
         <th class="r">Deuda</th>
         <th class="r">Intereses</th>
@@ -672,7 +678,7 @@ export async function GET(
       </tr>
     </thead>
     <tbody>
-      ${ufTableRows || `<tr><td colspan="${11 + (showB ? 2 : 0) + (showFondoObra ? 1 : 0)}">Sin unidades liquidadas</td></tr>`}
+      ${ufTableRows || `<tr><td colspan="${11 + (showB ? 2 : 0) + (showFondoObra ? 1 : 0) + (showCuotaExtra ? 1 : 0)}">Sin unidades liquidadas</td></tr>`}
       <tr class="totales-row">
         <td colspan="3">TOTALES</td>
         <td class="r mono">${moneyCompact(totales.saldo_anterior)}</td>
@@ -681,6 +687,7 @@ export async function GET(
         <td class="r mono">${moneyCompact(totales.expensas_a)}</td>
         ${showB ? `<td></td><td class="r mono">${moneyCompact(totales.expensas_b)}</td>` : ""}
         ${showFondoObra ? `<td class="r mono">${moneyCompact(totales.fondo_obra)}</td>` : ""}
+        ${showCuotaExtra ? `<td class="r mono">${moneyCompact(totales.cuota_extra)}</td>` : ""}
         <td class="r mono">${moneyCompact(totales.total_mes)}</td>
         <td class="r mono">${moneyCompact(totales.deuda - totales.credito_aplicado)}</td>
         <td class="r mono">${moneyCompact(totales.intereses)}</td>

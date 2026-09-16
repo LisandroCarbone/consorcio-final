@@ -50,6 +50,8 @@ const CONSORCIO_FIELD_MAP: Record<string, { column: string; kind: ConsorcioField
   formato_cobro: { column: "formato_cobro", kind: "text" },
   divisor_b: { column: "divisor_b", kind: "number" },
   fondo_obra_activo: { column: "fondo_obra_activo", kind: "boolean" },
+  cuota_extra_activo: { column: "cuota_extra_activo", kind: "boolean" },
+  cuota_extra: { column: "cuota_extra", kind: "number" },
   zona_desfavorable: { column: "zona_desfavorable", kind: "boolean" },
   tiene_cochera: { column: "tiene_cochera", kind: "boolean" },
   tiene_ascensor: { column: "tiene_ascensor", kind: "boolean" },

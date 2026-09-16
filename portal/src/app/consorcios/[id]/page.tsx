@@ -71,6 +71,8 @@ interface ConsorcioDetalle {
   pct_expensa_a: string;
   fondo_obra: string | null;
   fondo_obra_activo: boolean;
+  cuota_extra: string | null;
+  cuota_extra_activo: boolean;
   divisor_b: string | null;
 }
 
@@ -381,6 +383,22 @@ export default async function ConsorcioDetailPage({ params }: Props) {
               <div>
                 <label className="label">Monto total fondo de obra</label>
                 {inlineField("fondo_obra", consorcio.fondo_obra ? Number(consorcio.fondo_obra) : null, { type: "number", step: "0.01" })}
+                <p className="text-xs text-gray-400 mt-0.5">Se prorratea por Coef. A de cada unidad</p>
+              </div>
+            )}
+            <div className="flex items-end pb-1">
+              <ConsorcioToggleField
+                cuit={id}
+                field="cuota_extra_activo"
+                label="Cuota extraordinaria activa"
+                defaultChecked={consorcio.cuota_extra_activo}
+                action={updateConsorcioField}
+              />
+            </div>
+            {consorcio.cuota_extra_activo && (
+              <div>
+                <label className="label">Monto total cuota extraordinaria</label>
+                {inlineField("cuota_extra", consorcio.cuota_extra ? Number(consorcio.cuota_extra) : null, { type: "number", step: "0.01" })}
                 <p className="text-xs text-gray-400 mt-0.5">Se prorratea por Coef. A de cada unidad</p>
               </div>
             )}

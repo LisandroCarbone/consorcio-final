@@ -47,6 +47,10 @@ function formToConsorcio(formData: FormData) {
     fondo_obra: formData.get("fondo_obra")
       ? Number(formData.get("fondo_obra"))
       : 0,
+    cuota_extra_activo: bool("cuota_extra_activo"),
+    cuota_extra: formData.get("cuota_extra")
+      ? Number(formData.get("cuota_extra"))
+      : 0,
   };
 }
 
@@ -62,8 +66,8 @@ export async function createConsorcio(formData: FormData) {
         tiene_grupo_electrogeno, tiene_seguridad_centralizada,
         tiene_compactador, tiene_montacargas, tiene_otros_servicios_centrales,
         interest_rate, tipo_expensas, monto_fijo_default, pct_expensa_a, formato_cobro,
-        fondo_obra_activo, fondo_obra)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)`,
+        fondo_obra_activo, fondo_obra, cuota_extra_activo, cuota_extra)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)`,
     [d.nombre, d.direccion, d.cuit, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.uf_retiro_residuos, d.categoria_edificio, d.banco,
      d.tiene_cochera, d.tiene_movimiento_coches, d.tiene_jardin, d.zona_desfavorable,
@@ -72,7 +76,7 @@ export async function createConsorcio(formData: FormData) {
      d.tiene_grupo_electrogeno, d.tiene_seguridad_centralizada,
      d.tiene_compactador, d.tiene_montacargas, d.tiene_otros_servicios_centrales,
      d.intereses_mora_pct, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro,
-     d.fondo_obra_activo, d.fondo_obra]
+     d.fondo_obra_activo, d.fondo_obra, d.cuota_extra_activo, d.cuota_extra]
   );
   revalidatePath("/consorcios");
 }
@@ -93,7 +97,8 @@ export async function updateConsorcio(formData: FormData) {
        tiene_otros_servicios_centrales = $23, interest_rate = $24,
        clave_suterh = $25, tipo_expensas = $26,
        monto_fijo_default = $27, pct_expensa_a = $28, formato_cobro = $29,
-       fondo_obra_activo = $31, fondo_obra = $32
+       fondo_obra_activo = $31, fondo_obra = $32,
+       cuota_extra_activo = $33, cuota_extra = $34
      WHERE cuit = $30`,
     [d.nombre, d.direccion, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.uf_retiro_residuos, d.categoria_edificio, d.banco,
@@ -105,7 +110,7 @@ export async function updateConsorcio(formData: FormData) {
      d.tiene_compactador, d.tiene_montacargas,
      d.tiene_otros_servicios_centrales, d.intereses_mora_pct,
      d.clave_suterh, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro, cuit,
-     d.fondo_obra_activo, d.fondo_obra]
+     d.fondo_obra_activo, d.fondo_obra, d.cuota_extra_activo, d.cuota_extra]
   );
   revalidatePath("/consorcios");
   revalidatePath(`/consorcios/${cuit}`);
@@ -128,7 +133,8 @@ export async function updateConsorcioNoRedirect(formData: FormData) {
        tiene_otros_servicios_centrales = $23, interest_rate = $24,
        clave_suterh = $25, tipo_expensas = $26,
        monto_fijo_default = $27, pct_expensa_a = $28, formato_cobro = $29,
-       fondo_obra_activo = $31, fondo_obra = $32
+       fondo_obra_activo = $31, fondo_obra = $32,
+       cuota_extra_activo = $33, cuota_extra = $34
      WHERE cuit = $30`,
     [d.nombre, d.direccion, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.uf_retiro_residuos, d.categoria_edificio, d.banco,
@@ -140,7 +146,7 @@ export async function updateConsorcioNoRedirect(formData: FormData) {
      d.tiene_compactador, d.tiene_montacargas,
      d.tiene_otros_servicios_centrales, d.intereses_mora_pct,
      d.clave_suterh, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro, cuit,
-     d.fondo_obra_activo, d.fondo_obra]
+     d.fondo_obra_activo, d.fondo_obra, d.cuota_extra_activo, d.cuota_extra]
   );
   revalidatePath("/consorcios");
   revalidatePath(`/consorcios/${cuit}`);
