@@ -9,7 +9,7 @@ function revalidateDetail(consorcio_cuit: string) {
 
 // ---- Phase 2: Inline contact editing ----
 
-const EDITABLE_PERSONA_FIELDS = new Set(["nombre", "apellido", "dni", "email", "whatsapp"]);
+const EDITABLE_PERSONA_FIELDS = new Set(["nombre", "apellido", "dni", "email", "email_2", "whatsapp"]);
 
 export async function updatePersonaField(formData: FormData) {
   const persona_id = Number(formData.get("persona_id"));

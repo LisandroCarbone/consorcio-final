@@ -20,6 +20,7 @@ interface Propietario {
   apellido: string | null;
   dni: string | null;
   email: string | null;
+  email_2: string | null;
   whatsapp: string | null;
 }
 
@@ -86,7 +87,7 @@ async function getData(cuit: string) {
       id: number; uf: string; uf_numero: number | null; coef_a: string; coef_b: string; tipo: string;
       propietarios: Propietario[] | null;
       inquilino_ocupante_id: number | null; inquilino_persona_id: number | null;
-      inquilino_nombre: string | null; inquilino_apellido: string | null;
+      inquilino_nombre: string | null; inquilino_apellido: string | null; inquilino_email_2: string | null;
       inquilino_email: string | null; inquilino_whatsapp: string | null;
       cbu_entries: CbuEntry[] | null;
     }>(
@@ -99,6 +100,7 @@ async function getData(cuit: string) {
                     'apellido', prop.apellido,
                     'dni', prop.dni,
                     'email', prop.email,
+                    'email_2', prop.email_2,
                     'whatsapp', prop.whatsapp
                   ) ORDER BY o_prop.id)
                  FROM app.ocupantes o_prop
@@ -111,6 +113,7 @@ async function getData(cuit: string) {
               inq.nombre AS inquilino_nombre,
               inq.apellido AS inquilino_apellido,
               inq.email AS inquilino_email,
+              inq.email_2 AS inquilino_email_2,
               inq.whatsapp AS inquilino_whatsapp,
               COALESCE(
                 (SELECT json_agg(json_build_object(
@@ -452,6 +455,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                           nombre: u.inquilino_nombre,
                           apellido: u.inquilino_apellido,
                           email: u.inquilino_email,
+                          email_2: u.inquilino_email_2,
                           whatsapp: u.inquilino_whatsapp,
                         }
                       : null

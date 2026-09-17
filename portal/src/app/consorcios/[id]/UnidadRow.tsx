@@ -15,6 +15,7 @@ interface Propietario {
   apellido: string | null;
   dni: string | null;
   email: string | null;
+  email_2: string | null;
   whatsapp: string | null;
 }
 
@@ -24,6 +25,7 @@ interface Inquilino {
   nombre: string | null;
   apellido: string | null;
   email: string | null;
+  email_2: string | null;
   whatsapp: string | null;
 }
 
@@ -110,16 +112,26 @@ export function UnidadRow({
         </td>
         <td className="td text-xs text-gray-600 font-mono">
           {propietarios.map((p) => (
-            <InlineEditCell
-              key={p.ocupante_id}
-              entityId={p.persona_id}
-              field="email"
-              defaultValue={p.email}
-              type="email"
-              action={updatePersonaField}
-              consorcioCuit={consorcioCuit}
-              className="w-full bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-xs font-mono"
-            />
+            <div key={p.ocupante_id}>
+              <InlineEditCell
+                entityId={p.persona_id}
+                field="email"
+                defaultValue={p.email}
+                type="email"
+                action={updatePersonaField}
+                consorcioCuit={consorcioCuit}
+                className="w-full bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-xs font-mono"
+              />
+              <InlineEditCell
+                entityId={p.persona_id}
+                field="email_2"
+                defaultValue={p.email_2}
+                type="email"
+                action={updatePersonaField}
+                consorcioCuit={consorcioCuit}
+                className="w-full bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-xs font-mono text-gray-400"
+              />
+            </div>
           ))}
         </td>
         <td className="td text-xs text-gray-600 font-mono">
@@ -162,15 +174,26 @@ export function UnidadRow({
         </td>
         <td className="td text-xs text-gray-600 font-mono">
           {inquilino ? (
-            <InlineEditCell
-              entityId={inquilino.persona_id}
-              field="email"
-              defaultValue={inquilino.email}
-              type="email"
-              action={updatePersonaField}
-              consorcioCuit={consorcioCuit}
-              className="w-full bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-xs font-mono"
-            />
+            <>
+              <InlineEditCell
+                entityId={inquilino.persona_id}
+                field="email"
+                defaultValue={inquilino.email}
+                type="email"
+                action={updatePersonaField}
+                consorcioCuit={consorcioCuit}
+                className="w-full bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-xs font-mono"
+              />
+              <InlineEditCell
+                entityId={inquilino.persona_id}
+                field="email_2"
+                defaultValue={inquilino.email_2}
+                type="email"
+                action={updatePersonaField}
+                consorcioCuit={consorcioCuit}
+                className="w-full bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 px-1 py-0.5 text-xs font-mono text-gray-400"
+              />
+            </>
           ) : (
             "—"
           )}
