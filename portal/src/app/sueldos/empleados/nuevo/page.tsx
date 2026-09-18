@@ -19,6 +19,7 @@ interface EmpleadoAnterior {
   cuil: string;
   nombre: string;
   legajo: string | null;
+  fecha_nacimiento: string | null;
   cbu: string | null;
   banco: string | null;
   obra_social: string | null;
@@ -26,12 +27,18 @@ interface EmpleadoAnterior {
   email: string | null;
   whatsapp: string | null;
   consorcio_cuit: string;
+  categoria_edificio: number | null;
+  funcion: string | null;
+  jornada: string | null;
+  tiene_vivienda: boolean;
   [key: string]: unknown;
 }
 
 async function getEmpleadoAnterior(id: number): Promise<EmpleadoAnterior | null> {
   return queryOne<EmpleadoAnterior>(
-    `SELECT cuil, nombre, legajo, cbu, banco, obra_social, cod_obra_social, email, whatsapp, consorcio_cuit
+    `SELECT cuil, TRIM(nombre) as nombre, legajo, fecha_nacimiento::text, cbu, banco,
+            obra_social, cod_obra_social, email, whatsapp, consorcio_cuit,
+            categoria_edificio, funcion, jornada, tiene_vivienda
      FROM app.empleados WHERE id = $1`,
     [id]
   );
@@ -146,7 +153,7 @@ export default async function NuevoEmpleadoPage({
             </div>
             <div>
               <label className="label">Fecha de nacimiento</label>
-              <input name="fecha_nacimiento" type="date" className="input" />
+              <input name="fecha_nacimiento" type="date" className="input" defaultValue={anterior?.fecha_nacimiento?.slice(0, 10) ?? undefined} />
             </div>
             <div>
               <label className="label">Fecha de ingreso *</label>
@@ -192,14 +199,14 @@ export default async function NuevoEmpleadoPage({
                 Función *
                 {anterior && <span className="text-amber-600 font-normal ml-1">(verificar)</span>}
               </label>
-              <select name="funcion" required className="input" defaultValue={anterior ? "Suplente eventual" : ""}>
+              <select name="funcion" required className="input" defaultValue={anterior?.funcion ?? ""}>
                 <option value="">— seleccionar —</option>
                 {FUNCIONES.map((f) => <option key={f}>{f}</option>)}
               </select>
             </div>
             <div>
               <label className="label">Categoría edificio *</label>
-              <select name="categoria_edificio" required className="input">
+              <select name="categoria_edificio" required className="input" defaultValue={anterior?.categoria_edificio?.toString() ?? "1"}>
                 <option value="1">1° Cat.</option>
                 <option value="2">2° Cat.</option>
                 <option value="3">3° Cat.</option>
@@ -208,7 +215,7 @@ export default async function NuevoEmpleadoPage({
             </div>
             <div>
               <label className="label">Jornada *</label>
-              <select name="jornada" required className="input" defaultValue={anterior ? "Suplente" : undefined}>
+              <select name="jornada" required className="input" defaultValue={anterior?.jornada ?? "Completa"}>
                 <option>Completa</option>
                 <option>Media</option>
                 <option>Suplente</option>
@@ -216,7 +223,7 @@ export default async function NuevoEmpleadoPage({
             </div>
             <div>
               <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mt-6">
-                <input type="checkbox" name="tiene_vivienda" value="true" className="rounded" />
+                <input type="checkbox" name="tiene_vivienda" value="true" className="rounded" defaultChecked={anterior?.tiene_vivienda ?? false} />
                 Con vivienda
               </label>
             </div>
