@@ -28,6 +28,34 @@ export async function updatePersonaField(formData: FormData) {
   revalidateDetail(consorcio_cuit);
 }
 
+// ---- Phase 2c: Inline unidad-level field editing ----
+
+const EDITABLE_UNIDAD_FIELDS = new Set(["tipo", "coef_a", "coef_b"]);
+
+export async function updateUnidadField(formData: FormData) {
+  const unidad_id = Number(formData.get("unidad_id"));
+  const field = formData.get("field") as string;
+  const rawValue = ((formData.get("value") as string) ?? "").trim();
+  const consorcio_cuit = formData.get("consorcio_cuit") as string;
+
+  if (!EDITABLE_UNIDAD_FIELDS.has(field)) {
+    throw new Error(`Field "${field}" is not editable`);
+  }
+
+  let value: string | number | null;
+  if (field === "coef_a" || field === "coef_b") {
+    if (rawValue === "") throw new Error(`Field "${field}" cannot be empty`);
+    const n = Number(rawValue);
+    if (isNaN(n) || n < 0) throw new Error(`Invalid value for field "${field}"`);
+    value = n;
+  } else {
+    value = rawValue || null;
+  }
+
+  await query(`UPDATE app.unidades SET ${field} = $1 WHERE id = $2`, [value, unidad_id]);
+  revalidateDetail(consorcio_cuit);
+}
+
 // ---- Phase 2b: Inline consorcio-level field editing ----
 
 type ConsorcioFieldKind = "text" | "number" | "percent" | "boolean";
@@ -67,6 +95,8 @@ const CONSORCIO_FIELD_MAP: Record<string, { column: string; kind: ConsorcioField
   tiene_movimiento_coches: { column: "tiene_movimiento_coches", kind: "boolean" },
   tiene_jardin: { column: "tiene_jardin", kind: "boolean" },
   tiene_otros_servicios_centrales: { column: "tiene_otros_servicios_centrales", kind: "boolean" },
+  tiene_incendio: { column: "tiene_incendio", kind: "boolean" },
+  cant_ascensores: { column: "cant_ascensores", kind: "number" },
 };
 
 export async function updateConsorcioField(formData: FormData) {

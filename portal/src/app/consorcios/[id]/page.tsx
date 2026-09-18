@@ -49,6 +49,8 @@ interface ConsorcioDetalle {
   cant_uf: number | null;
   uf_retiro_residuos: number | null;
   categoria_edificio: string | null;
+  cant_ascensores: number | null;
+  tiene_incendio: boolean;
   banco: string | null;
   tiene_cochera: boolean;
   tiene_movimiento_coches: boolean;
@@ -167,6 +169,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
     { field: "tiene_compactador", label: "Compactador", checked: consorcio.tiene_compactador },
     { field: "tiene_montacargas", label: "Montacargas", checked: consorcio.tiene_montacargas },
     { field: "tiene_otros_servicios_centrales", label: "Otros servicios centrales", checked: consorcio.tiene_otros_servicios_centrales },
+    { field: "tiene_incendio", label: "Instalaciones fijas contra incendio", checked: consorcio.tiene_incendio },
   ];
 
   const inlineField = (
@@ -274,23 +277,6 @@ export default async function ConsorcioDetailPage({ params }: Props) {
           <div className="p-5 space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="label">Categoría edificio</label>
-                <ConsorcioSelectField
-                  cuit={id}
-                  field="categoria_edificio"
-                  defaultValue={consorcio.categoria_edificio ?? ""}
-                  action={updateConsorcioField}
-                  options={[
-                    { value: "", label: "— seleccionar —" },
-                    { value: "1° Cat.", label: "1° Cat." },
-                    { value: "2° Cat.", label: "2° Cat." },
-                    { value: "3° Cat.", label: "3° Cat." },
-                    { value: "4° Cat.", label: "4° Cat." },
-                  ]}
-                />
-                <p className="text-xs text-gray-400 mt-0.5">Según Art. 6 CCT 589/10</p>
-              </div>
-              <div>
                 <label className="label">Cantidad de UF</label>
                 {inlineField("cant_uf", consorcio.cant_uf, { type: "number" })}
               </div>
@@ -300,18 +286,24 @@ export default async function ConsorcioDetailPage({ params }: Props) {
               </div>
             </div>
             <div className="border-t border-gray-100 pt-4">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Servicios centrales</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Servicios centrales y partes comunes</p>
               <p className="text-xs text-gray-400 mb-3">Art. 6 CCT 589/10 — determinan la categoría del edificio</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {SERVICIOS_CENTRALES.map((f) => (
-                  <ConsorcioToggleField
-                    key={f.field}
-                    cuit={id}
-                    field={f.field}
-                    label={f.label}
-                    defaultChecked={f.checked}
-                    action={updateConsorcioField}
-                  />
+                  <div key={f.field} className="flex items-center gap-2">
+                    <ConsorcioToggleField
+                      cuit={id}
+                      field={f.field}
+                      label={f.label}
+                      defaultChecked={f.checked}
+                      action={updateConsorcioField}
+                    />
+                    {f.field === "tiene_ascensor" && consorcio.tiene_ascensor && (
+                      <div className="w-20">
+                        {inlineField("cant_ascensores", consorcio.cant_ascensores, { type: "number", placeholder: "Cant." })}
+                      </div>
+                    )}
+                  </div>
                 ))}
                 <ConsorcioToggleField
                   cuit={id}
@@ -432,6 +424,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                 <th className="th">Inquilino</th>
                 <th className="th">Email Inq.</th>
                 <th className="th">WhatsApp Inq.</th>
+                <th className="th"></th>
                 <th className="th">CBU</th>
               </tr>
             </thead>
