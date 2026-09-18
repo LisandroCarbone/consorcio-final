@@ -366,6 +366,7 @@ export async function getLiquidacionesPeriodo(periodo: string, tipo = "mensual",
        JOIN app.empleados e ON e.id = l.empleado_id
        JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
        WHERE l.periodo = $1 AND l.tipo = $2 AND e.consorcio_cuit = $3
+         AND e.estado IN ('activo', 'pendiente_revision')
        ORDER BY c.nombre, e.nombre`,
       [periodo, tipo, activeCuit]
     );
@@ -378,6 +379,7 @@ export async function getLiquidacionesPeriodo(periodo: string, tipo = "mensual",
      JOIN app.empleados e ON e.id = l.empleado_id
      JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
      WHERE l.periodo = $1 AND l.tipo = $2
+       AND e.estado IN ('activo', 'pendiente_revision')
      ORDER BY c.nombre, e.nombre`,
     [periodo, tipo]
   );

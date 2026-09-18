@@ -5,6 +5,7 @@ import { ConfirmarLiquidacionButton } from "./ConfirmarLiquidacionButton";
 import { RecalcularButton } from "./RecalcularButton";
 import { LimpiarPeriodoButton } from "./LimpiarPeriodoButton";
 import { LsdExportButton } from "./LsdExportButton";
+import { EliminarBorradorButton } from "./EliminarBorradorButton";
 import { formatMoney0, cleanPeriodo } from "@/lib/format";
 import { EstadoBadge } from "@/components/ui/EstadoBadge";
 import Link from "next/link";
@@ -263,7 +264,10 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
                               <a href={`/sueldos/liquidaciones/${l.id}`} className="text-blue-600 hover:text-blue-800 font-medium">Ver recibo</a>
                             )}
                             {l.estado === "borrador" && l.origen !== "manual" && (
-                              <ConfirmarLiquidacionButton id={l.id} periodo={periodo} tipo={tipo} />
+                              <>
+                                <ConfirmarLiquidacionButton id={l.id} periodo={periodo} tipo={tipo} />
+                                <EliminarBorradorButton id={l.id} />
+                              </>
                             )}
                           </div>
                         </td>
