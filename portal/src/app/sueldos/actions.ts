@@ -120,7 +120,10 @@ export async function createEmpleado(data: EmpleadoForm) {
 export async function getNovedadesPeriodo(periodo: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return query<any>(
-    `SELECT n.*, e.nombre AS empleado_nombre, e.funcion,
+    `SELECT n.*,
+            n.fecha_inicio_reemplazo::text AS fecha_inicio_reemplazo,
+            n.fecha_fin_reemplazo::text AS fecha_fin_reemplazo,
+            e.nombre AS empleado_nombre, e.funcion,
             c.nombre AS consorcio_nombre
      FROM app.novedades_sueldo n
      JOIN app.empleados e ON e.id = n.empleado_id
