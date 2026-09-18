@@ -2,9 +2,11 @@ import { getEmpleados } from "../actions";
 import { calcularIndemnizacionPreview, IndemnizacionPreview } from "@/lib/liquidacion/engine";
 import { formatMoney, formatEmpleadoOption } from "@/lib/format";
 import { ConfirmarDespidoButton } from "./ConfirmarDespidoButton";
+import { RevertirEgresoButton } from "./RevertirEgresoButton";
 import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { pool } from "@/lib/db";
+import Link from "next/link";
 
 const TIPOS_EGRESO = [
   { value: "despido_sin_causa", label: "Despido sin causa" },
@@ -47,7 +49,10 @@ export default async function DespidoPage({
   const empleados = allEmpleados.filter((e) => e.consorcio_cuit === activeCuit);
 
   const { rows: egresados } = await pool.query(
-    `SELECT e.id, e.nombre, e.cuil, e.funcion, e.fecha_ingreso, e.fecha_egreso, e.tipo_egreso
+    `SELECT e.id, e.nombre, e.cuil, e.funcion, e.fecha_ingreso, e.fecha_egreso, e.tipo_egreso, e.estado,
+            (SELECT ls.id FROM app.liquidaciones_sueldo ls
+             WHERE ls.empleado_id = e.id AND ls.tipo = 'indemnizacion'
+             ORDER BY ls.id DESC LIMIT 1) AS liquidacion_id
        FROM app.empleados e
       WHERE e.consorcio_cuit = $1
         AND e.fecha_egreso IS NOT NULL
@@ -226,6 +231,7 @@ export default async function DespidoPage({
                   <th className="th text-center">Ingreso</th>
                   <th className="th text-center">Egreso</th>
                   <th className="th">Tipo</th>
+                  <th className="th" />
                 </tr>
               </thead>
               <tbody>
@@ -242,6 +248,18 @@ export default async function DespidoPage({
                     </td>
                     <td className="td text-gray-600">
                       {TIPOS_EGRESO.find((t) => t.value === eg.tipo_egreso)?.label ?? eg.tipo_egreso ?? "—"}
+                    </td>
+                    <td className="td">
+                      <div className="flex items-center gap-3">
+                        {eg.liquidacion_id && (
+                          <Link href={`/sueldos/liquidaciones/${eg.liquidacion_id}`} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                            Ver liquidación
+                          </Link>
+                        )}
+                        {eg.estado === "inactivo" && (
+                          <RevertirEgresoButton empleadoId={eg.id} nombre={eg.nombre} />
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
