@@ -6,10 +6,35 @@ import MaskedInput from "@/components/ui/MaskedInput";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { EmpleadoFormClient } from "../EmpleadoFormClient";
+import { queryOne } from "@/lib/db";
+import { countConsecutiveSuplencias } from "../../actions";
+import { AlertTriangle } from "lucide-react";
 
 async function getConsorcios() {
   const { rows } = await pool.query("SELECT cuit, nombre FROM app.consorcios ORDER BY nombre");
   return rows;
+}
+
+interface EmpleadoAnterior {
+  cuil: string;
+  nombre: string;
+  legajo: string | null;
+  cbu: string | null;
+  banco: string | null;
+  obra_social: string | null;
+  cod_obra_social: number | null;
+  email: string | null;
+  whatsapp: string | null;
+  consorcio_cuit: string;
+  [key: string]: unknown;
+}
+
+async function getEmpleadoAnterior(id: number): Promise<EmpleadoAnterior | null> {
+  return queryOne<EmpleadoAnterior>(
+    `SELECT cuil, nombre, legajo, cbu, banco, obra_social, cod_obra_social, email, whatsapp, consorcio_cuit
+     FROM app.empleados WHERE id = $1`,
+    [id]
+  );
 }
 
 async function crearEmpleado(formData: FormData): Promise<{ error?: string }> {
@@ -61,13 +86,19 @@ async function crearEmpleado(formData: FormData): Promise<{ error?: string }> {
 export default async function NuevoEmpleadoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; rehire_from?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, rehire_from } = await searchParams;
   const consorcios = await getConsorcios();
 
   const cookieStore = await cookies();
   const activeCuit = cookieStore.get("active_consorcio_cuit")?.value || "";
+
+  const rehireId = rehire_from ? Number(rehire_from) : null;
+  const anterior = rehireId ? await getEmpleadoAnterior(rehireId) : null;
+  const consecutivas = anterior
+    ? await countConsecutiveSuplencias(anterior.cuil, anterior.consorcio_cuit)
+    : 0;
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -77,12 +108,21 @@ export default async function NuevoEmpleadoPage({
           {" / "}
           <span>Nuevo empleado</span>
         </p>
-        <h1 className="text-2xl font-bold text-gray-900">Nuevo empleado</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {anterior ? `Dar de alta nuevamente: ${anterior.nombre}` : "Nuevo empleado"}
+        </h1>
       </div>
 
       {error === 'cuil_duplicado' && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
           Este CUIL ya existe en este consorcio.
+        </div>
+      )}
+
+      {anterior && consecutivas >= 4 && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          Este CUIL acumula {consecutivas} suplencias en este consorcio en los últimos 6 meses. Considerá evaluar una contratación permanente.
         </div>
       )}
 
@@ -94,15 +134,15 @@ export default async function NuevoEmpleadoPage({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">CUIL *</label>
-              <MaskedInput preset="cuit" name="cuil" required className="input" placeholder="20-12345678-9" />
+              <MaskedInput preset="cuit" name="cuil" required className="input" placeholder="20-12345678-9" defaultValue={anterior?.cuil ?? undefined} />
             </div>
             <div>
               <label className="label">Legajo</label>
-              <input name="legajo" className="input" />
+              <input name="legajo" className="input" defaultValue={anterior?.legajo ?? undefined} />
             </div>
             <div className="col-span-2">
               <label className="label">Apellido y Nombre *</label>
-              <input name="nombre" required className="input" placeholder="APELLIDO NOMBRE" />
+              <input name="nombre" required className="input" placeholder="APELLIDO NOMBRE" defaultValue={anterior?.nombre ?? undefined} />
             </div>
             <div>
               <label className="label">Fecha de nacimiento</label>
@@ -114,11 +154,11 @@ export default async function NuevoEmpleadoPage({
             </div>
             <div>
               <label className="label">Email del Empleado</label>
-              <input name="email" type="email" className="input" placeholder="empleado@mail.com" />
+              <input name="email" type="email" className="input" placeholder="empleado@mail.com" defaultValue={anterior?.email ?? undefined} />
             </div>
             <div>
               <label className="label">WhatsApp (Celular)</label>
-              <MaskedInput preset="phone" name="whatsapp" className="input" placeholder="11-1234-5678" />
+              <MaskedInput preset="phone" name="whatsapp" className="input" placeholder="11-1234-5678" defaultValue={anterior?.whatsapp ?? undefined} />
             </div>
           </div>
         </div>
@@ -148,8 +188,11 @@ export default async function NuevoEmpleadoPage({
               )}
             </div>
             <div className="col-span-2">
-              <label className="label">Función *</label>
-              <select name="funcion" required className="input">
+              <label className="label">
+                Función *
+                {anterior && <span className="text-amber-600 font-normal ml-1">(verificar)</span>}
+              </label>
+              <select name="funcion" required className="input" defaultValue={anterior ? "Suplente eventual" : ""}>
                 <option value="">— seleccionar —</option>
                 {FUNCIONES.map((f) => <option key={f}>{f}</option>)}
               </select>
@@ -165,7 +208,7 @@ export default async function NuevoEmpleadoPage({
             </div>
             <div>
               <label className="label">Jornada *</label>
-              <select name="jornada" required className="input">
+              <select name="jornada" required className="input" defaultValue={anterior ? "Suplente" : undefined}>
                 <option>Completa</option>
                 <option>Media</option>
                 <option>Suplente</option>
@@ -186,19 +229,19 @@ export default async function NuevoEmpleadoPage({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Obra social</label>
-              <input name="obra_social" className="input" placeholder="OSPERYH" />
+              <input name="obra_social" className="input" placeholder="OSPERYH" defaultValue={anterior?.obra_social ?? undefined} />
             </div>
             <div>
               <label className="label">Código obra social</label>
-              <input name="cod_obra_social" type="number" className="input" placeholder="106500" />
+              <input name="cod_obra_social" type="number" className="input" placeholder="106500" defaultValue={anterior?.cod_obra_social ?? undefined} />
             </div>
             <div>
               <label className="label">Banco</label>
-              <input name="banco" className="input" />
+              <input name="banco" className="input" defaultValue={anterior?.banco ?? undefined} />
             </div>
             <div>
               <label className="label">CBU</label>
-              <MaskedInput preset="cbu" name="cbu" className="input" placeholder="22 dígitos" />
+              <MaskedInput preset="cbu" name="cbu" className="input" placeholder="22 dígitos" defaultValue={anterior?.cbu ?? undefined} />
             </div>
           </div>
         </div>

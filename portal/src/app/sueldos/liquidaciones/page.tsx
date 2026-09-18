@@ -75,6 +75,13 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
   const liquidaciones: LiquidacionRow[] = await getLiquidacionesPeriodo(periodo, tipo, activeCuit);
   const hasConfirmedLiqs = liquidaciones.some((l) => l.estado === "confirmada");
 
+  const { rows: suplentesPendientes } = await pool.query<{ id: number; nombre: string }>(
+    `SELECT e.id, e.nombre FROM app.empleados e
+     WHERE e.consorcio_cuit = $1 AND e.estado = 'pendiente_revision'
+     ORDER BY e.nombre`,
+    [activeCuit]
+  );
+
   const periodoDate = new Date(periodo + "T00:00:00Z");
   const year = periodoDate.getUTCFullYear();
 
@@ -203,6 +210,14 @@ export default async function LiquidacionesPage({ searchParams }: Props) {
               <div className="mx-5 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
                 <strong>⚠ {pendientesEscala} liquidación{pendientesEscala > 1 ? "es" : ""} con escala de período anterior.</strong>{" "}
                 Cargá las escalas del período actual y recalculá para poder confirmar.
+              </div>
+            )}
+
+            {suplentesPendientes.length > 0 && (
+              <div className="mx-5 mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-800">
+                <strong>⚠ {suplentesPendientes.length} suplente{suplentesPendientes.length > 1 ? "s" : ""} pendiente{suplentesPendientes.length > 1 ? "s" : ""} de revisión:</strong>{" "}
+                {suplentesPendientes.map(s => s.nombre).join(", ")}.{" "}
+                <a href="/sueldos" className="underline font-medium">Revisá su situación</a> antes de liquidar (confirmar baja o extender suplencia).
               </div>
             )}
 

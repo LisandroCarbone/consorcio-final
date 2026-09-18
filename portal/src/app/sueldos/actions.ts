@@ -58,6 +58,8 @@ export interface NovedadesForm {
 
 // ─── Empleados ────────────────────────────────────────────────────────────────
 
+export type EstadoEmpleado = "activo" | "inactivo" | "pendiente_revision";
+
 export interface EmpleadoRow {
   id: number;
   cuil: string;
@@ -68,10 +70,38 @@ export interface EmpleadoRow {
   consorcio_cuit: string;
   consorcio_nombre: string;
   antiguedad_anios: number;
+  estado?: EstadoEmpleado;
   [key: string]: unknown;
 }
 
+// Transitions active suplentes whose latest fecha_fin_reemplazo (in
+// novedades_sueldo) has already passed to 'pendiente_revision'. Never sets
+// estado to 'inactivo' directly — an admin must confirm the baja or extend
+// the suplencia. Returns the number of employees transitioned.
+export async function processAutoBajas(consorcioCuit?: string): Promise<number> {
+  const rows = await query<{ id: number }>(
+    `UPDATE app.empleados e
+     SET estado = 'pendiente_revision'
+     FROM (
+       SELECT DISTINCT ON (empleado_id) empleado_id, fecha_fin_reemplazo
+       FROM app.novedades_sueldo
+       WHERE fecha_fin_reemplazo IS NOT NULL
+       ORDER BY empleado_id, periodo DESC
+     ) latest
+     WHERE e.id = latest.empleado_id
+       AND e.jornada = 'Suplente'
+       AND e.estado = 'activo'
+       AND latest.fecha_fin_reemplazo < CURRENT_DATE
+       ${consorcioCuit ? "AND e.consorcio_cuit = $1" : ""}
+     RETURNING e.id`,
+    consorcioCuit ? [consorcioCuit] : []
+  );
+  if (rows.length > 0) revalidatePath("/sueldos");
+  return rows.length;
+}
+
 export async function getEmpleados(consorcioCuit?: string): Promise<EmpleadoRow[]> {
+  await processAutoBajas(consorcioCuit);
   return query<EmpleadoRow>(
     `SELECT e.*, c.nombre AS consorcio_nombre,
             EXTRACT(YEAR FROM AGE(NOW(), e.fecha_ingreso))::int AS antiguedad_anios
@@ -82,6 +112,133 @@ export async function getEmpleados(consorcioCuit?: string): Promise<EmpleadoRow[
      ORDER BY c.nombre, e.nombre`,
     consorcioCuit ? [consorcioCuit] : []
   );
+}
+
+// Same as getEmpleados but also includes 'pendiente_revision' employees —
+// they are still technically employed and may need novedades loaded until
+// an admin confirms baja or extends the suplencia.
+export async function getEmpleadosParaNovedades(consorcioCuit?: string): Promise<EmpleadoRow[]> {
+  await processAutoBajas(consorcioCuit);
+  return query<EmpleadoRow>(
+    `SELECT e.*, c.nombre AS consorcio_nombre,
+            EXTRACT(YEAR FROM AGE(NOW(), e.fecha_ingreso))::int AS antiguedad_anios
+     FROM app.empleados e
+     JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
+     WHERE e.estado IN ('activo', 'pendiente_revision')
+     ${consorcioCuit ? "AND e.consorcio_cuit = $1" : ""}
+     ORDER BY c.nombre, e.nombre`,
+    consorcioCuit ? [consorcioCuit] : []
+  );
+}
+
+// Employees no longer counted as active: inactivo (baja confirmada) and
+// pendiente_revision (auto-baja awaiting admin resolution). Feeds the
+// "Empleados anteriores" section in the Nómina page.
+export async function getInactiveEmpleados(consorcioCuit?: string): Promise<EmpleadoRow[]> {
+  return query<EmpleadoRow>(
+    `SELECT e.*, c.nombre AS consorcio_nombre,
+            EXTRACT(YEAR FROM AGE(NOW(), e.fecha_ingreso))::int AS antiguedad_anios
+     FROM app.empleados e
+     JOIN app.consorcios c ON c.cuit = e.consorcio_cuit
+     WHERE e.estado IN ('inactivo', 'pendiente_revision')
+     ${consorcioCuit ? "AND e.consorcio_cuit = $1" : ""}
+     ORDER BY e.estado, c.nombre, e.nombre`,
+    consorcioCuit ? [consorcioCuit] : []
+  );
+}
+
+// Counts suplencia records (empleado rows) for the same cuil+consorcio
+// created in the last 6 months. >=4 triggers a "consecutive suplencias"
+// warning on the rehire form and Nómina page.
+export async function countConsecutiveSuplencias(cuil: string, consorcioCuit: string): Promise<number> {
+  const row = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) AS count
+     FROM app.empleados
+     WHERE cuil = $1 AND consorcio_cuit = $2
+       AND (funcion ILIKE '%suplente%' OR jornada = 'Suplente')
+       AND created_at >= NOW() - INTERVAL '6 months'`,
+    [cuil, consorcioCuit]
+  );
+  return Number(row?.count ?? 0);
+}
+
+// Rehires a former employee: creates a brand-new empleado row (new id)
+// copying persona data from the previous (inactive) record, defaulting
+// funcion to "Suplente eventual" and dates to today. The old row is left
+// untouched, preserving history. Rejects if an active employee with the
+// same cuil+consorcio already exists.
+export async function rehireEmpleado(oldEmpleadoId: number): Promise<{ newId: number }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const old = await queryOne<any>(`SELECT * FROM app.empleados WHERE id = $1`, [oldEmpleadoId]);
+  if (!old) throw new Error("Empleado anterior no encontrado");
+  if (old.estado === "activo") throw new Error("El empleado ya está activo");
+
+  const activeExists = await queryOne<{ id: number }>(
+    `SELECT id FROM app.empleados WHERE cuil = $1 AND consorcio_cuit = $2 AND estado = 'activo'`,
+    [old.cuil, old.consorcio_cuit]
+  );
+  if (activeExists) {
+    throw new Error("Ya existe un empleado activo con este CUIL en este consorcio");
+  }
+
+  const inserted = await queryOne<{ id: number }>(
+    `INSERT INTO app.empleados
+       (cuil, nombre, legajo, fecha_nacimiento, fecha_ingreso, fecha_egreso, consorcio_cuit,
+        funcion, categoria_edificio, jornada, tiene_vivienda,
+        obra_social, cod_obra_social, banco, cbu,
+        retiro_residuos, clasificacion_residuos, plus_cocheras,
+        plus_movimiento_coches, plus_jardin, plus_zona_desfavorable,
+        plus_pileta, tiene_titulo, adicional_voluntario, email, whatsapp, estado)
+     VALUES ($1,$2,$3,$4,CURRENT_DATE,NULL,$5,
+             $6,$7,$8,$9,
+             $10,$11,$12,$13,
+             $14,$15,$16,
+             $17,$18,$19,
+             $20,$21,$22,$23,$24,'activo')
+     RETURNING id`,
+    [
+      old.cuil, old.nombre, old.legajo, old.fecha_nacimiento, old.consorcio_cuit,
+      "Suplente eventual", old.categoria_edificio, "Suplente", old.tiene_vivienda,
+      old.obra_social, old.cod_obra_social, old.banco, old.cbu,
+      old.retiro_residuos, old.clasificacion_residuos, old.plus_cocheras,
+      old.plus_movimiento_coches, old.plus_jardin, old.plus_zona_desfavorable,
+      old.plus_pileta, old.tiene_titulo, 0, old.email, old.whatsapp,
+    ]
+  );
+
+  revalidatePath("/sueldos");
+  return { newId: inserted!.id };
+}
+
+// Admin confirms a pending-review suplente's baja: sets estado='inactivo'
+// with the provided fecha_egreso/tipo_egreso.
+export async function confirmBaja(empleadoId: number, fechaEgreso: string, tipoEgreso: string): Promise<void> {
+  if (!fechaEgreso) throw new Error("Fecha de egreso requerida");
+  if (!tipoEgreso) throw new Error("Tipo de egreso requerido");
+  await query(
+    `UPDATE app.empleados SET estado = 'inactivo', fecha_egreso = $2, tipo_egreso = $3 WHERE id = $1`,
+    [empleadoId, fechaEgreso, tipoEgreso]
+  );
+  revalidatePath("/sueldos");
+}
+
+// Admin extends a pending-review suplente's contract: clears
+// pendiente_revision back to 'activo' and updates fecha_fin_reemplazo on
+// the most recent novedades_sueldo row for that employee.
+export async function extendSuplencia(empleadoId: number, newEndDate: string): Promise<void> {
+  if (!newEndDate) throw new Error("Nueva fecha de fin de reemplazo requerida");
+  await query(`UPDATE app.empleados SET estado = 'activo' WHERE id = $1`, [empleadoId]);
+  await query(
+    `UPDATE app.novedades_sueldo
+     SET fecha_fin_reemplazo = $2
+     WHERE id = (
+       SELECT id FROM app.novedades_sueldo
+       WHERE empleado_id = $1
+       ORDER BY periodo DESC LIMIT 1
+     )`,
+    [empleadoId, newEndDate]
+  );
+  revalidatePath("/sueldos");
 }
 
 export async function createEmpleado(data: EmpleadoForm) {

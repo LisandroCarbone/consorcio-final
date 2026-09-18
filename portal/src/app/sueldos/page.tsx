@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { ConsorcioRequerido } from "@/components/ui/ConsorcioRequerido";
 import { cleanPeriodo } from "@/lib/format";
 import { SueldosTableClient } from "./SueldosTableClient";
+import { EmpleadosAnterioresClient, EmpleadoAnteriorRow } from "./EmpleadosAnterioresClient";
+import { getInactiveEmpleados, processAutoBajas } from "./actions";
 import {
   Users,
   FileCheck,
@@ -154,9 +156,12 @@ export default async function SueldosPage() {
     );
   }
 
-  const [stats, empleados] = await Promise.all([
+  await processAutoBajas(activeCuit);
+
+  const [stats, empleados, empleadosAnteriores] = await Promise.all([
     getSueldosStats(activeCuit, activePeriodo),
-    getEmpleadosActivos(activeCuit)
+    getEmpleadosActivos(activeCuit),
+    getInactiveEmpleados(activeCuit) as unknown as Promise<EmpleadoAnteriorRow[]>,
   ]);
 
   const checklist = await getSueldosChecklist(activeCuit, stats.periodo);
@@ -294,6 +299,8 @@ export default async function SueldosPage() {
             
             <SueldosTableClient empleados={empleados} />
           </div>
+
+          <EmpleadosAnterioresClient empleados={empleadosAnteriores} />
         </div>
 
         {/* Lado Derecho (1/3 de ancho) - Acciones y Escalas */}

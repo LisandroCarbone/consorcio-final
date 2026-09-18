@@ -1,4 +1,4 @@
-import { getEmpleados, getNovedadesPeriodo, getAdicionalRemuneratorio, getFondoEducacion, getConceptosAdicionalesPeriodo } from "../actions";
+import { getEmpleadosParaNovedades, getNovedadesPeriodo, getAdicionalRemuneratorio, getFondoEducacion, getConceptosAdicionalesPeriodo } from "../actions";
 import { PeriodNav } from "@/components/ui/PeriodNav";
 import NovedadesForm from "./NovedadesForm";
 import { AdicionalRemuneratorioCard } from "./AdicionalRemuneratorioCard";
@@ -40,7 +40,7 @@ export default async function NovedadesPage({ searchParams }: Props) {
   const consorcioFiltro = activeCuit;
 
   const [empleados, novedades, adicionalRem, fondoEdu, conceptosAdicionales] = await Promise.all([
-    getEmpleados(),
+    getEmpleadosParaNovedades(),
     getNovedadesPeriodo(periodo),
     getAdicionalRemuneratorio(periodo),
     getFondoEducacion(periodo),
