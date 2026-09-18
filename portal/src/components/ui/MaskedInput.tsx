@@ -27,7 +27,7 @@ const MASK_CONFIGS: Record<MaskPreset, Record<string, unknown>> = {
     min: 0,
   },
   cbu: {
-    mask: "0000 0000 0000 0000 0000 00",
+    mask: "0000000000000000000000",
     lazy: false,
     placeholderChar: "_",
   },
