@@ -212,7 +212,8 @@ export function calcContribPatronal(
   jornada: string = "Completa",
   horasTotalesSuplente: number = 0,
   fateryh_art19bis: number = 0,
-  scvoOverride: number | null = null
+  scvoOverride: number | null = null,
+  esSuplente: boolean = false
 ): ContribPatronal {
   const jubilacion  = base * Number(cons.pct_contrib_jubilacion ?? 0.18);
   const obraSocial  = baseOS * Number(cons.pct_contrib_obra_social ?? 0.06);
@@ -225,12 +226,12 @@ export function calcContribPatronal(
     : (cons.sv_costo_fijo ? Number(cons.sv_costo_fijo) : 0);
 
   let fateryh_fijo = 0;
-  if (jornada === "Completa") {
+  if (esSuplente) {
+    fateryh_fijo = fateryh_art19bis * (horasTotalesSuplente / 200);
+  } else if (jornada === "Completa") {
     fateryh_fijo = fateryh_art19bis;
   } else if (jornada === "Media") {
     fateryh_fijo = fateryh_art19bis * 0.5;
-  } else if (jornada === "Suplente") {
-    fateryh_fijo = fateryh_art19bis * (horasTotalesSuplente / 200);
   }
 
   const total = jubilacion + obraSocial + suterh + fateryh + fateryh_fijo + seracarh + art + scvo;
@@ -871,7 +872,8 @@ export async function calcularLiquidacion(
     emp.jornada,
     horasTotalesSuplente,
     fateryh_art19bis,
-    excluirSCVO ? 0 : scvoFromParametros
+    excluirSCVO ? 0 : scvoFromParametros,
+    esSuplente
   );
   const totalPatronal = patron.total;
 
@@ -1193,7 +1195,7 @@ export async function calcularSACPreview(
   }
   const excluirSCVOsac = esSuplente && diasAntiguedad(emp.fecha_ingreso, periodoSAC, emp.fecha_egreso) < 30;
   const totalPatronal = cons
-    ? calcContribPatronal(totalBruto, basePatronalSACOS, cons, emp.jornada, 0, fateryhArt19bisSAC, excluirSCVOsac ? 0 : scvoSAC).total
+    ? calcContribPatronal(totalBruto, basePatronalSACOS, cons, emp.jornada, 0, fateryhArt19bisSAC, excluirSCVOsac ? 0 : scvoSAC, esSuplente).total
     : 0;
 
   return {

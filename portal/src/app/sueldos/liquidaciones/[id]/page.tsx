@@ -215,10 +215,10 @@ export default async function ReciboPage({
     const suplencia100Hs = Number(liq.novedad_suplencia_100_hs ?? 0);
     const horasTotalesSuplente = diasSuplente * Math.min(horasJornada, 18) + suplencia100Hs;
     fateryhFijo = fateryhArt19bis * (horasTotalesSuplente / 200);
-  } else if (liq.jornada === "Completa") {
-    fateryhFijo = fateryhArt19bis;
-  } else {
+  } else if (liq.jornada === "Media") {
     fateryhFijo = fateryhArt19bis * 0.5;
+  } else {
+    fateryhFijo = fateryhArt19bis;
   }
 
   const patronalRows = [
