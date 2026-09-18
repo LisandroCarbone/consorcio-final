@@ -216,7 +216,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
             <form action={updateConsorcioField} className="mt-1">
               <input type="hidden" name="cuit" value={id} />
               <input type="hidden" name="field" value="divisor_b" />
-              <input type="hidden" name="value" value="" />
+              <input type="hidden" name="value" value="0" />
               <button type="submit" className="text-amber-800 underline hover:text-amber-900 font-medium">
                 Limpiar divisor B
               </button>
