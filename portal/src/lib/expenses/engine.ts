@@ -419,18 +419,38 @@ async function _runCalculateExpenses(
   const fondoObraTotal = consorcio.fondo_obra_activo ? Number(consorcio.fondo_obra || 0) : 0;
   const cuotaExtraTotal = consorcio.cuota_extra_activo ? Number(consorcio.cuota_extra || 0) : 0;
 
+  // Display-only rounding for formato_cobro === 'exacto': every component
+  // amount shown to the vecino/on the comprobante is rounded to a whole
+  // number, and the total is the SUM of the already-rounded parts (never a
+  // separate round of the total). Confirmed with revisor-liquidacion: this
+  // must stay cosmetic — it never touches app.deuda_periodo, whose
+  // monto_capital_pendiente / monto_intereses_* keep full decimal precision
+  // so the month-to-month interest carry never drifts by accumulated cents.
+  const isExacto = consorcio.formato_cobro === 'exacto';
+  const roundDisplay = isExacto ? Math.round : round2;
+
   for (const u of units) {
-    const expensasA = round2(totalProrrateoA * Number(u.coef_a) / divisorA) + (isFija ? 0 : round2(unitAMap.get(u.id) || 0));
-    const expensasB = (isFija && pctA >= 1) ? 0 : round2(totalProrrateoB * Number(u.coef_b) / divisorB) + (isFija ? 0 : round2(unitBMap.get(u.id) || 0));
-    const gastPart = isFija ? 0 : round2(unitParticularMap.get(u.id) || 0);
+    let expensasA = round2(totalProrrateoA * Number(u.coef_a) / divisorA) + (isFija ? 0 : round2(unitAMap.get(u.id) || 0));
+    let expensasB = (isFija && pctA >= 1) ? 0 : round2(totalProrrateoB * Number(u.coef_b) / divisorB) + (isFija ? 0 : round2(unitBMap.get(u.id) || 0));
+    let gastPart = isFija ? 0 : round2(unitParticularMap.get(u.id) || 0);
     // F3: Fondo de obra — fixed total amount prorated by the unit's Coef. A,
     // stored as a separate line item (not folded into expensas_a).
-    const fondoObra = fondoObraTotal > 0 ? round2(fondoObraTotal * Number(u.coef_a) / divisorA) : 0;
-    const cuotaExtra = cuotaExtraTotal > 0 ? round2(cuotaExtraTotal * Number(u.coef_a) / divisorA) : 0;
+    let fondoObra = fondoObraTotal > 0 ? round2(fondoObraTotal * Number(u.coef_a) / divisorA) : 0;
+    let cuotaExtra = cuotaExtraTotal > 0 ? round2(cuotaExtraTotal * Number(u.coef_a) / divisorA) : 0;
 
     const exist = existingMap.get(u.id);
-    const sAsamblea = exist ? Number(exist.s_asamblea || 0) : 0;
-    const otros = exist ? Number(exist.otros || 0) : 0;
+    let sAsamblea = exist ? Number(exist.s_asamblea || 0) : 0;
+    let otros = exist ? Number(exist.otros || 0) : 0;
+
+    if (isExacto) {
+      expensasA = roundDisplay(expensasA);
+      expensasB = roundDisplay(expensasB);
+      gastPart = roundDisplay(gastPart);
+      fondoObra = roundDisplay(fondoObra);
+      cuotaExtra = roundDisplay(cuotaExtra);
+      sAsamblea = roundDisplay(sAsamblea);
+      otros = roundDisplay(otros);
+    }
 
     // Motor de Intereses Real: saldo_anterior is the sum of pending capital
     // across every unpaid deuda_periodo row for this unit (not derived from
@@ -438,9 +458,15 @@ async function _runCalculateExpenses(
     // real per-period interest calculated by calcularInteresesPeriodo,
     // instead of a flat rate applied to the whole balance.
     const unitInterestData = interesesResultPorUnidad.get(u.id);
-    const intereses = unitInterestData
+    // NOTE: this `intereses` local is only used for display/persistence in
+    // res_cuenta_periodo below — the real interest accrual that feeds future
+    // periods is written to app.deuda_periodo via r.interesCalculado in the
+    // UPDATE right below (unrounded), so rounding this copy for 'exacto'
+    // cannot drift the month-to-month carry.
+    let intereses = unitInterestData
       ? round2(unitInterestData.resultados.reduce((sum, r) => sum + r.interesCalculado, 0))
       : 0;
+    if (isExacto) intereses = roundDisplay(intereses);
 
     // Step 1: write the freshly-calculated theoretical interest back into
     // deuda_periodo (monto_intereses_acumulado = full accrual,
@@ -543,22 +569,29 @@ async function _runCalculateExpenses(
     if (saldoInicialHistorico > 0 && !unitsWithPriorPeriod.has(u.id)) {
       saldoAnterior = round2(saldoAnterior + saldoInicialHistorico);
     }
+    // Display-only rounding, same reasoning as `intereses` above: the real
+    // pending capital lives in app.deuda_periodo.monto_capital_pendiente
+    // (already persisted unrounded via the UPDATEs above); this local copy
+    // is only what gets shown/stored in res_cuenta_periodo.saldo_anterior.
+    if (isExacto) saldoAnterior = roundDisplay(saldoAnterior);
 
     // su_pago: from pagos table or fallback to existing res_cuenta_periodo.su_pago
     const suPago = pagosMap.has(u.id)
       ? Number(pagosMap.get(u.id) || 0)
       : (exist ? Number(exist.su_pago || 0) : 0);
 
-    const deuda = round2(saldoAnterior - suPago);
+    const deuda = roundDisplay(saldoAnterior - suPago);
 
-    const totalMes = round2(expensasA + expensasB + sAsamblea + otros + gastPart + fondoObra + cuotaExtra);
-    let totalPagar = round2(totalMes + deuda + intereses);
+    // Each component above is already rounded to a whole number when
+    // formato_cobro === 'exacto', so the total is simply their sum — never
+    // a separate round of the total (that would let component rounding
+    // errors accumulate into a total that doesn't match its own parts).
+    const totalMes = roundDisplay(expensasA + expensasB + sAsamblea + otros + gastPart + fondoObra + cuotaExtra);
+    let totalPagar = roundDisplay(totalMes + deuda + intereses);
 
     if (consorcio.formato_cobro === 'identificacion_uf' && u.uf_numero && totalPagar > 0) {
       const ufNum = u.uf_numero % 100;
       totalPagar = Math.floor(totalPagar) + ufNum / 100;
-    } else if (consorcio.formato_cobro === 'exacto') {
-      totalPagar = Math.round(totalPagar);
     }
 
     // F4 — Compensación automática de crédito en cuenta corriente: any
@@ -590,7 +623,16 @@ async function _runCalculateExpenses(
          ORDER BY es_gasto_periodo_actual DESC, cu.created_at ASC`,
         [u.id, cuit, periodoId]
       );
-      let remaining = round2(Math.min(totalPagar, creditosRows.reduce((s, c) => s + Number(c.monto), 0)));
+      // In 'exacto' mode, round the consumption TARGET before running the
+      // FIFO loop (not the leftover subtraction after it) — this keeps what
+      // gets marked aplicado = true peso-for-peso with what's shown as
+      // consumed, and any fractional remainder is correctly re-inserted as
+      // a fresh unapplied credit below, exactly like the non-exacto path
+      // (confirmed with revisor-liquidacion: rounding only the final
+      // subtraction would mark a credit fully applied while displaying less
+      // than its real value, silently overcharging the vecino by the
+      // rounded-off cents).
+      let remaining = roundDisplay(Math.min(totalPagar, creditosRows.reduce((s, c) => s + Number(c.monto), 0)));
       creditoAplicado = remaining;
       for (const c of creditosRows) {
         if (remaining <= 0) break;
@@ -631,7 +673,7 @@ async function _runCalculateExpenses(
       }
 
       if (creditoAplicado > 0) {
-        totalPagar = round2(totalPagar - creditoAplicado);
+        totalPagar = roundDisplay(totalPagar - creditoAplicado);
       }
     }
 
