@@ -3,9 +3,11 @@
 import { useTransition } from "react";
 import { revertirEgresoAction } from "./actions";
 import { Undo2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function RevertirEgresoButton({ empleadoId, nombre }: { empleadoId: number; nombre: string }) {
   const [loading, startTransition] = useTransition();
+  const router = useRouter();
 
   return (
     <button
@@ -16,8 +18,13 @@ export function RevertirEgresoButton({ empleadoId, nombre }: { empleadoId: numbe
         if (!confirm(`¿Revertir el egreso de ${nombre}? El empleado volverá a estado activo.`)) return;
         const fd = new FormData();
         fd.set("empleado_id", String(empleadoId));
-        startTransition(() => {
-          revertirEgresoAction(fd).catch(() => {});
+        startTransition(async () => {
+          try {
+            await revertirEgresoAction(fd);
+            router.refresh();
+          } catch (e: unknown) {
+            alert(`Error al revertir: ${e instanceof Error ? e.message : "error desconocido"}`);
+          }
         });
       }}
     >
