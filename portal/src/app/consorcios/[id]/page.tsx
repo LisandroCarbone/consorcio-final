@@ -362,7 +362,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
             <div>
               <label className="label">% Coeficiente A</label>
               {inlineField("pct_expensa_a", pctExpensaA, { type: "number", step: "0.01" })}
-              <p className="text-xs text-gray-400 mt-0.5">El resto se asigna a Coef. B</p>
+              <p className="text-xs text-gray-400 mt-0.5">El resto se asigna a Coef. B. No aplica si el período tiene montos fijos A y B por separado.</p>
             </div>
             {consorcio.tipo_expensas === "fija" && (
               <div>
