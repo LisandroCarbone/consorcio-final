@@ -31,6 +31,7 @@ function formToConsorcio(formData: FormData) {
     tiene_seguridad_centralizada: bool("tiene_seguridad_centralizada"),
     tiene_compactador: bool("tiene_compactador"),
     tiene_montacargas: bool("tiene_montacargas"),
+    tiene_incendio: bool("tiene_incendio"),
     tiene_otros_servicios_centrales: bool("tiene_otros_servicios_centrales"),
     intereses_mora_pct: formData.get("intereses_mora_pct")
       ? Number(formData.get("intereses_mora_pct")) / 100
@@ -64,17 +65,17 @@ export async function createConsorcio(formData: FormData) {
         tiene_pileta, tiene_caldera, tiene_ascensor, tiene_agua_caliente_central,
         tiene_calefaccion_central, tiene_aire_acondicionado_central,
         tiene_grupo_electrogeno, tiene_seguridad_centralizada,
-        tiene_compactador, tiene_montacargas, tiene_otros_servicios_centrales,
+        tiene_compactador, tiene_montacargas, tiene_incendio, tiene_otros_servicios_centrales,
         interest_rate, tipo_expensas, monto_fijo_default, pct_expensa_a, formato_cobro,
         fondo_obra_activo, fondo_obra, cuota_extra_activo, cuota_extra)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)`,
     [d.nombre, d.direccion, d.cuit, d.codigo_postal, d.nro_cta_suterh,
      d.cant_uf, d.uf_retiro_residuos, d.categoria_edificio, d.banco,
      d.tiene_cochera, d.tiene_movimiento_coches, d.tiene_jardin, d.zona_desfavorable,
      d.tiene_pileta, d.tiene_caldera, d.tiene_ascensor, d.tiene_agua_caliente_central,
      d.tiene_calefaccion_central, d.tiene_aire_acondicionado_central,
      d.tiene_grupo_electrogeno, d.tiene_seguridad_centralizada,
-     d.tiene_compactador, d.tiene_montacargas, d.tiene_otros_servicios_centrales,
+     d.tiene_compactador, d.tiene_montacargas, d.tiene_incendio, d.tiene_otros_servicios_centrales,
      d.intereses_mora_pct, d.tipo_expensas, d.monto_fijo_default, d.pct_expensa_a, d.formato_cobro,
      d.fondo_obra_activo, d.fondo_obra, d.cuota_extra_activo, d.cuota_extra]
   );

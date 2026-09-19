@@ -113,13 +113,17 @@ export default async function ConsorciosPage() {
                     { name: 'tiene_calefaccion_central', label: 'Calefacción central' },
                     { name: 'tiene_aire_acondicionado_central', label: 'Aire acond. central' },
                     { name: 'tiene_cochera', label: 'Cocheras' },
+                    { name: 'tiene_movimiento_coches', label: 'Movimiento de coches' },
                     { name: 'tiene_grupo_electrogeno', label: 'Grupo electrógeno' },
                     { name: 'tiene_pileta', label: 'Pileta' },
+                    { name: 'tiene_caldera', label: 'Caldera' },
                     { name: 'tiene_jardin', label: 'Jardín' },
                     { name: 'tiene_seguridad_centralizada', label: 'Seguridad centralizada' },
                     { name: 'tiene_compactador', label: 'Compactador' },
                     { name: 'tiene_montacargas', label: 'Montacargas' },
+                    { name: 'tiene_incendio', label: 'Instal. contra incendio' },
                     { name: 'tiene_otros_servicios_centrales', label: 'Otros servicios centrales' },
+                    { name: 'zona_desfavorable', label: 'Zona desfavorable' },
                   ].map((f) => (
                     <label key={f.name} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
                       <input type="checkbox" name={f.name} value="true" className="rounded" />

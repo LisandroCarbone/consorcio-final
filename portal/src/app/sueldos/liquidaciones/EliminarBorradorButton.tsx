@@ -3,9 +3,11 @@
 import { useTransition } from "react";
 import { eliminarBorradorAction } from "./actions";
 import { Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function EliminarBorradorButton({ id }: { id: number }) {
   const [loading, startTransition] = useTransition();
+  const router = useRouter();
 
   return (
     <button
@@ -16,8 +18,13 @@ export function EliminarBorradorButton({ id }: { id: number }) {
         if (!confirm("¿Eliminar este borrador?")) return;
         const fd = new FormData();
         fd.set("id", String(id));
-        startTransition(() => {
-          eliminarBorradorAction(fd).catch(() => {});
+        startTransition(async () => {
+          try {
+            await eliminarBorradorAction(fd);
+            router.refresh();
+          } catch (e: unknown) {
+            alert(`Error al eliminar: ${e instanceof Error ? e.message : "error desconocido"}`);
+          }
         });
       }}
     >

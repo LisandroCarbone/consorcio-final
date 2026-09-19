@@ -47,6 +47,18 @@ export async function revertirEgresoAction(formData: FormData) {
       [empleadoId]
     );
 
+    // Check no active employee with same CUIL exists (rehired case)
+    const { rows: dupeCheck } = await client.query(
+      `SELECT id FROM app.empleados
+       WHERE cuil = (SELECT cuil FROM app.empleados WHERE id = $1)
+         AND consorcio_cuit = (SELECT consorcio_cuit FROM app.empleados WHERE id = $1)
+         AND estado = 'activo' AND id != $1`,
+      [empleadoId]
+    );
+    if (dupeCheck.length > 0) {
+      throw new Error("Ya existe un empleado activo con el mismo CUIL en este consorcio. Debe dar de baja al nuevo registro primero.");
+    }
+
     // Restore employee to active
     await client.query(
       `UPDATE app.empleados
