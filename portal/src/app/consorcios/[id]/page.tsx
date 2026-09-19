@@ -30,6 +30,7 @@ interface Inquilino {
   nombre: string | null;
   apellido: string | null;
   email: string | null;
+  email_2: string | null;
   whatsapp: string | null;
 }
 
@@ -88,9 +89,7 @@ async function getData(cuit: string) {
     query<{
       id: number; uf: string; uf_numero: number | null; coef_a: string; coef_b: string; tipo: string;
       propietarios: Propietario[] | null;
-      inquilino_ocupante_id: number | null; inquilino_persona_id: number | null;
-      inquilino_nombre: string | null; inquilino_apellido: string | null; inquilino_email_2: string | null;
-      inquilino_email: string | null; inquilino_whatsapp: string | null;
+      inquilinos: Inquilino[] | null;
       cbu_entries: CbuEntry[] | null;
     }>(
       `SELECT u.id, u.uf, u.uf_numero, u.coef_a, u.coef_b, u.tipo,
@@ -110,13 +109,21 @@ async function getData(cuit: string) {
                  WHERE o_prop.unidad_id = u.id AND o_prop.activo = true AND o_prop.rol = 'propietario'
                 ), '[]'
               ) AS propietarios,
-              o_inq.id AS inquilino_ocupante_id,
-              inq.id AS inquilino_persona_id,
-              inq.nombre AS inquilino_nombre,
-              inq.apellido AS inquilino_apellido,
-              inq.email AS inquilino_email,
-              inq.email_2 AS inquilino_email_2,
-              inq.whatsapp AS inquilino_whatsapp,
+              COALESCE(
+                (SELECT json_agg(json_build_object(
+                    'ocupante_id', o_inq.id,
+                    'persona_id', inq.id,
+                    'nombre', inq.nombre,
+                    'apellido', inq.apellido,
+                    'email', inq.email,
+                    'email_2', inq.email_2,
+                    'whatsapp', inq.whatsapp
+                  ) ORDER BY o_inq.id)
+                 FROM app.ocupantes o_inq
+                 JOIN app.personas inq ON inq.id = o_inq.persona_id
+                 WHERE o_inq.unidad_id = u.id AND o_inq.activo = true AND o_inq.rol = 'inquilino'
+                ), '[]'
+              ) AS inquilinos,
               COALESCE(
                 (SELECT json_agg(json_build_object(
                     'cbu_o_cuit', cm.cbu_o_cuit,
@@ -127,8 +134,6 @@ async function getData(cuit: string) {
                 ), '[]'
               ) AS cbu_entries
        FROM app.unidades u
-       LEFT JOIN app.ocupantes o_inq ON o_inq.unidad_id=u.id AND o_inq.activo=true AND o_inq.rol='inquilino'
-       LEFT JOIN app.personas inq ON inq.id=o_inq.persona_id
        WHERE u.consorcio_cuit=$1
        ORDER BY u.uf_numero NULLS LAST, u.uf`,
       [cuit]
@@ -435,19 +440,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                   coefB={u.coef_b}
                   consorcioCuit={id}
                   propietarios={u.propietarios ?? []}
-                  inquilino={
-                    u.inquilino_ocupante_id && u.inquilino_persona_id
-                      ? {
-                          ocupante_id: u.inquilino_ocupante_id,
-                          persona_id: u.inquilino_persona_id,
-                          nombre: u.inquilino_nombre,
-                          apellido: u.inquilino_apellido,
-                          email: u.inquilino_email,
-                          email_2: u.inquilino_email_2,
-                          whatsapp: u.inquilino_whatsapp,
-                        }
-                      : null
-                  }
+                  inquilinos={u.inquilinos ?? []}
                   cbuEntries={u.cbu_entries ?? []}
                 />
               ))}

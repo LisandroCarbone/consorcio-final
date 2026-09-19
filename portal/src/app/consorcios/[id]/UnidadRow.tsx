@@ -141,7 +141,7 @@ export function UnidadRow({
   coefB,
   consorcioCuit,
   propietarios,
-  inquilino,
+  inquilinos,
   cbuEntries,
 }: {
   id: number;
@@ -152,7 +152,7 @@ export function UnidadRow({
   coefB: string;
   consorcioCuit: string;
   propietarios: Propietario[];
-  inquilino: Inquilino | null;
+  inquilinos: Inquilino[];
   cbuEntries: CbuEntry[];
 }) {
   const [open, setOpen] = useState(false);
@@ -173,7 +173,7 @@ export function UnidadRow({
   }
 
   const propietarioNames = propietarios.map((p) => fullName(p.nombre, p.apellido) ?? "Sin nombre").join(", ");
-  const inquilinoName = inquilino ? fullName(inquilino.nombre, inquilino.apellido) ?? "Sin nombre" : null;
+  const inquilinoNames = inquilinos.map((i) => fullName(i.nombre, i.apellido) ?? "Sin nombre").join(", ");
 
   return (
     <>
@@ -198,8 +198,8 @@ export function UnidadRow({
           )}
         </td>
         <td className="td text-sm">
-          {inquilinoName ? (
-            <span className="font-medium text-gray-800">{inquilinoName}</span>
+          {inquilinos.length > 0 ? (
+            <span className="font-medium text-gray-800">{inquilinoNames}</span>
           ) : (
             <span className="text-gray-400 italic text-xs font-normal">Sin asignar</span>
           )}
@@ -368,11 +368,81 @@ export function UnidadRow({
                 )}
               </div>
 
-              {/* Inquilino */}
+              {/* Inquilino(s) */}
               <div className="card p-4">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Inquilino</h4>
-                {!inquilino ? (
-                  showAddInquilino ? (
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  Inquilino{inquilinos.length !== 1 ? "s" : ""}
+                </h4>
+                {inquilinos.length === 0 && !showAddInquilino ? (
+                  <p className="text-sm text-gray-400 italic">Sin inquilinos asignados</p>
+                ) : (
+                  <div className="space-y-4">
+                    {inquilinos.map((inq) => (
+                      <div key={inq.ocupante_id} className="border border-gray-100 rounded-lg p-3 bg-white">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <DetailField label="Nombre">
+                            <InlineEditCell
+                              entityId={inq.persona_id}
+                              field="nombre"
+                              defaultValue={inq.nombre}
+                              action={updatePersonaField}
+                              consorcioCuit={consorcioCuit}
+                              className="input"
+                            />
+                          </DetailField>
+                          <DetailField label="Apellido">
+                            <InlineEditCell
+                              entityId={inq.persona_id}
+                              field="apellido"
+                              defaultValue={inq.apellido}
+                              action={updatePersonaField}
+                              consorcioCuit={consorcioCuit}
+                              className="input"
+                            />
+                          </DetailField>
+                          <DetailField label="WhatsApp">
+                            <InlineEditCell
+                              entityId={inq.persona_id}
+                              field="whatsapp"
+                              defaultValue={inq.whatsapp}
+                              type="tel"
+                              action={updatePersonaField}
+                              consorcioCuit={consorcioCuit}
+                              className="input font-mono"
+                            />
+                          </DetailField>
+                          <DetailField label="Email">
+                            <InlineEditCell
+                              entityId={inq.persona_id}
+                              field="email"
+                              defaultValue={inq.email}
+                              type="email"
+                              action={updatePersonaField}
+                              consorcioCuit={consorcioCuit}
+                              className="input"
+                            />
+                          </DetailField>
+                          <DetailField label="Email alternativo">
+                            <InlineEditCell
+                              entityId={inq.persona_id}
+                              field="email_2"
+                              defaultValue={inq.email_2}
+                              type="email"
+                              action={updatePersonaField}
+                              consorcioCuit={consorcioCuit}
+                              className="input"
+                            />
+                          </DetailField>
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-gray-100">
+                          <RemoveInquilinoButton ocupanteId={inq.ocupante_id} consorcioCuit={consorcioCuit} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {showAddInquilino ? (
+                  <div className="mt-4">
                     <NuevoOcupanteForm
                       unidadId={id}
                       consorcioCuit={consorcioCuit}
@@ -383,76 +453,15 @@ export function UnidadRow({
                         router.refresh();
                       }}
                     />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowAddInquilino(true)}
-                      className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline"
-                    >
-                      Agregar inquilino
-                    </button>
-                  )
-                ) : (
-                  <div className="border border-gray-100 rounded-lg p-3 bg-white">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <DetailField label="Nombre">
-                        <InlineEditCell
-                          entityId={inquilino.persona_id}
-                          field="nombre"
-                          defaultValue={inquilino.nombre}
-                          action={updatePersonaField}
-                          consorcioCuit={consorcioCuit}
-                          className="input"
-                        />
-                      </DetailField>
-                      <DetailField label="Apellido">
-                        <InlineEditCell
-                          entityId={inquilino.persona_id}
-                          field="apellido"
-                          defaultValue={inquilino.apellido}
-                          action={updatePersonaField}
-                          consorcioCuit={consorcioCuit}
-                          className="input"
-                        />
-                      </DetailField>
-                      <DetailField label="WhatsApp">
-                        <InlineEditCell
-                          entityId={inquilino.persona_id}
-                          field="whatsapp"
-                          defaultValue={inquilino.whatsapp}
-                          type="tel"
-                          action={updatePersonaField}
-                          consorcioCuit={consorcioCuit}
-                          className="input font-mono"
-                        />
-                      </DetailField>
-                      <DetailField label="Email">
-                        <InlineEditCell
-                          entityId={inquilino.persona_id}
-                          field="email"
-                          defaultValue={inquilino.email}
-                          type="email"
-                          action={updatePersonaField}
-                          consorcioCuit={consorcioCuit}
-                          className="input"
-                        />
-                      </DetailField>
-                      <DetailField label="Email alternativo">
-                        <InlineEditCell
-                          entityId={inquilino.persona_id}
-                          field="email_2"
-                          defaultValue={inquilino.email_2}
-                          type="email"
-                          action={updatePersonaField}
-                          consorcioCuit={consorcioCuit}
-                          className="input"
-                        />
-                      </DetailField>
-                    </div>
-                    <div className="mt-3 pt-2 border-t border-gray-100">
-                      <RemoveInquilinoButton ocupanteId={inquilino.ocupante_id} consorcioCuit={consorcioCuit} />
-                    </div>
                   </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddInquilino(true)}
+                    className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline mt-3"
+                  >
+                    Agregar inquilino
+                  </button>
                 )}
               </div>
 
