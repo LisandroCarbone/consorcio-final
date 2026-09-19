@@ -164,14 +164,14 @@ export default async function ConsorciosPage() {
               </div>
               
               <div className="border-t pt-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Servicios centrales</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Servicios centrales y partes comunes</p>
                 <p className="text-xs text-gray-400 mb-2">Art. 6 CCT 589/10</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
                     { name: 'tiene_ascensor', label: 'Ascensor' },
                     { name: 'tiene_agua_caliente_central', label: 'Agua caliente central' },
                     { name: 'tiene_calefaccion_central', label: 'Calefacción central' },
-                    { name: 'tiene_aire_acondicionado_central', label: 'Aire acond. central' },
+                    { name: 'tiene_aire_acondicionado_central', label: 'Aire acondicionado central' },
                     { name: 'tiene_cochera', label: 'Cocheras' },
                     { name: 'tiene_movimiento_coches', label: 'Movimiento de coches' },
                     { name: 'tiene_grupo_electrogeno', label: 'Grupo electrógeno' },
@@ -181,8 +181,8 @@ export default async function ConsorciosPage() {
                     { name: 'tiene_seguridad_centralizada', label: 'Seguridad centralizada' },
                     { name: 'tiene_compactador', label: 'Compactador' },
                     { name: 'tiene_montacargas', label: 'Montacargas' },
-                    { name: 'tiene_incendio', label: 'Instal. contra incendio' },
                     { name: 'tiene_otros_servicios_centrales', label: 'Otros servicios centrales' },
+                    { name: 'tiene_incendio', label: 'Instalaciones fijas contra incendio' },
                     { name: 'zona_desfavorable', label: 'Zona desfavorable' },
                   ].map((f) => (
                     <label key={f.name} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">

@@ -287,7 +287,7 @@ export default async function ConsorcioDetailPage({ params }: Props) {
             </div>
             <div className="border-t border-gray-100 pt-4">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Servicios centrales y partes comunes</p>
-              <p className="text-xs text-gray-400 mb-3">Art. 6 CCT 589/10 — determinan la categoría del edificio</p>
+              <p className="text-xs text-gray-400 mb-3">Art. 6 CCT 589/10</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {SERVICIOS_CENTRALES.map((f) => (
                   <div key={f.field} className="flex items-center gap-2">
