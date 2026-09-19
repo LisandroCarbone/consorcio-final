@@ -922,6 +922,30 @@ export async function asignarManual(movimientoId: number, tipo: "cobranza" | "ga
   revalidatePath(BASE_PATH);
 }
 
+export async function asignarManualMultiple(movimientoId: number, gastoIds: number[]) {
+  if (!gastoIds || gastoIds.length === 0) {
+    throw new Error("Debe seleccionar al menos un gasto.");
+  }
+
+  const mov = await queryOne<{ extracto_id: number }>(
+    "SELECT extracto_id FROM app.extracto_movimientos WHERE id = $1",
+    [movimientoId]
+  );
+  if (!mov) return;
+
+  await query(
+    `UPDATE app.extracto_movimientos
+     SET match_tipo = 'gasto', match_id = $1, match_confianza = 1.0,
+         estado_match = 'confirmado', categoria_bancaria = NULL,
+         match_group_ids = $2
+     WHERE id = $3`,
+    [gastoIds[0], gastoIds, movimientoId]
+  );
+
+  await updateExtractoMatchedCount(mov.extracto_id);
+  revalidatePath(BASE_PATH);
+}
+
 function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }

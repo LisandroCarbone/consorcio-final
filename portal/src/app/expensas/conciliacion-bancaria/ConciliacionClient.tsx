@@ -24,6 +24,7 @@ import {
   desconfirmarMatch,
   descartarMovimiento,
   asignarManual,
+  asignarManualMultiple,
   asignarSplit,
   marcarGastoBancario,
   cargarGastosBancarios,
@@ -889,6 +890,16 @@ function MovimientosTable({
                                 estado_match: "confirmado",
                               }));
                             }}
+                            onAssignMultipleGastos={(gastoIds) => {
+                              setAssignOpenFor(null);
+                              withPending(m.id, () => asignarManualMultiple(m.id, gastoIds), (mv) => ({
+                                ...mv,
+                                match_tipo: "gasto",
+                                match_id: gastoIds[0],
+                                match_group_ids: gastoIds,
+                                estado_match: "confirmado",
+                              }));
+                            }}
                           />
                         )}
                       </div>
@@ -919,6 +930,7 @@ function AssignPopover({
   onAssign,
   onMarkBankCharge,
   onAssignSplit,
+  onAssignMultipleGastos,
   triggerRef,
 }: {
   movimiento: Movimiento;
@@ -928,6 +940,7 @@ function AssignPopover({
   onAssign: (tipo: "cobranza" | "gasto", targetId: number) => void;
   onMarkBankCharge: (categoria: BankChargeCategoria) => void;
   onAssignSplit?: (splits: { unidadId: number; monto: number }[]) => void;
+  onAssignMultipleGastos?: (gastoIds: number[]) => void;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   const [search, setSearch] = useState("");
@@ -936,6 +949,8 @@ function AssignPopover({
   const [splitMode, setSplitMode] = useState(false);
   const [splitSelected, setSplitSelected] = useState<number[]>([]);
   const [splitAmounts, setSplitAmounts] = useState<Record<number, string>>({});
+  const [multiGastoMode, setMultiGastoMode] = useState(false);
+  const [selectedGastoIds, setSelectedGastoIds] = useState<number[]>([]);
   const panelW = 420;
   const panelH = 480;
 
@@ -999,7 +1014,7 @@ function AssignPopover({
               {splitMode ? "✕ Cancelar división" : "➗ Dividir entre UFs"}
             </button>
           )}
-          {!splitMode && (
+          {!splitMode && !multiGastoMode && (
             <input
               type="text"
               placeholder="Buscar por nombre, monto..."
@@ -1027,8 +1042,120 @@ function AssignPopover({
                 </button>
               ))}
             </div>
+            {onAssignMultipleGastos && (
+              <button
+                type="button"
+                onClick={() => setMultiGastoMode((v) => !v)}
+                className={`mt-2 text-[11px] font-medium px-2 py-1 rounded-lg border transition-colors ${
+                  multiGastoMode
+                    ? "bg-blue-50 border-blue-300 text-blue-700"
+                    : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {multiGastoMode ? "✕ Cancelar selección múltiple" : "☑ Seleccionar múltiples gastos"}
+              </button>
+            )}
           </div>
         )}
+        {multiGastoMode && !isCredit && onAssignMultipleGastos && (() => {
+          const montoDebito = Math.abs(Number(movimiento.monto));
+          const sumaGastos = selectedGastoIds.reduce((s, id) => {
+            const g = gastos.find((x) => x.id === id);
+            return s + (g ? Number(g.monto) : 0);
+          }, 0);
+          const diff = round2(montoDebito - sumaGastos);
+          const toggleGasto = (id: number) => {
+            setSelectedGastoIds((prev) =>
+              prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+            );
+          };
+          const canConfirm = selectedGastoIds.length > 0 && diff >= 0;
+          let diffColor = "text-green-600";
+          let diffMessage: string | null = null;
+          if (diff === 0) {
+            diffColor = "text-green-600";
+          } else if (diff > 0 && diff <= 1) {
+            diffColor = "text-yellow-600";
+            diffMessage = `Diferencia de ${formatMoney(diff)} (¿redondeo?)`;
+          } else if (diff > 1) {
+            diffColor = "text-orange-600";
+            diffMessage = `Falta cargar ${formatMoney(diff)} en gastos`;
+          } else {
+            diffColor = "text-red-600";
+            diffMessage = "La suma excede el débito";
+          }
+          return (
+            <div className="px-3 pt-2 pb-3 border-b border-gray-100">
+              <div className="flex items-center justify-between text-[11px] mb-1 flex-wrap gap-1">
+                <span className="text-gray-500">
+                  Débito: <span className="font-mono font-medium text-gray-800">{formatMoney(montoDebito)}</span>
+                </span>
+                <span className="text-gray-500">
+                  Seleccionados: <span className="font-mono font-medium text-gray-800">{formatMoney(sumaGastos)}</span>
+                </span>
+                <span className={`font-semibold ${diffColor}`}>
+                  Diferencia: {formatMoney(diff)}
+                </span>
+              </div>
+              {diffMessage && (
+                <div className={`text-[11px] mb-2 ${diffColor}`}>{diffMessage}</div>
+              )}
+              <div className="max-h-56 overflow-y-auto space-y-1 mb-2">
+                {filteredGastos.length > 0 ? (
+                  (() => {
+                    const grouped = new Map<string, Gasto[]>();
+                    filteredGastos.forEach((g) => {
+                      const key = g.periodo_label;
+                      if (!grouped.has(key)) grouped.set(key, []);
+                      grouped.get(key)!.push(g);
+                    });
+                    return Array.from(grouped.entries()).map(([label, items]) => (
+                      <div key={label}>
+                        <div className="px-2 py-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-50">
+                          Período {label}
+                        </div>
+                        {items.map((g) => {
+                          const checked = selectedGastoIds.includes(g.id);
+                          return (
+                            <div
+                              key={g.id}
+                              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${checked ? "bg-blue-50" : "hover:bg-gray-50"}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleGasto(g.id)}
+                                className="shrink-0"
+                              />
+                              <span className="text-xs text-gray-800 flex-1 truncate">{g.descripcion}</span>
+                              <span className="font-mono text-xs text-gray-500 whitespace-nowrap">
+                                {formatMoney(g.monto)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()
+                ) : (
+                  <p className="text-xs text-gray-400 text-center py-4">Sin resultados</p>
+                )}
+              </div>
+              <button
+                type="button"
+                disabled={!canConfirm}
+                onClick={() => onAssignMultipleGastos(selectedGastoIds)}
+                className={`w-full text-xs font-semibold py-2 rounded-lg transition-colors ${
+                  canConfirm
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                Confirmar asignación múltiple
+              </button>
+            </div>
+          );
+        })()}
         {splitMode && isCredit && onAssignSplit && (() => {
           const montoTotal = Number(movimiento.monto);
           const asignado = splitSelected.reduce((s, id) => s + (Number(splitAmounts[id]) || 0), 0);
@@ -1100,7 +1227,7 @@ function AssignPopover({
           );
         })()}
         <div className="overflow-y-auto flex-1 p-1.5">
-          {splitMode ? null : isCredit ? (
+          {splitMode || multiGastoMode ? null : isCredit ? (
             filteredUnidades.length > 0 ? (
               filteredUnidades.map((u) => (
                 <button
