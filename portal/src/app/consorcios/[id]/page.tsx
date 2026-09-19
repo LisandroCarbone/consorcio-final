@@ -419,13 +419,8 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                 <th className="th text-right">Coef. A</th>
                 <th className="th text-right">Coef. B</th>
                 <th className="th">Propietario</th>
-                <th className="th">Email Prop.</th>
-                <th className="th">WhatsApp Prop.</th>
                 <th className="th">Inquilino</th>
-                <th className="th">Email Inq.</th>
-                <th className="th">WhatsApp Inq.</th>
                 <th className="th"></th>
-                <th className="th">CBU</th>
               </tr>
             </thead>
             <tbody>
