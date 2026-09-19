@@ -431,7 +431,7 @@ async function _runCalculateExpenses(
 
   for (const u of units) {
     let expensasA = round2(totalProrrateoA * Number(u.coef_a) / divisorA) + (isFija ? 0 : round2(unitAMap.get(u.id) || 0));
-    let expensasB = (isFija && pctA >= 1) ? 0 : round2(totalProrrateoB * Number(u.coef_b) / divisorB) + (isFija ? 0 : round2(unitBMap.get(u.id) || 0));
+    let expensasB = (isFija && pctA >= 1 && !hasMontoFijoAB) ? 0 : round2(totalProrrateoB * Number(u.coef_b) / divisorB) + (isFija ? 0 : round2(unitBMap.get(u.id) || 0));
     let gastPart = isFija ? 0 : round2(unitParticularMap.get(u.id) || 0);
     // F3: Fondo de obra — fixed total amount prorated by the unit's Coef. A,
     // stored as a separate line item (not folded into expensas_a).
