@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { UfNumeroCell } from "./UfNumeroCell";
 import { UfLabelCell } from "./UfLabelCell";
 import { InlineEditCell } from "./InlineEditCell";
 import { CbuExpandRow } from "./CbuExpandRow";
 import { ReplacePropietarioButton, RemoveInquilinoButton } from "./OcupanteActions";
 import { updatePersonaField, updateUnidadField } from "./actions";
+import { createPersonaAndOcupante } from "../actions";
 
 interface Propietario {
   ocupante_id: number;
@@ -52,6 +54,69 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
+function NuevoOcupanteForm({
+  unidadId,
+  consorcioCuit,
+  rol,
+  onCancel,
+  onSaved,
+}: {
+  unidadId: number;
+  consorcioCuit: string;
+  rol: "propietario" | "inquilino";
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    fd.set("unidad_id", String(unidadId));
+    fd.set("consorcio_cuit", consorcioCuit);
+    fd.set("rol", rol);
+    startTransition(async () => {
+      await createPersonaAndOcupante(fd);
+      onSaved();
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="border border-gray-100 rounded-lg p-3 bg-white space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <DetailField label="Nombre">
+          <input name="nombre" required disabled={isPending} className="input" />
+        </DetailField>
+        <DetailField label="Apellido">
+          <input name="apellido" required disabled={isPending} className="input" />
+        </DetailField>
+        <DetailField label="DNI / CUIT">
+          <input name="dni" disabled={isPending} className="input font-mono" placeholder="20123456789" />
+        </DetailField>
+        <DetailField label="WhatsApp">
+          <input name="whatsapp" type="tel" disabled={isPending} className="input font-mono" placeholder="+5491112345678" />
+        </DetailField>
+        <DetailField label="Email">
+          <input name="email" type="email" disabled={isPending} className="input" />
+        </DetailField>
+      </div>
+      <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+        <button type="submit" disabled={isPending} className="btn-primary text-sm">
+          {isPending ? "Guardando..." : "Guardar"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isPending}
+          className="text-sm text-gray-500 hover:text-gray-700"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function DetailField({
   label,
   children,
@@ -92,6 +157,9 @@ export function UnidadRow({
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [showAddPropietario, setShowAddPropietario] = useState(false);
+  const [showAddInquilino, setShowAddInquilino] = useState(false);
+  const router = useRouter();
 
   function saveUnidadField(field: "tipo" | "coef_a" | "coef_b", value: string) {
     startTransition(async () => {
@@ -276,13 +344,54 @@ export function UnidadRow({
                     ))}
                   </div>
                 )}
+                {showAddPropietario ? (
+                  <div className="mt-4">
+                    <NuevoOcupanteForm
+                      unidadId={id}
+                      consorcioCuit={consorcioCuit}
+                      rol="propietario"
+                      onCancel={() => setShowAddPropietario(false)}
+                      onSaved={() => {
+                        setShowAddPropietario(false);
+                        router.refresh();
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPropietario(true)}
+                    className="mt-3 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline"
+                  >
+                    Agregar propietario
+                  </button>
+                )}
               </div>
 
               {/* Inquilino */}
               <div className="card p-4">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Inquilino</h4>
                 {!inquilino ? (
-                  <p className="text-sm text-gray-400 italic">Sin inquilino asignado</p>
+                  showAddInquilino ? (
+                    <NuevoOcupanteForm
+                      unidadId={id}
+                      consorcioCuit={consorcioCuit}
+                      rol="inquilino"
+                      onCancel={() => setShowAddInquilino(false)}
+                      onSaved={() => {
+                        setShowAddInquilino(false);
+                        router.refresh();
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddInquilino(true)}
+                      className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline"
+                    >
+                      Agregar inquilino
+                    </button>
+                  )
                 ) : (
                   <div className="border border-gray-100 rounded-lg p-3 bg-white">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

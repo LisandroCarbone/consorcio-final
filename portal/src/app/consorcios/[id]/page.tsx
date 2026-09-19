@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { query, queryOne } from "@/lib/db";
 import { notFound } from "next/navigation";
-import { createUnidad, createPersonaAndOcupante } from "../actions";
+import { createUnidad } from "../actions";
 import { UnidadRow } from "./UnidadRow";
 import { InlineEditCell } from "./InlineEditCell";
 import { ConsorcioToggleField, ConsorcioSelectField } from "./ConsorcioFieldControls";
@@ -506,57 +506,6 @@ export default async function ConsorcioDetailPage({ params }: Props) {
               </div>
             </div>
             <button type="submit" className="btn-primary w-full justify-center">Agregar unidad</button>
-          </form>
-        </div>
-
-        {/* Asignar ocupante */}
-        <div className="card p-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Asignar propietario / inquilino</h3>
-          <form action={createPersonaAndOcupante} className="space-y-3">
-            <input type="hidden" name="consorcio_cuit" value={id} />
-            <div>
-              <label className="label">Unidad *</label>
-              <select name="unidad_id" required className="input">
-                <option value="">Seleccionar...</option>
-                {unidades.map((u) => (
-                  <option key={u.id} value={u.id}>{u.uf}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Nombre *</label>
-                <input name="nombre" required className="input" />
-              </div>
-              <div>
-                <label className="label">Apellido *</label>
-                <input name="apellido" required className="input" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">DNI / CUIT</label>
-                <input name="dni" className="input" placeholder="20123456789" />
-              </div>
-              <div>
-                <label className="label">Email</label>
-                <input name="email" type="email" className="input" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">WhatsApp</label>
-                <input name="whatsapp" className="input" placeholder="+5491112345678" />
-              </div>
-              <div>
-                <label className="label">Rol</label>
-                <select name="rol" className="input">
-                  <option value="propietario">Propietario</option>
-                  <option value="inquilino">Inquilino</option>
-                </select>
-              </div>
-            </div>
-            <button type="submit" className="btn-primary w-full justify-center">Asignar</button>
           </form>
         </div>
       </div>
