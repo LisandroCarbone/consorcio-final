@@ -19,11 +19,11 @@ export function EliminarBorradorButton({ id }: { id: number }) {
         const fd = new FormData();
         fd.set("id", String(id));
         startTransition(async () => {
-          try {
-            await eliminarBorradorAction(fd);
+          const result = await eliminarBorradorAction(fd);
+          if (result.ok) {
             router.refresh();
-          } catch (e: unknown) {
-            alert(`Error al eliminar: ${e instanceof Error ? e.message : "error desconocido"}`);
+          } else {
+            alert(`Error al eliminar: ${result.error}`);
           }
         });
       }}

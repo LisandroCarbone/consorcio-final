@@ -19,11 +19,11 @@ export function RevertirEgresoButton({ empleadoId, nombre }: { empleadoId: numbe
         const fd = new FormData();
         fd.set("empleado_id", String(empleadoId));
         startTransition(async () => {
-          try {
-            await revertirEgresoAction(fd);
+          const result = await revertirEgresoAction(fd);
+          if (result.ok) {
             router.refresh();
-          } catch (e: unknown) {
-            alert(`Error al revertir: ${e instanceof Error ? e.message : "error desconocido"}`);
+          } else {
+            alert(`Error al revertir: ${result.error}`);
           }
         });
       }}

@@ -23,9 +23,9 @@ export async function accionLiquidarDespido(formData: FormData) {
   logAudit("create", "liquidacion_indemnizacion", empleadoId, { after: { fechaEgreso, tipoEgreso } });
 }
 
-export async function revertirEgresoAction(formData: FormData) {
+export async function revertirEgresoAction(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   const empleadoId = Number(formData.get("empleado_id"));
-  if (!empleadoId) throw new Error("Empleado requerido");
+  if (!empleadoId) return { ok: false, error: "Empleado requerido" };
 
   const client = await pool.connect();
   try {
@@ -35,9 +35,13 @@ export async function revertirEgresoAction(formData: FormData) {
       `SELECT estado, fecha_egreso FROM app.empleados WHERE id = $1`,
       [empleadoId]
     );
-    if (rows.length === 0) throw new Error("Empleado no encontrado");
+    if (rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { ok: false, error: "Empleado no encontrado" };
+    }
     if (rows[0].estado !== "inactivo" || !rows[0].fecha_egreso) {
-      throw new Error("Este empleado no tiene un egreso registrado para revertir");
+      await client.query("ROLLBACK");
+      return { ok: false, error: "Este empleado no tiene un egreso registrado para revertir" };
     }
 
     // Delete indemnización borrador if exists
@@ -56,7 +60,8 @@ export async function revertirEgresoAction(formData: FormData) {
       [empleadoId]
     );
     if (dupeCheck.length > 0) {
-      throw new Error("Ya existe un empleado activo con el mismo CUIL en este consorcio. Debe dar de baja al nuevo registro primero.");
+      await client.query("ROLLBACK");
+      return { ok: false, error: "Ya existe un empleado activo con el mismo CUIL en este consorcio. Debe dar de baja al nuevo registro primero." };
     }
 
     // Restore employee to active
@@ -70,7 +75,7 @@ export async function revertirEgresoAction(formData: FormData) {
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
-    throw err;
+    return { ok: false, error: err instanceof Error ? err.message : "Error desconocido al revertir" };
   } finally {
     client.release();
   }
@@ -81,4 +86,5 @@ export async function revertirEgresoAction(formData: FormData) {
   revalidatePath("/sueldos/empleados");
   revalidatePath("/sueldos/novedades");
   revalidatePath("/sueldos/liquidaciones");
+  return { ok: true };
 }

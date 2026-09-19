@@ -138,21 +138,22 @@ export async function limpiarPeriodoSueldos(
   }
 }
 
-export async function eliminarBorradorAction(formData: FormData) {
+export async function eliminarBorradorAction(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   const id = Number(formData.get("id"));
 
   const { rows } = await pool.query(
     `SELECT estado FROM app.liquidaciones_sueldo WHERE id = $1`,
     [id]
   );
-  if (rows.length === 0) return;
+  if (rows.length === 0) return { ok: false, error: "Liquidación no encontrada" };
   if (rows[0].estado !== "borrador") {
-    throw new Error("Solo se pueden eliminar liquidaciones en estado borrador");
+    return { ok: false, error: "Solo se pueden eliminar liquidaciones en estado borrador" };
   }
 
   await pool.query(`DELETE FROM app.liquidaciones_sueldo WHERE id = $1 AND estado = 'borrador'`, [id]);
   logAudit("delete", "liquidacion_sueldo", id, { after: { estado: "borrador" } });
   revalidatePath("/sueldos/liquidaciones");
+  return { ok: true };
 }
 
 export async function clearUltimoDepositoManual(
