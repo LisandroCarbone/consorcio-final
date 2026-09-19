@@ -3,6 +3,7 @@ import { formatMoney, formatMonth, formatDate, cleanPeriodo } from "@/lib/format
 import { RecalcularButton } from "./RecalcularButton";
 import { LimpiarPeriodoButton } from "./LimpiarPeriodoButton";
 import { CreatePeriodoButton } from "./CreatePeriodoButton";
+import { NuevoPeriodoButton } from "./NuevoPeriodoButton";
 import { SaveMontoFijoButton } from "./SaveMontoFijoButton";
 import MaskedInput from "@/components/ui/MaskedInput";
 import { RegenerarCat1Button } from "./RegenerarCat1Button";
@@ -404,44 +405,34 @@ export default async function ExpensasPage({
     <div className="w-full">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">{selected ? "Liquidación de Expensas" : "Liquidación"}</h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Períodos */}
-        <div className="lg:col-span-1 order-2 lg:order-last">
-          <div className="card mb-4">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-              <CalendarDays className="w-4.5 h-4.5 text-gray-400" />
-              <h3 className="font-semibold text-gray-800">Períodos</h3>
-            </div>
-            <ul className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+      <div className="space-y-5">
+        {/* Períodos (horizontal) + Nuevo período */}
+        <div className="flex items-start gap-3">
+          <div className="card flex-1 overflow-x-auto">
+            <div className="flex items-stretch divide-x divide-gray-100 min-w-max">
               {periodos.map((p) => {
                 const isActive = selected?.id === p.id;
                 return (
-                  <li key={p.id} className={`group flex items-center border-l-4 transition-colors ${
-                    isActive ? "border-brand-600 bg-brand-50/20" : "border-transparent hover:bg-gray-50/50"
+                  <div key={p.id} className={`group relative flex items-center gap-2 px-4 py-3 transition-colors ${
+                    isActive ? "bg-brand-50/40 border-b-2 border-brand-600" : "border-b-2 border-transparent hover:bg-gray-50/50"
                   }`}>
-                    <a
-                      href={`/expensas?periodoId=${p.id}`}
-                      className="flex-1 flex items-center justify-between px-5 py-3.5 min-w-0"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <CalendarDays className={`w-4 h-4 shrink-0 ${isActive ? "text-brand-600" : "text-gray-400"}`} />
-                        <div className="min-w-0">
-                          <p className={`text-sm font-semibold ${isActive ? "text-brand-700" : "text-gray-700"}`}>
-                            {formatMonth(p.anio, p.mes)}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-0.5 truncate">{p.consorcio_nombre}</p>
+                    <a href={`/expensas?periodoId=${p.id}`} className="flex items-center gap-2 min-w-0">
+                      <CalendarDays className={`w-4 h-4 shrink-0 ${isActive ? "text-brand-600" : "text-gray-400"}`} />
+                      <div className="min-w-0">
+                        <p className={`text-sm font-semibold whitespace-nowrap ${isActive ? "text-brand-700" : "text-gray-700"}`}>
+                          {formatMonth(p.anio, p.mes)}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`badge text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                            p.estado === "liquidado" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                          }`}>
+                            {p.estado}
+                          </span>
+                          <span className="text-xs font-semibold text-gray-600 font-mono">{formatMoney(p.total_gastos)}</span>
                         </div>
                       </div>
-                      <div className="text-right shrink-0 ml-2">
-                        <span className={`badge text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                          p.estado === "liquidado" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                        }`}>
-                          {p.estado}
-                        </span>
-                        <p className="text-xs font-semibold text-gray-600 mt-1 font-mono">{formatMoney(p.total_gastos)}</p>
-                      </div>
                     </a>
-                    <div className="pr-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
+                    <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
                       <PeriodoActionsMenu
                         periodoId={p.id}
                         fechaVencimiento={p.fecha_vencimiento}
@@ -449,88 +440,51 @@ export default async function ExpensasPage({
                         esUltimoPeriodo={periodos.length > 0 && periodos[0].id === p.id}
                       />
                     </div>
-                  </li>
+                  </div>
                 );
               })}
-            </ul>
+            </div>
           </div>
+          <NuevoPeriodoButton consorcioId={activeCuit} />
+        </div>
 
-          {/* Nuevo período */}
-          <div className="card p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Nuevo período</h3>
-            <form className="space-y-3">
-              <div>
-                <label className="label">Consorcio *</label>
-                <select disabled value={activeCuit} className="input bg-gray-50 cursor-not-allowed">
-                  {consorcios.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
-                <input type="hidden" name="consorcio_id" value={activeCuit} />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="label">Año *</label>
-                  <input name="anio" type="number" defaultValue={new Date().getFullYear()} required className="input" />
-                </div>
-                <div>
-                  <label className="label">Mes *</label>
-                  <input name="mes" type="number" min="1" max="12" defaultValue={new Date().getMonth() + 1} required className="input" />
-                </div>
-              </div>
-              <div>
-                <label className="label">Vencimiento</label>
-                <input name="fecha_vencimiento" type="date" className="input" />
-              </div>
-              <CreatePeriodoButton />
-            </form>
-          </div>
-
-          {/* Informes y Rendiciones */}
-          <div className="card p-5 mt-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+        {/* Informes y Rendiciones (compacto) */}
+        <div className="card p-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 shrink-0">
               <FileText className="w-4 h-4 text-brand-600" /> Informes y Rendiciones
             </h3>
-            <div className="space-y-3">
-              {selected ? (
-                <div>
-                  <label className="label mb-1">Rendición Mensual del Período</label>
-                  <a
-                    href={`/api/expensas/reporte-mensual?periodoId=${selected.id}`}
-                    target="_blank"
-                    className="btn-secondary text-xs w-full text-center justify-center py-2 flex items-center gap-1 hover:bg-gray-100/80 transition-colors"
-                  >
-                    <FileText className="w-3.5 h-3.5" /> Descargar Rendición Mensual
-                  </a>
-                </div>
-              ) : (
-                <div className="text-xs text-gray-400 italic">
-                  Seleccione un período para descargar su rendición de cuentas mensual.
-                </div>
-              )}
-
-              <div className="pt-3 border-t border-gray-100">
-                <label className="label mb-1">Informe Anual para Asamblea</label>
-                <form action="/api/expensas/reporte-anual" method="GET" target="_blank" className="flex gap-2">
-                  <input type="hidden" name="consorcioCuit" value={activeCuit} />
-                  <input
-                    name="anio"
-                    type="number"
-                    defaultValue={selected ? selected.anio : new Date().getFullYear()}
-                    className="input text-xs w-24 py-1.5"
-                    placeholder="Año"
-                    required
-                  />
-                  <button type="submit" className="btn-primary text-xs flex-1 justify-center py-1.5">
-                    Generar Anual
-                  </button>
-                </form>
-              </div>
-            </div>
+            {selected ? (
+              <a
+                href={`/api/expensas/reporte-mensual?periodoId=${selected.id}`}
+                target="_blank"
+                className="btn-secondary text-xs py-1.5 flex items-center gap-1 hover:bg-gray-100/80 transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5" /> Descargar Rendición Mensual
+              </a>
+            ) : (
+              <span className="text-xs text-gray-400 italic">Seleccione un período para descargar su rendición.</span>
+            )}
+            <form action="/api/expensas/reporte-anual" method="GET" target="_blank" className="flex items-center gap-2">
+              <input type="hidden" name="consorcioCuit" value={activeCuit} />
+              <label className="label mb-0 text-xs">Informe Anual</label>
+              <input
+                name="anio"
+                type="number"
+                defaultValue={selected ? selected.anio : new Date().getFullYear()}
+                className="input text-xs w-24 py-1.5"
+                placeholder="Año"
+                required
+              />
+              <button type="submit" className="btn-primary text-xs py-1.5">
+                Generar
+              </button>
+            </form>
           </div>
         </div>
 
         {/* Detalle del período seleccionado */}
-        <div className="lg:col-span-2 order-1 lg:order-first">
-          {!selected ? (
+        {!selected ? (
             <div className="card p-12 text-center">
               <p className="text-3xl mb-2">💰</p>
               <h4 className="font-semibold text-gray-800 mb-1">Período no inicializado</h4>
@@ -815,7 +769,6 @@ export default async function ExpensasPage({
 
             </div>
           )}
-        </div>
       </div>
     </div>
   );
