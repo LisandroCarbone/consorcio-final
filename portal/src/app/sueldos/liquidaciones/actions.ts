@@ -83,7 +83,8 @@ export async function limpiarPeriodoSueldos(
          JOIN app.empleados e ON e.id = l.empleado_id
         WHERE l.periodo = $1
           AND l.tipo = $2
-          AND l.estado IN ('borrador', 'requiere_revision')`,
+          AND l.estado IN ('borrador', 'requiere_revision')
+          AND e.estado IN ('activo', 'pendiente_revision')`,
       [periodo, tipo]
     );
     const ids: number[] = targetRes.rows.map((r) => r.id);
