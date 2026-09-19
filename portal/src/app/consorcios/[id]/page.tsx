@@ -370,7 +370,9 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                 {inlineField("monto_fijo_default", consorcio.monto_fijo_default ? Number(consorcio.monto_fijo_default) : null, { type: "number", step: "0.01" })}
               </div>
             )}
-            <div className="flex items-end pb-1">
+          </div>
+          <div className="px-5 pb-5 space-y-3">
+            <div className="border border-gray-100 rounded-lg p-3">
               <ConsorcioToggleField
                 cuit={id}
                 field="fondo_obra_activo"
@@ -378,15 +380,15 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                 defaultChecked={consorcio.fondo_obra_activo}
                 action={updateConsorcioField}
               />
+              {consorcio.fondo_obra_activo && (
+                <div className="mt-2">
+                  <label className="label">Monto total fondo de obra</label>
+                  {inlineField("fondo_obra", consorcio.fondo_obra ? Number(consorcio.fondo_obra) : null, { type: "number", step: "0.01" })}
+                  <p className="text-xs text-gray-400 mt-0.5">Se prorratea por Coef. A de cada unidad</p>
+                </div>
+              )}
             </div>
-            {consorcio.fondo_obra_activo && (
-              <div>
-                <label className="label">Monto total fondo de obra</label>
-                {inlineField("fondo_obra", consorcio.fondo_obra ? Number(consorcio.fondo_obra) : null, { type: "number", step: "0.01" })}
-                <p className="text-xs text-gray-400 mt-0.5">Se prorratea por Coef. A de cada unidad</p>
-              </div>
-            )}
-            <div className="flex items-end pb-1">
+            <div className="border border-gray-100 rounded-lg p-3">
               <ConsorcioToggleField
                 cuit={id}
                 field="cuota_extra_activo"
@@ -394,14 +396,14 @@ export default async function ConsorcioDetailPage({ params }: Props) {
                 defaultChecked={consorcio.cuota_extra_activo}
                 action={updateConsorcioField}
               />
+              {consorcio.cuota_extra_activo && (
+                <div className="mt-2">
+                  <label className="label">Monto total cuota extraordinaria</label>
+                  {inlineField("cuota_extra", consorcio.cuota_extra ? Number(consorcio.cuota_extra) : null, { type: "number", step: "0.01" })}
+                  <p className="text-xs text-gray-400 mt-0.5">Se prorratea por Coef. A de cada unidad</p>
+                </div>
+              )}
             </div>
-            {consorcio.cuota_extra_activo && (
-              <div>
-                <label className="label">Monto total cuota extraordinaria</label>
-                {inlineField("cuota_extra", consorcio.cuota_extra ? Number(consorcio.cuota_extra) : null, { type: "number", step: "0.01" })}
-                <p className="text-xs text-gray-400 mt-0.5">Se prorratea por Coef. A de cada unidad</p>
-              </div>
-            )}
           </div>
         </details>
       </div>
