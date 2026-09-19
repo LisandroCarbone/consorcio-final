@@ -82,9 +82,15 @@ export default async function ConsorciosPage() {
                   <input name="codigo_postal" className="input" />
                 </div>
               </div>
-              <div>
-                <label className="label">Clave SUTERH</label>
-                <input name="suterh_key" className="input" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">N° Cta. SUTERH</label>
+                  <input name="nro_cta_suterh" className="input" />
+                </div>
+                <div>
+                  <label className="label">Clave SUTERH</label>
+                  <input name="clave_suterh" className="input" />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -100,6 +106,60 @@ export default async function ConsorciosPage() {
                 <div>
                   <label className="label">Banco</label>
                   <input name="banco" className="input" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Cantidad de UF</label>
+                  <input name="cant_uf" type="number" min="1" className="input" />
+                </div>
+                <div>
+                  <label className="label">UF p/ Retiro Residuos</label>
+                  <input name="uf_retiro_residuos" type="number" min="0" className="input" />
+                </div>
+              </div>
+
+              <div className="border-t pt-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Configuración Expensas</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Tipo de expensas</label>
+                    <select name="tipo_expensas" className="input">
+                      <option value="variable">Variable</option>
+                      <option value="fija">Fija</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Formato de cobro</label>
+                    <select name="formato_cobro" className="input">
+                      <option value="exacto">Monto exacto</option>
+                      <option value="identificacion_uf">Identif. por UF</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Intereses mora (%)</label>
+                    <input name="intereses_mora_pct" type="number" step="0.01" className="input" placeholder="Ej: 3.5" />
+                  </div>
+                  <div>
+                    <label className="label">% Coeficiente A</label>
+                    <input name="pct_expensa_a" type="number" step="0.01" defaultValue="100" className="input" />
+                  </div>
+                  <div>
+                    <label className="label">Monto fijo default</label>
+                    <input name="monto_fijo_default" type="number" step="0.01" className="input" />
+                  </div>
+                </div>
+                <div className="mt-2 space-y-2">
+                  <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                    <input type="checkbox" name="fondo_obra_activo" value="true" className="rounded" />
+                    Fondo de obra activo
+                  </label>
+                  <input name="fondo_obra" type="number" step="0.01" className="input" placeholder="Monto total fondo de obra" />
+                  <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                    <input type="checkbox" name="cuota_extra_activo" value="true" className="rounded" />
+                    Cuota extraordinaria activa
+                  </label>
+                  <input name="cuota_extra" type="number" step="0.01" className="input" placeholder="Monto total cuota extra" />
                 </div>
               </div>
               
